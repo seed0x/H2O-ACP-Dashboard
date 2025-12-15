@@ -128,6 +128,10 @@ class JobBase(BaseModel):
     scheduled_start: Optional[datetime]
     scheduled_end: Optional[datetime]
     notes: Optional[str]
+    warranty_start_date: Optional[date] = None
+    warranty_end_date: Optional[date] = None
+    warranty_notes: Optional[str] = None
+    completion_date: Optional[date] = None
 
 class JobCreate(JobBase):
     pass
@@ -137,6 +141,10 @@ class JobUpdate(BaseModel):
     scheduled_start: Optional[datetime]
     scheduled_end: Optional[datetime]
     notes: Optional[str]
+    warranty_start_date: Optional[date] = None
+    warranty_end_date: Optional[date] = None
+    warranty_notes: Optional[str] = None
+    completion_date: Optional[date] = None
 
 class JobOut(JobBase):
     id: UUID
