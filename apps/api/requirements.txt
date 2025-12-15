@@ -8,6 +8,7 @@ asyncpg
 python-jose[cryptography]
 python-dotenv
 pydantic
+email-validator
 pytest
 pytest-asyncio
 httpx
