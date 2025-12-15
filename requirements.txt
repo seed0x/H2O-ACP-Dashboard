@@ -7,5 +7,6 @@ asyncpg
 python-jose[cryptography]
 python-dotenv
 pydantic
+pydantic-settings
 email-validator
 pydantic-settings
