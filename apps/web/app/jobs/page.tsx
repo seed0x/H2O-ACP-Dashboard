@@ -1,6 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { API_URL } from '../../lib/config'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { Select } from '../../components/ui/Select'
+import { Badge } from '../../components/ui/Badge'
 
 export default function JobsPage(){
   const [jobs, setJobs] = useState<any[]>([])
@@ -50,38 +55,62 @@ export default function JobsPage(){
   }
 
   return (
-    <main className="p-6">
-      <h1 className="text-xl font-bold">Jobs (All County)</h1>
-      <div className="flex gap-2 mt-4 mb-4">
-        <input placeholder="search" value={search} onChange={e=>setSearch(e.target.value)} className="border p-1" />
-        <input placeholder="community" value={community} onChange={e=>setCommunity(e.target.value)} className="border p-1" />
-        <select value={builderId} onChange={e=>setBuilderId(e.target.value)} className="border p-1">
-          <option value="">Any builder</option>
-          {builders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <select value={status} onChange={e=>setStatus(e.target.value)} className="border p-1">
-          <option value="">Any status</option>
-          <option value="Pending">Pending</option>
-          <option value="Scheduled">Scheduled</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Completed">Completed</option>
-          <option value="Hold">Hold</option>
-        </select>
-        <button onClick={searchNow} className="btn bg-gray-200 px-3">Search</button>
-        <button onClick={create} className="btn bg-blue-600 text-white px-3">Create</button>
+    <main className="p-8 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">All County Jobs</h1>
+          <p className="text-gray-600 mt-1">Manage new construction projects</p>
+        </div>
+        <Button onClick={create}>+ New Job</Button>
+      </div>
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <Input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} />
+          <Input placeholder="Community" value={community} onChange={e=>setCommunity(e.target.value)} />
+          <Select
+            options={[
+              { value: '', label: 'All Builders' },
+              ...builders.map(b => ({ value: b.id, label: b.name }))
+            ]}
+            value={builderId}
+            onChange={e=>setBuilderId(e.target.value)}
+          />
+          <Select
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'Pending', label: 'Pending' },
+              { value: 'Scheduled', label: 'Scheduled' },
+              { value: 'In Progress', label: 'In Progress' },
+              { value: 'Completed', label: 'Completed' },
+              { value: 'Hold', label: 'Hold' }
+            ]}
+            value={status}
+            onChange={e=>setStatus(e.target.value)}
+          />
+          <Button onClick={searchNow} variant="secondary">Search</Button>
+        </div>
       </div>
 
-      <ul>
-        {jobs.map(j => (
-          <li key={j.id} className="border rounded p-2 mb-2">
-            <a href={`/jobs/${j.id}`} className="block">
-              <div className="font-bold">{j.community} - Lot {j.lot_number} ({j.phase})</div>
-              <div className="text-sm text-gray-600">{j.address_line1}, {j.city}</div>
-              <div className="text-sm mt-1">Status: {j.status}</div>
-            </a>
-          </li>
-        ))}
-      </ul>
+      <div className="bg-white rounded-lg shadow divide-y">
+        {jobs.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No jobs found. Create your first job to get started.</div>
+        ) : (
+          jobs.map(j => (
+            <div key={j.id} className="p-4 hover:bg-gray-50 cursor-pointer" onClick={() => window.location.href = `/jobs/${j.id}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900">{j.community} - Lot {j.lot_number}</div>
+                  <div className="text-sm text-gray-600 mt-1">{j.address_line1}, {j.city}</div>
+                  <div className="text-sm text-gray-500 mt-1">Phase: {j.phase}</div>
+                </div>
+                <Badge variant={j.status === 'Completed' ? 'success' : j.status === 'In Progress' ? 'warning' : 'default'}>
+                  {j.status}
+                </Badge>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </main>
   )
 }
