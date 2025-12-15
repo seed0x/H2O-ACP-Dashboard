@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+SQLAlchemy==2.0.22
+alembic
+psycopg2-binary
+asyncpg
+python-jose[cryptography]
+python-dotenv
+pydantic
+pydantic-settings

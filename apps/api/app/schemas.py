@@ -1,0 +1,197 @@
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
+from datetime import datetime, date
+from uuid import UUID
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class BuilderBase(BaseModel):
+    name: str
+    notes: Optional[str] = None
+
+class BuilderCreate(BuilderBase):
+    pass
+
+class BuilderUpdate(BaseModel):
+    name: Optional[str] = None
+    notes: Optional[str] = None
+
+class BuilderOut(BuilderBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class BuilderContactBase(BaseModel):
+    name: str
+    role: str
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    preferred_contact_method: Optional[str] = None
+    notes: Optional[str] = None
+    visibility: Optional[str] = "both"
+
+class BuilderContactCreate(BuilderContactBase):
+    pass
+
+class BuilderContactUpdate(BaseModel):
+    name: Optional[str]
+    role: Optional[str]
+    phone: Optional[str]
+    email: Optional[EmailStr]
+    preferred_contact_method: Optional[str]
+    notes: Optional[str]
+    visibility: Optional[str]
+
+class BuilderContactOut(BuilderContactBase):
+    id: UUID
+    builder_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class BidBase(BaseModel):
+    tenant_id: str
+    project_name: str
+    status: str
+    builder_id: Optional[UUID]
+
+class BidCreate(BidBase):
+    due_date: Optional[date]
+    sent_date: Optional[date]
+    amount_cents: Optional[int]
+    notes: Optional[str]
+
+class BidUpdate(BaseModel):
+    project_name: Optional[str]
+    status: Optional[str]
+    builder_id: Optional[UUID]
+    due_date: Optional[date]
+    sent_date: Optional[date]
+    amount_cents: Optional[int]
+    notes: Optional[str]
+
+class BidOut(BidBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class BidLineItemBase(BaseModel):
+    category: str
+    description: str
+    qty: Optional[float] = 1
+    unit_price_cents: Optional[int]
+    total_cents: Optional[int]
+    notes: Optional[str]
+
+class BidLineItemCreate(BidLineItemBase):
+    pass
+
+class BidLineItemUpdate(BaseModel):
+    category: Optional[str]
+    description: Optional[str]
+    qty: Optional[float]
+    unit_price_cents: Optional[int]
+    total_cents: Optional[int]
+    notes: Optional[str]
+
+class BidLineItemOut(BidLineItemBase):
+    id: UUID
+    bid_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class JobBase(BaseModel):
+    tenant_id: str
+    builder_id: UUID
+    community: str
+    lot_number: str
+    plan: Optional[str]
+    phase: str
+    status: str
+    address_line1: str
+    city: str
+    state: Optional[str] = "WA"
+    zip: str
+    scheduled_start: Optional[datetime]
+    scheduled_end: Optional[datetime]
+    notes: Optional[str]
+
+class JobCreate(JobBase):
+    pass
+
+class JobUpdate(BaseModel):
+    status: Optional[str]
+    scheduled_start: Optional[datetime]
+    scheduled_end: Optional[datetime]
+    notes: Optional[str]
+
+class JobOut(JobBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class ServiceCallBase(BaseModel):
+    tenant_id: str
+    builder_id: Optional[UUID]
+    customer_name: str
+    phone: Optional[str]
+    email: Optional[EmailStr]
+    address_line1: str
+    city: str
+    state: Optional[str] = "WA"
+    zip: str
+    issue_description: str
+    priority: Optional[str] = "Normal"
+    status: str
+    scheduled_start: Optional[datetime]
+    scheduled_end: Optional[datetime]
+    notes: Optional[str]
+
+class ServiceCallCreate(ServiceCallBase):
+    pass
+
+class ServiceCallUpdate(BaseModel):
+    status: Optional[str]
+    scheduled_start: Optional[datetime]
+    scheduled_end: Optional[datetime]
+    notes: Optional[str]
+
+class ServiceCallOut(ServiceCallBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class AuditLogOut(BaseModel):
+    id: UUID
+    tenant_id: Optional[str]
+    entity_type: str
+    entity_id: UUID
+    action: str
+    field: Optional[str]
+    old_value: Optional[str]
+    new_value: Optional[str]
+    changed_by: str
+    changed_at: datetime
+
+    class Config:
+        orm_mode = True
+
