@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_URL } from '../lib/config'
+import { Badge } from '../components/ui/Badge'
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState({ serviceCalls: [], jobs: [], loading: true })
@@ -42,17 +43,44 @@ export default function Dashboard() {
 
       {/* Task Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm font-medium text-gray-600">Current Tasks</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{totalTasks}</div>
+        <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-600">Current Tasks</div>
+              <div className="text-3xl font-bold text-gray-900 mt-2">{totalTasks}</div>
+            </div>
+            <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm font-medium text-gray-600">H2O Service Calls</div>
-          <div className="text-3xl font-bold text-blue-600 mt-2">{tasks.serviceCalls.length}</div>
+        <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-600">H2O Service Calls</div>
+              <div className="text-3xl font-bold text-blue-600 mt-2">{tasks.serviceCalls.length}</div>
+            </div>
+            <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm font-medium text-gray-600">All County Jobs</div>
-          <div className="text-3xl font-bold text-green-600 mt-2">{tasks.jobs.length}</div>
+        <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-600">All County Jobs</div>
+              <div className="text-3xl font-bold text-green-600 mt-2">{tasks.jobs.length}</div>
+            </div>
+            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -85,11 +113,9 @@ export default function Dashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{call.address_line1}, {call.city}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{call.issue_description.substring(0, 50)}...</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        call.priority === 'High' ? 'bg-red-100 text-red-800' :
-                        call.priority === 'Normal' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>{call.priority}</span>
+                      <Badge variant={call.priority === 'High' ? 'danger' : call.priority === 'Normal' ? 'warning' : 'default'}>
+                        {call.priority}
+                      </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(call.created_at).toLocaleDateString()}</td>
                   </tr>
