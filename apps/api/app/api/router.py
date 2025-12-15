@@ -18,7 +18,17 @@ from sqlalchemy import select
 from .. import crud, models
 from uuid import UUID
 
+# Import marketing routes (sync-based for now)
+try:
+    from ..routes_marketing import router as marketing_router
+except ImportError:
+    marketing_router = None
+
 router = APIRouter()
+
+# Include marketing routes if available
+if marketing_router:
+    router.include_router(marketing_router)
 
 class LoginRequest(BaseModel):
     password: str
