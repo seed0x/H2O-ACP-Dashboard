@@ -1,6 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { API_URL } from '../../lib/config'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { Select } from '../../components/ui/Select'
+import { Badge } from '../../components/ui/Badge'
 
 export default function ServiceCallsPage(){
   const [scs, setScs] = useState<any[]>([])
@@ -48,37 +53,70 @@ export default function ServiceCallsPage(){
   }
 
   return (
-    <main className="p-6">
-      <h1 className="text-xl font-bold">Service Calls (H2O)</h1>
-      <div className="flex gap-2 mt-4 mb-4">
-        <input placeholder="search" value={search} onChange={e=>setSearch(e.target.value)} className="border p-1" />
-        <select value={builderId} onChange={e=>setBuilderId(e.target.value)} className="border p-1">
-          <option value="">Any builder</option>
-          {builders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <select value={status} onChange={e=>setStatus(e.target.value)} className="border p-1">
-          <option value="">Any status</option>
-          <option value="New">New</option>
-          <option value="Scheduled">Scheduled</option>
-          <option value="Dispatched">Dispatched</option>
-          <option value="Completed">Completed</option>
-          <option value="On Hold">On Hold</option>
-        </select>
-        <button onClick={searchNow} className="btn bg-gray-200 px-3">Search</button>
-        <button onClick={create} className="btn bg-blue-600 text-white px-3">Create</button>
+    <main className="p-8 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">H2O Service Calls</h1>
+          <p className="text-gray-600 mt-1">Manage service and warranty calls</p>
+        </div>
+        <Button onClick={create}>+ New Service Call</Button>
       </div>
 
-      <ul>
-        {scs.map(s => (
-          <li key={s.id} className="border rounded p-2 mb-2">
-            <a href={`/service-calls/${s.id}`} className="block">
-              <div className="font-bold">{s.customer_name}</div>
-              <div className="text-sm text-gray-600">{s.address_line1}, {s.city}</div>
-              <div className="text-sm mt-1">Status: {s.status}</div>
-            </a>
-          </li>
-        ))}
-      </ul>
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} />
+          <Select
+            options={[
+              { value: '', label: 'All Builders' },
+              ...builders.map(b => ({ value: b.id, label: b.name }))
+            ]}
+            value={builderId}
+            onChange={e=>setBuilderId(e.target.value)}
+          />
+          <Select
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'New', label: 'New' },
+              { value: 'Scheduled', label: 'Scheduled' },
+              { value: 'Dispatched', label: 'Dispatched' },
+              { value: 'Completed', label: 'Completed' },
+              { value: 'On Hold', label: 'On Hold' }
+            ]}
+            value={status}
+            onChange={e=>setStatus(e.target.value)}
+          />
+          <Button onClick={searchNow} variant="secondary">Search</Button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow divide-y">
+        {scs.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No service calls found. Create your first service call to get started.</div>
+        ) : (
+          scs.map(s => (
+            <div key={s.id} className="p-4 hover:bg-gray-50 cursor-pointer" onClick={() => window.location.href = `/service-calls/${s.id}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="font-semibold text-gray-900">{s.customer_name}</div>
+                    {s.priority === 'High' && (
+                      <Badge variant="danger">High Priority</Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">{s.address_line1}, {s.city}</div>
+                  <div className="text-sm text-gray-500 mt-1">{s.issue_description}</div>
+                  {s.phone && (
+                    <div className="text-sm text-gray-500 mt-1">📞 {s.phone}</div>
+                  )}
+                </div>
+                <Badge variant={s.status === 'Completed' ? 'success' : s.status === 'Dispatched' ? 'warning' : s.status === 'New' ? 'danger' : 'default'}>
+                  {s.status}
+                </Badge>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </main>
   )
 }
