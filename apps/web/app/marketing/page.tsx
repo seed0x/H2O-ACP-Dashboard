@@ -25,7 +25,8 @@ function MarketingContent() {
   const tabs = [
     { id: 'posts', label: 'Posts' },
     { id: 'calendar', label: 'Calendar' },
-    { id: 'accounts', label: 'Accounts' }
+    { id: 'accounts', label: 'Accounts' },
+    { id: 'scoreboard', label: 'Scoreboard' }
   ]
 
   const setActiveTab = (tabId: string) => {
@@ -84,6 +85,7 @@ function MarketingContent() {
           {activeTab === 'posts' && <PostsView />}
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'accounts' && <AccountsView />}
+          {activeTab === 'scoreboard' && <ScoreboardView />}
         </div>
       </div>
     </>
@@ -907,6 +909,8 @@ function CalendarView() {
 }
 
 function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, channels: any[], onClose: () => void, onUpdate: () => void }) {
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [showAudit, setShowAudit] = useState(false)
   const [editForm, setEditForm] = useState({
     title: post.title || '',
     body_text: post.body_text || '',
@@ -975,6 +979,19 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
   const postChannels = post.channel_ids?.map((cid: string) => 
     channels.find(ch => ch.id === cid)?.name
   ).filter(Boolean).join(', ') || 'No channel'
+
+  async function loadAuditTrail() {
+    try {
+      const response = await fetch(`/api/marketing/audit-trail/${post.id}?entity_type=content_post`, {
+        credentials: 'include'
+      })
+      const data = await response.json()
+      setAuditLogs(data)
+      setShowAudit(true)
+    } catch (error) {
+      console.error('Failed to load audit trail:', error)
+    }
+  }
 
   return (
     <div className="marketing-modal" style={{
@@ -1308,8 +1325,349 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
           >
             Cancel
           </button>
+          <button
+            onClick={loadAuditTrail}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-secondary)',
+              fontSize: '14px',
+              cursor: 'pointer',
+              marginLeft: 'auto'
+            }}
+          >
+            📋 History
+          </button>
+        </div>
+
+        {/* Audit Trail */}
+        {showAudit && (
+          <div style={{ marginTop: '24px', borderTop: '1px solid var(--color-border)', paddingTop: '20px' }}>
+            <h4 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+              Change History
+            </h4>
+            {auditLogs.length === 0 ? (
+              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>No changes recorded</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {auditLogs.map((log: any) => (
+                  <div
+                    key={log.id}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: 'var(--color-hover)',
+                      borderRadius: '8px',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{log.changed_by}</span>
+                      <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                        {new Date(log.changed_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--color-text-secondary)' }}>
+                      {log.action === 'create' && '✨ Created post'}
+                      {log.action === 'update' && '✏️ Updated post'}
+                      {log.action === 'delete' && '🗑️ Deleted post'}
+                      {log.action === 'mark_posted' && '✅ Marked as posted'}
+                      {log.action === 'mark_failed' && '❌ Marked as failed'}
+                      {log.field && (
+                        <span>
+                          {' - '}
+                          <span style={{ color: 'var(--color-text-primary)' }}>{log.field}</span>
+                          {log.old_value && log.new_value && (
+                            <span>
+                              {': '}
+                              <span style={{ textDecoration: 'line-through' }}>{log.old_value}</span>
+                              {' → '}
+                              <span style={{ fontWeight: '600' }}>{log.new_value}</span>
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ScoreboardView() {
+  const [scoreboard, setScoreboard] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [weekStart, setWeekStart] = useState(getWeekStart(new Date()))
+
+  useEffect(() => {
+    loadScoreboard()
+  }, [weekStart])
+
+  function getWeekStart(date: Date) {
+    const d = new Date(date)
+    const day = d.getDay()
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Monday
+    return new Date(d.setDate(diff))
+  }
+
+  function getWeekEnd(start: Date) {
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6)
+    return end
+  }
+
+  async function loadScoreboard() {
+    try {
+      const end = getWeekEnd(weekStart)
+      const params = new URLSearchParams({
+        tenant_id: 'h2o',
+        week_start: weekStart.toISOString(),
+        week_end: end.toISOString()
+      })
+      
+      const response = await fetch(`/api/marketing/scoreboard?${params}`, {
+        credentials: 'include'
+      })
+      const data = await response.json()
+      setScoreboard(data)
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to load scoreboard:', error)
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
+        Loading scoreboard...
+      </div>
+    )
+  }
+
+  const weekEnd = getWeekEnd(weekStart)
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            Weekly Scoreboard
+          </h2>
+          <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+            {weekStart.toLocaleDateString()} - {weekEnd.toLocaleDateString()}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => {
+              const newStart = new Date(weekStart)
+              newStart.setDate(newStart.getDate() - 7)
+              setWeekStart(newStart)
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--color-hover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => setWeekStart(getWeekStart(new Date()))}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--color-hover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            This Week
+          </button>
+          <button
+            onClick={() => {
+              const newStart = new Date(weekStart)
+              newStart.setDate(newStart.getDate() + 7)
+              setWeekStart(newStart)
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--color-hover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            Next →
+          </button>
         </div>
       </div>
+
+      {/* Scoreboard Grid */}
+      {scoreboard.length === 0 ? (
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          padding: '48px',
+          textAlign: 'center',
+          color: 'var(--color-text-secondary)'
+        }}>
+          No activity this week
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {scoreboard.map(owner => {
+            const completionRate = owner.planned > 0 ? Math.round((owner.posted / owner.planned) * 100) : 0
+            const hasIssues = owner.overdue_drafts > 0 || owner.missed > 0 || owner.failed > 0
+            
+            return (
+              <div
+                key={owner.owner}
+                style={{
+                  backgroundColor: 'var(--color-card)',
+                  border: hasIssues ? '2px solid #EF5350' : '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                  padding: '20px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                      {owner.owner}
+                    </h3>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                      {completionRate}% completion rate
+                    </div>
+                  </div>
+                  {hasIssues && (
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                      color: '#EF5350'
+                    }}>
+                      ⚠️ ISSUES
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: 'var(--color-hover)',
+                    borderRadius: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-primary)' }}>
+                      {owner.planned}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                      Planned
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    borderRadius: '8px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#66BB6A' }}>
+                      {owner.posted}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                      ✓ Posted
+                    </div>
+                  </div>
+
+                  {owner.overdue_drafts > 0 && (
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>
+                        {owner.overdue_drafts}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        🔥 Overdue
+                      </div>
+                    </div>
+                  )}
+
+                  {owner.missed > 0 && (
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '24px', fontWeight: '700', color: '#FFA726' }}>
+                        {owner.missed}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        ⏰ Missed
+                      </div>
+                    </div>
+                  )}
+
+                  {owner.failed > 0 && (
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>
+                        {owner.failed}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        ❌ Failed
+                      </div>
+                    </div>
+                  )}
+
+                  {owner.canceled > 0 && (
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: 'var(--color-hover)',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-secondary)' }}>
+                        {owner.canceled}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        Canceled
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
