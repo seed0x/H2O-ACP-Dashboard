@@ -1,5 +1,10 @@
 import os
-from pydantic import BaseSettings
+try:
+    # pydantic v2 moved BaseSettings to pydantic-settings package
+    from pydantic_settings import BaseSettings
+except Exception:
+    # fallback for older pydantic versions
+    from pydantic import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@db:5432/plumbing")
