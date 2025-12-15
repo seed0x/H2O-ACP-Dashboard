@@ -9,28 +9,65 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({ 
   variant = 'primary', 
   size = 'md', 
-  className = '', 
   children, 
   ...props 
 }: ButtonProps) {
-  const baseStyles = 'font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
-  
-  const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500'
+  const getVariantStyles = (): React.CSSProperties => {
+    const variants: Record<string, React.CSSProperties> = {
+      primary: {
+        backgroundColor: 'var(--color-primary)',
+        color: '#ffffff',
+        border: 'none'
+      },
+      secondary: {
+        backgroundColor: 'var(--color-hover)',
+        color: 'var(--color-text-primary)',
+        border: '1px solid var(--color-border)'
+      },
+      danger: {
+        backgroundColor: '#EF5350',
+        color: '#ffffff',
+        border: 'none'
+      },
+      ghost: {
+        backgroundColor: 'transparent',
+        color: 'var(--color-text-secondary)',
+        border: '1px solid var(--color-border)'
+      }
+    }
+    return variants[variant]
   }
-  
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base'
+
+  const getSizeStyles = (): React.CSSProperties => {
+    const sizes: Record<string, React.CSSProperties> = {
+      sm: { padding: '6px 12px', fontSize: '13px' },
+      md: { padding: '10px 20px', fontSize: '14px' },
+      lg: { padding: '14px 28px', fontSize: '16px' }
+    }
+    return sizes[size]
   }
-  
+
   return (
     <button
-      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
+      style={{
+        fontWeight: '500',
+        borderRadius: '8px',
+        transition: 'all 0.2s',
+        cursor: props.disabled ? 'not-allowed' : 'pointer',
+        opacity: props.disabled ? 0.5 : 1,
+        ...getVariantStyles(),
+        ...getSizeStyles()
+      }}
+      onMouseEnter={(e) => {
+        if (!props.disabled) {
+          e.currentTarget.style.transform = 'translateY(-1px)'
+          e.currentTarget.style.opacity = '0.9'
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.opacity = '1'
+      }}
       {...props}
     >
       {children}

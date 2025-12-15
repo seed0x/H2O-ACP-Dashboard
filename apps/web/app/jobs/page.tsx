@@ -1,116 +1,160 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_URL } from '../../lib/config'
+import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
+import { Table } from '../../components/ui/Table'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
-import { Badge } from '../../components/ui/Badge'
 
-export default function JobsPage(){
-  const [jobs, setJobs] = useState<any[]>([])
+interface Job {
+  id: number
+  tenant_id: string
+  builder_id: number
+  community: string
+  lot_number: string
+  phase: string
+  address_line1: string
+  city: string
+  status: string
+  scheduled_start: string | null
+}
+
+export default function JobsPage() {
+  const router = useRouter()
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [community, setCommunity] = useState('')
-  const [builderId, setBuilderId] = useState('')
-  const [status, setStatus] = useState('')
-  const [builders, setBuilders] = useState<any[]>([])
+  const [statusFilter, setStatusFilter] = useState('')
 
-  useEffect(()=>{
-    const token = localStorage.getItem('token')
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    async function load(){
-      const b = await axios.get('/api/builders')
-      setBuilders(b.data)
-      const res = await axios.get('/api/jobs', { params: { tenant_id: 'all_county', search, community, builder_id: builderId || undefined, status: status || undefined } })
-      setJobs(res.data)
-    }
-    load()
+  useEffect(() => {
+    loadJobs()
   }, [])
 
-  async function searchNow(){
-    const res = await axios.get('/api/jobs', { params: { tenant_id: 'all_county', search, community, builder_id: builderId || undefined, status: status || undefined } })
-    setJobs(res.data)
+  async function loadJobs() {
+    try {
+      const response = await axios.get(`${API_URL}/jobs?tenant_id=all_county`, { 
+        withCredentials: true 
+      })
+      setJobs(response.data)
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to load jobs:', error)
+      setLoading(false)
+    }
   }
 
-  async function create(){
-    try{
-      const tok = localStorage.getItem('token')
-      axios.defaults.headers.common['Authorization'] = `Bearer ${tok}`
-      const body = {
-        tenant_id: 'all_county',
-        builder_id: builderId || builders[0]?.id,
-        community: community || 'Unknown',
-        lot_number: Math.random().toString(36).slice(2,7),
-        phase: 'rough',
-        status: 'Pending',
-        address_line1: 'temp address',
-        city: 'City',
-        zip: '98000'
-      }
-      await axios.post('/api/jobs', body)
-      await searchNow()
-    } catch (err: any){
-      alert(err?.response?.data?.detail || 'Failed to create')
+  const filteredJobs = jobs.filter(job => {
+    const matchesSearch = search === '' || 
+      job.community.toLowerCase().includes(search.toLowerCase()) ||
+      job.lot_number.includes(search) ||
+      job.address_line1.toLowerCase().includes(search.toLowerCase())
+    
+    const matchesStatus = statusFilter === '' || job.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
+
+  const columns = [
+    {
+      header: 'Community',
+      accessor: 'community' as keyof Job
+    },
+    {
+      header: 'Lot',
+      accessor: 'lot_number' as keyof Job,
+      width: '100px'
+    },
+    {
+      header: 'Phase',
+      accessor: 'phase' as keyof Job,
+      width: '120px'
+    },
+    {
+      header: 'Address',
+      accessor: (row: Job) => `${row.address_line1}, ${row.city}`
+    },
+    {
+      header: 'Status',
+      accessor: (row: Job) => <StatusBadge status={row.status} />,
+      width: '150px'
+    },
+    {
+      header: 'Scheduled Start',
+      accessor: (row: Job) => row.scheduled_start 
+        ? new Date(row.scheduled_start).toLocaleDateString() 
+        : 'Not scheduled',
+      width: '150px'
     }
+  ]
+
+  if (loading) {
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '400px',
+          color: 'var(--color-text-secondary)'
+        }}>
+          Loading jobs...
+        </div>
+      </div>
+    )
   }
 
   return (
-    <main className="p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">All County Jobs</h1>
-          <p className="text-gray-600 mt-1">Manage new construction projects</p>
-        </div>
-        <Button onClick={create}>+ New Job</Button>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} />
-          <Input placeholder="Community" value={community} onChange={e=>setCommunity(e.target.value)} />
-          <Select
-            options={[
-              { value: '', label: 'All Builders' },
-              ...builders.map(b => ({ value: b.id, label: b.name }))
-            ]}
-            value={builderId}
-            onChange={e=>setBuilderId(e.target.value)}
+    <div style={{ padding: '32px' }}>
+      <PageHeader
+        title="All County Jobs"
+        description="New construction projects and installations"
+        action={<Button onClick={() => router.push('/jobs/new')}>+ New Job</Button>}
+      />
+
+      {/* Filters */}
+      <div style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '24px'
+      }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <Input
+            placeholder="Search community, lot, or address..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
           <Select
             options={[
               { value: '', label: 'All Statuses' },
-              { value: 'Pending', label: 'Pending' },
+              { value: 'New', label: 'New' },
               { value: 'Scheduled', label: 'Scheduled' },
               { value: 'In Progress', label: 'In Progress' },
               { value: 'Completed', label: 'Completed' },
-              { value: 'Hold', label: 'Hold' }
+              { value: 'On Hold', label: 'On Hold' }
             ]}
-            value={status}
-            onChange={e=>setStatus(e.target.value)}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
           />
-          <Button onClick={searchNow} variant="secondary">Search</Button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow divide-y">
-        {jobs.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No jobs found. Create your first job to get started.</div>
-        ) : (
-          jobs.map(j => (
-            <div key={j.id} className="p-4 hover:bg-gray-50 cursor-pointer" onClick={() => window.location.href = `/jobs/${j.id}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-900">{j.community} - Lot {j.lot_number}</div>
-                  <div className="text-sm text-gray-600 mt-1">{j.address_line1}, {j.city}</div>
-                  <div className="text-sm text-gray-500 mt-1">Phase: {j.phase}</div>
-                </div>
-                <Badge variant={j.status === 'Completed' ? 'success' : j.status === 'In Progress' ? 'warning' : 'default'}>
-                  {j.status}
-                </Badge>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </main>
+      {/* Table */}
+      <Table
+        data={filteredJobs}
+        columns={columns}
+        onRowClick={(job) => router.push(`/jobs/${job.id}`)}
+        emptyMessage="No jobs found. Create your first job to get started."
+      />
+    </div>
   )
 }
