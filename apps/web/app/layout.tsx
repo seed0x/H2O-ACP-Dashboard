@@ -4,14 +4,12 @@ import { Sidebar } from '../components/Sidebar'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-dark-bg">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 ml-64">
-            {children}
-          </main>
-        </div>
+    <html lang="en">
+      <body style={{ margin: 0, padding: 0, backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
+        <Sidebar />
+        <main style={{ marginLeft: '256px', minHeight: '100vh', width: 'calc(100% - 256px)' }}>
+          {children}
+        </main>
       </body>
     </html>
   )

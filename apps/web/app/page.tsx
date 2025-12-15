@@ -33,7 +33,7 @@ export default function Dashboard() {
         activeJobs,
         pendingServiceCalls: pendingCalls,
         totalBuilders: builders.data.length,
-        completedThisWeek: 0 // TODO: calculate based on completion_date
+        completedThisWeek: 0
       })
 
       setRecentJobs(jobs.data.slice(0, 5))
@@ -47,76 +47,134 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-dark-muted">Loading...</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div style={{ color: 'var(--color-text-secondary)' }}>Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-8">
+    <div style={{ padding: '32px' }}>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-dark-text">Operations Dashboard</h1>
-        <p className="text-dark-muted mt-1">H2O Plumbing & All County Construction</p>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{
+          fontSize: '32px',
+          fontWeight: '700',
+          color: 'var(--color-text-primary)',
+          marginBottom: '8px'
+        }}>Operations Dashboard</h1>
+        <p style={{
+          fontSize: '14px',
+          color: 'var(--color-text-secondary)'
+        }}>H2O Plumbing & All County Construction</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '20px',
+        marginBottom: '32px'
+      }}>
         <StatCard
           title="Active Jobs"
           value={stats.activeJobs}
-          icon="🏗️"
-          change="+12%"
-          color="blue"
+          color="#7C5CFC"
         />
         <StatCard
           title="Pending Service Calls"
           value={stats.pendingServiceCalls}
-          icon="🔧"
-          change="+5%"
-          color="yellow"
+          color="#FF9800"
         />
         <StatCard
           title="Total Builders"
           value={stats.totalBuilders}
-          icon="👷"
-          change="+2"
-          color="green"
+          color="#4CAF50"
         />
         <StatCard
           title="Completed This Week"
           value={stats.completedThisWeek}
-          icon="✅"
-          change="+8"
-          color="purple"
+          color="#2196F3"
         />
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+        gap: '24px'
+      }}>
         {/* Recent Jobs */}
-        <div className="bg-dark-card border border-dark-border rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-dark-text">Recent Jobs</h2>
-            <a href="/jobs" className="text-sm text-primary hover:text-primary-hover">View All →</a>
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          borderRadius: '12px',
+          border: '1px solid var(--color-border)',
+          padding: '24px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px'
+          }}>
+            <h2 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: 'var(--color-text-primary)'
+            }}>Recent Jobs</h2>
+            <a href="/jobs" style={{
+              fontSize: '14px',
+              color: 'var(--color-primary)',
+              textDecoration: 'none'
+            }}>View All →</a>
           </div>
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {recentJobs.length === 0 ? (
-              <div className="text-center py-8 text-dark-muted">No jobs found</div>
+              <div style={{
+                textAlign: 'center',
+                padding: '32px',
+                color: 'var(--color-text-secondary)'
+              }}>No jobs found</div>
             ) : (
               recentJobs.map((job) => (
                 <a
                   key={job.id}
                   href={`/jobs/${job.id}`}
-                  className="block p-4 bg-dark-panel hover:bg-dark-hover rounded-lg border border-dark-border transition-colors"
+                  style={{
+                    display: 'block',
+                    padding: '16px',
+                    backgroundColor: 'var(--color-hover)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-border)',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                  }}
                 >
-                  <div className="flex items-start justify-between">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                     <div>
-                      <div className="font-medium text-dark-text">{job.community} - Lot {job.lot_number}</div>
-                      <div className="text-sm text-dark-muted mt-1">{job.address_line1}, {job.city}</div>
+                      <div style={{
+                        fontWeight: '500',
+                        color: 'var(--color-text-primary)',
+                        marginBottom: '4px'
+                      }}>{job.community} - Lot {job.lot_number}</div>
+                      <div style={{
+                        fontSize: '13px',
+                        color: 'var(--color-text-secondary)'
+                      }}>{job.address_line1}, {job.city}</div>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded ${getStatusColor(job.status)}`}>
+                    <span style={{
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      ...getStatusStyle(job.status)
+                    }}>
                       {job.status}
                     </span>
                   </div>
@@ -127,32 +185,88 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Service Calls */}
-        <div className="bg-dark-card border border-dark-border rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-dark-text">Recent Service Calls</h2>
-            <a href="/service-calls" className="text-sm text-primary hover:text-primary-hover">View All →</a>
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          borderRadius: '12px',
+          border: '1px solid var(--color-border)',
+          padding: '24px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px'
+          }}>
+            <h2 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: 'var(--color-text-primary)'
+            }}>Recent Service Calls</h2>
+            <a href="/service-calls" style={{
+              fontSize: '14px',
+              color: 'var(--color-primary)',
+              textDecoration: 'none'
+            }}>View All →</a>
           </div>
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {recentCalls.length === 0 ? (
-              <div className="text-center py-8 text-dark-muted">No service calls found</div>
+              <div style={{
+                textAlign: 'center',
+                padding: '32px',
+                color: 'var(--color-text-secondary)'
+              }}>No service calls found</div>
             ) : (
               recentCalls.map((call) => (
                 <a
                   key={call.id}
                   href={`/service-calls/${call.id}`}
-                  className="block p-4 bg-dark-panel hover:bg-dark-hover rounded-lg border border-dark-border transition-colors"
+                  style={{
+                    display: 'block',
+                    padding: '16px',
+                    backgroundColor: 'var(--color-hover)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-border)',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-bg)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                  }}
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-medium text-dark-text">{call.customer_name}</div>
-                      <div className="text-sm text-dark-muted mt-1">{call.issue_description?.substring(0, 50)}...</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontWeight: '500',
+                        color: 'var(--color-text-primary)',
+                        marginBottom: '4px'
+                      }}>{call.customer_name}</div>
+                      <div style={{
+                        fontSize: '13px',
+                        color: 'var(--color-text-secondary)'
+                      }}>{call.issue_description?.substring(0, 50)}...</div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={`px-2 py-1 text-xs rounded ${getStatusColor(call.status)}`}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        ...getStatusStyle(call.status)
+                      }}>
                         {call.status}
                       </span>
                       {call.priority === 'High' && (
-                        <span className="px-2 py-1 text-xs rounded bg-red-500/20 text-red-400">
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                          color: '#EF5350'
+                        }}>
                           High Priority
                         </span>
                       )}
@@ -168,42 +282,53 @@ export default function Dashboard() {
   )
 }
 
-interface StatCardProps {
+function StatCard({ title, value, color }: {
   title: string
   value: number
-  icon: string
-  change: string
-  color: 'blue' | 'yellow' | 'green' | 'purple'
-}
-
-function StatCard({ title, value, icon, change, color }: StatCardProps) {
-  const colorClasses = {
-    blue: 'bg-blue-500/10 text-blue-400',
-    yellow: 'bg-yellow-500/10 text-yellow-400',
-    green: 'bg-green-500/10 text-green-400',
-    purple: 'bg-purple-500/10 text-purple-400',
-  }
-
+  color: string
+}) {
   return (
-    <div className="bg-dark-card border border-dark-border rounded-lg p-6 hover:border-dark-hover transition-colors">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-2xl">{icon}</span>
-        <span className="text-xs text-dark-muted">{change}</span>
-      </div>
-      <div className="text-3xl font-bold text-dark-text mb-1">{value}</div>
-      <div className="text-sm text-dark-muted">{title}</div>
+    <div style={{
+      backgroundColor: 'var(--color-card)',
+      border: '1px solid var(--color-border)',
+      borderRadius: '12px',
+      padding: '24px',
+      transition: 'all 0.2s',
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.borderColor = color
+      e.currentTarget.style.transform = 'translateY(-2px)'
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.borderColor = 'var(--color-border)'
+      e.currentTarget.style.transform = 'translateY(0)'
+    }}
+    >
+      <div style={{
+        fontSize: '13px',
+        color: 'var(--color-text-secondary)',
+        marginBottom: '12px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        fontWeight: '500'
+      }}>{title}</div>
+      <div style={{
+        fontSize: '36px',
+        fontWeight: '700',
+        color: color
+      }}>{value}</div>
     </div>
   )
 }
 
-function getStatusColor(status: string): string {
-  const statusMap: Record<string, string> = {
-    'New': 'bg-blue-500/20 text-blue-400',
-    'Scheduled': 'bg-yellow-500/20 text-yellow-400',
-    'In Progress': 'bg-purple-500/20 text-purple-400',
-    'Dispatched': 'bg-orange-500/20 text-orange-400',
-    'Completed': 'bg-green-500/20 text-green-400',
-    'On Hold': 'bg-gray-500/20 text-gray-400',
+function getStatusStyle(status: string): React.CSSProperties {
+  const statusStyles: Record<string, React.CSSProperties> = {
+    'New': { backgroundColor: 'rgba(33, 150, 243, 0.2)', color: '#42A5F5' },
+    'Scheduled': { backgroundColor: 'rgba(255, 152, 0, 0.2)', color: '#FFA726' },
+    'In Progress': { backgroundColor: 'rgba(124, 92, 252, 0.2)', color: '#9B7FFF' },
+    'Dispatched': { backgroundColor: 'rgba(255, 152, 0, 0.2)', color: '#FFA726' },
+    'Completed': { backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#66BB6A' },
+    'On Hold': { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' },
   }
-  return statusMap[status] || 'bg-gray-500/20 text-gray-400'
+  return statusStyles[status] || { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' }
 }

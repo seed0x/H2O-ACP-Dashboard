@@ -1,64 +1,138 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import UilDashboard from '@iconscout/react-unicons/icons/uil-dashboard'
+import UilBuilding from '@iconscout/react-unicons/icons/uil-building'
+import UilWrench from '@iconscout/react-unicons/icons/uil-wrench'
+import UilUserCircle from '@iconscout/react-unicons/icons/uil-user-circle'
+import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+import UilUser from '@iconscout/react-unicons/icons/uil-user'
 
 interface NavItem {
   name: string
   href: string
-  icon: string
+  icon: React.ComponentType<{ size?: number | string; color?: string }>
 }
 
 const navItems: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: '📊' },
-  { name: 'All County Jobs', href: '/jobs', icon: '🏗️' },
-  { name: 'H2O Service Calls', href: '/service-calls', icon: '🔧' },
-  { name: 'Builders', href: '/builders', icon: '👷' },
-  { name: 'Bids', href: '/bids', icon: '📋' },
+  { name: 'Dashboard', href: '/', icon: UilDashboard },
+  { name: 'All County Jobs', href: '/jobs', icon: UilBuilding },
+  { name: 'H2O Service Calls', href: '/service-calls', icon: UilWrench },
+  { name: 'Builders', href: '/builders', icon: UilUserCircle },
+  { name: 'Bids', href: '/bids', icon: UilFileAlt },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-panel border-r border-dark-border flex flex-col">
+    <aside style={{
+      position: 'fixed',
+      left: 0,
+      top: 0,
+      height: '100vh',
+      width: '256px',
+      backgroundColor: 'var(--color-card)',
+      borderRight: '1px solid var(--color-border)',
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: 100,
+    }}>
       {/* Logo/Brand */}
-      <div className="p-6 border-b border-dark-border">
-        <h1 className="text-xl font-bold text-dark-text">H2O-ACP Dashboard</h1>
-        <p className="text-xs text-dark-muted mt-1">Operations Platform</p>
+      <div style={{
+        padding: '24px',
+        borderBottom: '1px solid var(--color-border)',
+      }}>
+        <h1 style={{
+          fontSize: '20px',
+          fontWeight: '700',
+          color: 'var(--color-text-primary)',
+          marginBottom: '4px',
+        }}>H2O-ACP</h1>
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--color-text-secondary)',
+        }}>Operations Platform</p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav style={{
+        flex: 1,
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }}>
         {navItems.map((item) => {
           const isActive = pathname === item.href
+          const Icon = item.icon
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`
-                flex items-center gap-3 px-4 py-3 rounded-lg transition-colors
-                ${isActive 
-                  ? 'bg-primary text-white' 
-                  : 'text-dark-muted hover:bg-dark-hover hover:text-dark-text'
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                transition: 'all 0.2s',
+                backgroundColor: isActive ? 'var(--color-primary)' : 'transparent',
+                color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                  e.currentTarget.style.color = 'var(--color-text-primary)'
                 }
-              `}
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'var(--color-text-secondary)'
+                }
+              }}
             >
-              <span className="text-lg">{item.icon}</span>
-              <span className="font-medium">{item.name}</span>
+              <Icon size="20" color="currentColor" />
+              <span style={{ fontSize: '14px', fontWeight: '500' }}>{item.name}</span>
             </Link>
           )
         })}
       </nav>
 
       {/* User section */}
-      <div className="p-4 border-t border-dark-border">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="w-10 h-10 rounded-full bg-dark-hover flex items-center justify-center text-dark-text">
-            👤
+      <div style={{
+        padding: '16px',
+        borderTop: '1px solid var(--color-border)',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 16px',
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: 'var(--color-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <UilUser size="20" color="#ffffff" />
           </div>
-          <div className="flex-1">
-            <div className="text-sm font-medium text-dark-text">Admin User</div>
-            <div className="text-xs text-dark-muted">Operations Manager</div>
+          <div>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--color-text-primary)',
+            }}>Admin User</div>
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--color-text-secondary)',
+            }}>Operations Manager</div>
           </div>
         </div>
       </div>
