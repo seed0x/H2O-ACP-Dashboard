@@ -62,13 +62,14 @@ class ChannelAccount(ChannelAccountBase):
 class ContentPostBase(BaseModel):
     tenant_id: str
     title: str
-    channel_account_id: UUID
+    channel_ids: List[UUID]
     status: str
     scheduled_for: Optional[datetime] = None
+    draft_due_date: Optional[datetime] = None
     posted_at: Optional[datetime] = None
     owner: str
     reviewer: Optional[str] = None
-    caption: Optional[str] = None
+    body_text: Optional[str] = None
     cta_type: Optional[str] = None
     cta_url: Optional[str] = None
     target_city: Optional[str] = None
@@ -100,13 +101,14 @@ class ContentPostCreate(ContentPostBase):
 
 class ContentPostUpdate(BaseModel):
     title: Optional[str] = None
-    channel_account_id: Optional[UUID] = None
+    channel_ids: Optional[List[UUID]] = None
     status: Optional[str] = None
     scheduled_for: Optional[datetime] = None
+    draft_due_date: Optional[datetime] = None
     posted_at: Optional[datetime] = None
     owner: Optional[str] = None
     reviewer: Optional[str] = None
-    caption: Optional[str] = None
+    body_text: Optional[str] = None
     cta_type: Optional[str] = None
     cta_url: Optional[str] = None
     target_city: Optional[str] = None

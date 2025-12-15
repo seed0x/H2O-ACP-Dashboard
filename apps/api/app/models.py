@@ -190,7 +190,6 @@ class ChannelAccount(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     channel = relationship("MarketingChannel", back_populates="accounts")
-    posts = relationship("ContentPost", back_populates="channel_account")
 
 class ContentPost(Base):
     __tablename__ = "content_posts"
@@ -198,13 +197,14 @@ class ContentPost(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(Text, nullable=False)
     title = Column(String, nullable=False)
-    channel_account_id = Column(UUID(as_uuid=True), ForeignKey("channel_accounts.id"), nullable=False)
+    channel_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False)
     status = Column(String, nullable=False)
     scheduled_for = Column(DateTime(timezone=True), nullable=True)
+    draft_due_date = Column(DateTime(timezone=True), nullable=True)
     posted_at = Column(DateTime(timezone=True), nullable=True)
     owner = Column(String, nullable=False)
     reviewer = Column(String, nullable=True)
-    caption = Column(Text, nullable=True)
+    body_text = Column(Text, nullable=True)
     cta_type = Column(String, nullable=True)
     cta_url = Column(String, nullable=True)
     target_city = Column(String, nullable=True)
@@ -218,7 +218,6 @@ class ContentPost(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    channel_account = relationship("ChannelAccount", back_populates="posts")
     publish_jobs = relationship("PublishJob", back_populates="content_post")
 
 class PublishJob(Base):

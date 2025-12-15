@@ -170,7 +170,7 @@ def get_content_posts(
         query = query.filter(
             or_(
                 ContentPost.title.ilike(f"%{search}%"),
-                ContentPost.caption.ilike(f"%{search}%"),
+                ContentPost.body_text.ilike(f"%{search}%"),
                 ContentPost.tags.contains([search])
             )
         )
@@ -289,7 +289,11 @@ def get_calendar(
                 calendar_data[date_key] = []
             calendar_data[date_key].append(ContentPostSchema.from_orm(post))
     
-    return calendar_data
+    # Return as array of {date, posts} objects for easier frontend consumption
+    return [
+        {'date': date, 'posts': posts}
+        for date, posts in calendar_data.items()
+    ]
 
 
 # Publishing Actions
@@ -352,8 +356,11 @@ def queue_publish(
     if not db_post:
         raise HTTPException(status_code=404, detail="Content post not found")
     
-    # Check if account supports autopost
-    account = db.query(ChannelAccount).filter(ChannelAccount.id == db_post.channel_account_id).first()
+    # Check if any account supports autopost (using first channel for now)
+    if not db_post.channel_ids:
+        raise HTTPException(status_code=400, detail="No channels assigned to post")
+    
+    account = db.query(ChannelAccount).filter(ChannelAccount.id == db_post.channel_ids[0]).first()
     if not account or not account.oauth_connected:
         raise HTTPException(status_code=400, detail="Account not connected for auto-posting")
     
@@ -370,3 +377,100 @@ def queue_publish(
     db.commit()
     
     return {"message": "Post queued for publishing", "job_id": str(job.id)}
+
+
+# Weekly Scoreboard
+
+@router.get("/scoreboard")
+def get_weekly_scoreboard(
+    tenant_id: str = Query(...),
+    week_start: datetime = Query(...),
+    week_end: datetime = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Get weekly accountability scoreboard by owner"""
+    posts = db.query(ContentPost).filter(
+        and_(
+            ContentPost.tenant_id == tenant_id,
+            or_(
+                and_(
+                    ContentPost.scheduled_for >= week_start,
+                    ContentPost.scheduled_for <= week_end
+                ),
+                and_(
+                    ContentPost.created_at >= week_start,
+                    ContentPost.created_at <= week_end
+                )
+            )
+        )
+    ).all()
+    
+    # Group by owner
+    scoreboard = {}
+    for post in posts:
+        owner = post.owner or 'Unassigned'
+        if owner not in scoreboard:
+            scoreboard[owner] = {
+                'owner': owner,
+                'planned': 0,
+                'posted': 0,
+                'missed': 0,
+                'failed': 0,
+                'canceled': 0,
+                'overdue_drafts': 0
+            }
+        
+        # Count planned (created this week or scheduled this week)
+        if (post.created_at >= week_start and post.created_at <= week_end) or \
+           (post.scheduled_for and post.scheduled_for >= week_start and post.scheduled_for <= week_end):
+            scoreboard[owner]['planned'] += 1
+        
+        # Count by status
+        if post.status == 'Posted':
+            scoreboard[owner]['posted'] += 1
+        elif post.status == 'Failed':
+            scoreboard[owner]['failed'] += 1
+        elif post.status == 'Canceled':
+            scoreboard[owner]['canceled'] += 1
+        
+        # Check if overdue draft
+        if post.status in ['Draft', 'Idea'] and post.draft_due_date:
+            if post.draft_due_date < datetime.utcnow():
+                scoreboard[owner]['overdue_drafts'] += 1
+        
+        # Check if missed scheduled post
+        if post.status == 'Scheduled' and post.scheduled_for:
+            if post.scheduled_for < datetime.utcnow():
+                scoreboard[owner]['missed'] += 1
+    
+    return list(scoreboard.values())
+
+
+# Audit Trail
+
+@router.get("/audit-trail/{entity_id}")
+def get_audit_trail(
+    entity_id: UUID,
+    entity_type: str = Query("content_post"),
+    db: Session = Depends(get_db)
+):
+    """Get audit trail for an entity"""
+    logs = db.query(AuditLog).filter(
+        and_(
+            AuditLog.entity_type == entity_type,
+            AuditLog.entity_id == entity_id
+        )
+    ).order_by(AuditLog.changed_at.desc()).all()
+    
+    return [
+        {
+            'id': str(log.id),
+            'action': log.action,
+            'field': log.field,
+            'old_value': log.old_value,
+            'new_value': log.new_value,
+            'changed_by': log.changed_by,
+            'changed_at': log.changed_at.isoformat()
+        }
+        for log in logs
+    ]
