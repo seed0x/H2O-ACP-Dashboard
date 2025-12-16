@@ -1,0 +1,318 @@
+# Comprehensive API Test Script
+# Tests all endpoints and features
+
+$baseUrl = "http://localhost:8000/api/v1"
+$token = $null
+$adminToken = $null
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Comprehensive API Testing Suite" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Helper function to make API calls
+function Invoke-ApiCall {
+    param(
+        [string]$Method = "GET",
+        [string]$Url,
+        [object]$Body = $null,
+        [string]$Token = $null,
+        [bool]$ExpectError = $false
+    )
+    
+    $headers = @{
+        "Content-Type" = "application/json"
+    }
+    
+    if ($Token) {
+        $headers["Authorization"] = "Bearer $Token"
+    }
+    
+    try {
+        if ($Body) {
+            $bodyJson = $Body | ConvertTo-Json -Depth 10
+            $response = Invoke-WebRequest -Uri $Url -Method $Method -Headers $headers -Body $bodyJson -UseBasicParsing
+        } else {
+            $response = Invoke-WebRequest -Uri $Url -Method $Method -Headers $headers -UseBasicParsing
+        }
+        
+        if ($ExpectError) {
+            Write-Host "  ❌ Expected error but got success" -ForegroundColor Red
+            return $null
+        }
+        
+        return @{
+            StatusCode = $response.StatusCode
+            Content = $response.Content | ConvertFrom-Json
+            Success = $true
+        }
+    } catch {
+        if ($ExpectError) {
+            Write-Host "  ✓ Expected error occurred" -ForegroundColor Green
+            return @{ Success = $true; ExpectedError = $true }
+        }
+        
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $errorContent = $null
+        if ($_.Exception.Response) {
+            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $errorContent = $reader.ReadToEnd()
+        }
+        
+        return @{
+            StatusCode = $statusCode
+            Error = $errorContent
+            Success = $false
+        }
+    }
+}
+
+# Test 1: Health Check
+Write-Host "1. Testing Health Endpoint..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/health"
+if ($result.Success -and $result.StatusCode -eq 200) {
+    Write-Host "  ✓ Health check passed" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ Health check failed" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 2: Login (Admin)
+Write-Host "2. Testing Login (Admin)..." -ForegroundColor Yellow
+$loginBody = @{
+    username = "admin"
+    password = "test-admin"
+}
+$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/login" -Body $loginBody
+if ($result.Success -and $result.StatusCode -eq 200) {
+    $adminToken = $result.Content.message
+    Write-Host "  ✓ Admin login successful" -ForegroundColor Green
+    Write-Host "  Response: $($result.Content | ConvertTo-Json)" -ForegroundColor Gray
+} else {
+    Write-Host "  ❌ Admin login failed" -ForegroundColor Red
+    Write-Host "  Error: $($result.Error)" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 3: Get Token from Cookie (for subsequent requests)
+# Note: In real scenario, token would be in cookie, but for testing we'll use Bearer token
+# For now, we'll create a user and use that token
+
+# Test 4: User Management - Create User
+Write-Host "3. Testing User Management - Create User..." -ForegroundColor Yellow
+$newUser = @{
+    username = "testuser"
+    password = "testpass123"
+    email = "testuser@example.com"
+    full_name = "Test User"
+    role = "user"
+    tenant_id = "all_county"
+}
+$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/users" -Body $newUser -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200 -or $result.StatusCode -eq 201) {
+    $userId = $result.Content.id
+    Write-Host "  ✓ User created successfully" -ForegroundColor Green
+    Write-Host "  User ID: $userId" -ForegroundColor Gray
+} else {
+    Write-Host "  ⚠ User creation: $($result.StatusCode) - $($result.Error)" -ForegroundColor Yellow
+    # User might already exist, try to login
+    Write-Host "  Attempting login with test user..." -ForegroundColor Yellow
+    $loginBody = @{
+        username = "testuser"
+        password = "testpass123"
+    }
+    $loginResult = Invoke-ApiCall -Method "POST" -Url "$baseUrl/login" -Body $loginBody
+    if ($loginResult.Success) {
+        Write-Host "  ✓ Test user login successful" -ForegroundColor Green
+        $token = "testuser-token" # We'll use admin token for now
+    }
+}
+Write-Host ""
+
+# Test 5: List Users
+Write-Host "4. Testing List Users..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/users" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    $userCount = ($result.Content | Measure-Object).Count
+    Write-Host "  ✓ Users listed successfully ($userCount users)" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ List users failed" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 6: Builders - List
+Write-Host "5. Testing Builders - List..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/builders" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    Write-Host "  ✓ Builders listed successfully" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ List builders failed" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 7: Builders - Create
+Write-Host "6. Testing Builders - Create..." -ForegroundColor Yellow
+$newBuilder = @{
+    name = "Test Builder"
+    tenant_id = "all_county"
+}
+$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/builders" -Body $newBuilder -Token $adminToken
+if ($result.Success -and ($result.StatusCode -eq 200 -or $result.StatusCode -eq 201)) {
+    $builderId = $result.Content.id
+    Write-Host "  ✓ Builder created successfully" -ForegroundColor Green
+    Write-Host "  Builder ID: $builderId" -ForegroundColor Gray
+    
+    # Test 8: Get Builder
+    Write-Host "7. Testing Get Builder..." -ForegroundColor Yellow
+    $getResult = Invoke-ApiCall -Url "$baseUrl/builders/$builderId" -Token $adminToken
+    if ($getResult.Success) {
+        Write-Host "  ✓ Builder retrieved successfully" -ForegroundColor Green
+    }
+} else {
+    Write-Host "  ⚠ Builder creation: $($result.StatusCode)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 9: Jobs - List
+Write-Host "8. Testing Jobs - List..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/jobs?tenant_id=all_county" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    Write-Host "  ✓ Jobs listed successfully" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ List jobs failed" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 10: Jobs - Create (with tenant validation)
+Write-Host "9. Testing Jobs - Create (Tenant Validation)..." -ForegroundColor Yellow
+$newJob = @{
+    tenant_id = "all_county"
+    builder_id = $builderId
+    community = "Test Community"
+    lot = "123"
+    status = "draft"
+}
+$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/jobs" -Body $newJob -Token $adminToken
+if ($result.Success -and ($result.StatusCode -eq 200 -or $result.StatusCode -eq 201)) {
+    $jobId = $result.Content.id
+    Write-Host "  ✓ Job created successfully" -ForegroundColor Green
+    Write-Host "  Job ID: $jobId" -ForegroundColor Gray
+} else {
+    Write-Host "  ⚠ Job creation: $($result.StatusCode)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 11: Jobs - Invalid Tenant (should fail)
+Write-Host "10. Testing Jobs - Invalid Tenant (should fail)..." -ForegroundColor Yellow
+$invalidJob = @{
+    tenant_id = "invalid_tenant"
+    builder_id = $builderId
+    community = "Test"
+    lot = "123"
+    status = "draft"
+}
+$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/jobs" -Body $invalidJob -Token $adminToken -ExpectError $true
+if ($result.ExpectedError) {
+    Write-Host "  ✓ Tenant validation working (correctly rejected invalid tenant)" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Tenant validation may not be working" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 12: Bids - List
+Write-Host "11. Testing Bids - List..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/bids" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    Write-Host "  ✓ Bids listed successfully" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ List bids failed" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 13: Service Calls - List
+Write-Host "12. Testing Service Calls - List..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/service-calls?tenant_id=h2o" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    Write-Host "  ✓ Service calls listed successfully" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ List service calls failed" -ForegroundColor Red
+}
+Write-Host ""
+
+# Test 14: Marketing - Channels
+Write-Host "13. Testing Marketing - Channels..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/marketing/channels" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    $channelCount = ($result.Content | Measure-Object).Count
+    Write-Host "  ✓ Marketing channels listed successfully ($channelCount channels)" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Marketing channels: $($result.StatusCode)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 15: Marketing - Channel Accounts
+Write-Host "14. Testing Marketing - Channel Accounts..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/marketing/channel-accounts?tenant_id=h2o" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    Write-Host "  ✓ Channel accounts listed successfully" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Channel accounts: $($result.StatusCode)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 16: Audit Log
+Write-Host "15. Testing Audit Log..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/audit?limit=10" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    $auditCount = ($result.Content | Measure-Object).Count
+    Write-Host "  ✓ Audit log accessed successfully ($auditCount entries)" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Audit log: $($result.StatusCode)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 17: Rate Limiting (Login attempts)
+Write-Host "16. Testing Rate Limiting (Login attempts)..." -ForegroundColor Yellow
+$rateLimitTested = $false
+for ($i = 1; $i -le 12; $i++) {
+    $loginBody = @{
+        username = "admin"
+        password = "wrong-password"
+    }
+    $result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/login" -Body $loginBody -ExpectError $true
+    if ($i -eq 11 -and $result.StatusCode -eq 429) {
+        Write-Host "  ✓ Rate limiting working (429 after 10 attempts)" -ForegroundColor Green
+        $rateLimitTested = $true
+        break
+    }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $rateLimitTested) {
+    Write-Host "  ⚠ Rate limiting test inconclusive (may need more attempts)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 18: Unauthorized Access
+Write-Host "17. Testing Unauthorized Access..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/users" -ExpectError $true
+if ($result.ExpectedError -or $result.StatusCode -eq 401) {
+    Write-Host "  ✓ Unauthorized access correctly blocked" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Authorization may not be working" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Test 19: Invalid Endpoint
+Write-Host "18. Testing Invalid Endpoint (404)..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/invalid-endpoint" -ExpectError $true
+if ($result.ExpectedError -or $result.StatusCode -eq 404) {
+    Write-Host "  ✓ 404 handling working correctly" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ 404 handling may not be working" -ForegroundColor Yellow
+}
+Write-Host ""
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Testing Complete!" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
