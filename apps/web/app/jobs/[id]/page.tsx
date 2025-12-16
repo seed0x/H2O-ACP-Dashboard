@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { API_BASE_URL } from '../../lib/config'
 
 export default function JobDetail({ params }: { params: { id: string } }){
   const [job, setJob] = useState<any>(null)
@@ -11,7 +12,7 @@ export default function JobDetail({ params }: { params: { id: string } }){
     async function load(){
       const token = localStorage.getItem('token')
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      const res = await axios.get(`/api/jobs/${params.id}`)
+      const res = await axios.get(`${API_BASE_URL}/jobs/${params.id}`, { withCredentials: true })
       setJob(res.data)
       await loadAudit()
     }
@@ -21,13 +22,13 @@ export default function JobDetail({ params }: { params: { id: string } }){
   async function patch(){
     const token = localStorage.getItem('token')
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    await axios.patch(`/api/jobs/${params.id}`, { notes })
-    const res = await axios.get(`/api/jobs/${params.id}`)
+    await axios.patch(`${API_BASE_URL}/jobs/${params.id}`, { notes }, { withCredentials: true })
+    const res = await axios.get(`${API_BASE_URL}/jobs/${params.id}`, { withCredentials: true })
     setJob(res.data)
   }
 
   async function loadAudit(){
-    const res = await axios.get('/api/audit', { params: { entity_type: 'job', entity_id: params.id } })
+    const res = await axios.get(`${API_BASE_URL}/audit`, { params: { entity_type: 'job', entity_id: params.id }, withCredentials: true })
     setAudit(res.data)
   }
 

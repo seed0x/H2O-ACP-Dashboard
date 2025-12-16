@@ -1,12 +1,3 @@
-fastapi
-uvicorn
-SQLAlchemy==2.0.22
-alembic
-psycopg2-binary
-asyncpg
-python-jose[cryptography]
-python-dotenv
-pydantic
-pydantic-settings
-email-validator
-pydantic-settings
+# Root requirements.txt - Legacy file
+# Use apps/api/requirements.txt for API dependencies
+# Use api/requirements.txt for Vercel serverless function dependencies

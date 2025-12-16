@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { API_URL } from '../lib/config'
+import { API_BASE_URL } from '../lib/config'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -21,9 +21,9 @@ export default function Dashboard() {
   async function loadDashboard() {
     try {
       const [jobs, serviceCalls, builders] = await Promise.all([
-        axios.get(`${API_URL}/jobs?tenant_id=all_county`, { withCredentials: true }),
-        axios.get(`${API_URL}/service-calls?tenant_id=h2o`, { withCredentials: true }),
-        axios.get(`${API_URL}/builders`, { withCredentials: true })
+        axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { withCredentials: true }),
+        axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { withCredentials: true }),
+        axios.get(`${API_BASE_URL}/builders`, { withCredentials: true })
       ])
 
       const activeJobs = jobs.data.filter((j: any) => j.status !== 'Completed').length

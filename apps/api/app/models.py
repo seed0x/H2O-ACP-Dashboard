@@ -19,6 +19,23 @@ import uuid
 
 Base = declarative_base()
 
+# User Management Models
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username = Column(String, nullable=False, unique=True)
+    email = Column(String, nullable=True, unique=True)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    role = Column(String, nullable=False, default='user')  # 'admin', 'user', 'viewer'
+    is_active = Column(Boolean, nullable=False, default=True)
+    tenant_id = Column(Text, nullable=True)  # If None, user has access to all tenants
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_login = Column(DateTime(timezone=True), nullable=True)
+
 class Builder(Base):
     __tablename__ = "builders"
 

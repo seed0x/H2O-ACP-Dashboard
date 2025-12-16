@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 
-from .database import get_db
-from .models import MarketingChannel, ChannelAccount, ContentPost, PublishJob, AuditLog
+from ..db.session import get_session
+from ..core.auth import get_current_user
+from .. import models
 from .schemas_marketing import (
     MarketingChannel as MarketingChannelSchema,
     ChannelAccount as ChannelAccountSchema,
@@ -23,118 +24,164 @@ from .schemas_marketing import (
 router = APIRouter(prefix="/marketing", tags=["marketing"])
 
 
-# Helper function for audit logging
-def log_audit(db: Session, entity_type: str, entity_id: UUID, action: str, changed_by: str, tenant_id: str = None):
-    audit = AuditLog(
-        tenant_id=tenant_id,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        action=action,
-        changed_by=changed_by
+# Helper function for async audit logging
+async def write_audit_marketing(
+    db: AsyncSession,
+    tenant_id: str | None,
+    entity_type: str,
+    entity_id: UUID,
+    action: str,
+    changed_by: str,
+    field: str | None = None,
+    old_value: str | None = None,
+    new_value: str | None = None,
+):
+    """Write audit log entry for marketing module"""
+    await db.execute(
+        models.AuditLog.__table__.insert().values(
+            tenant_id=tenant_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action=action,
+            field=field,
+            old_value=old_value,
+            new_value=new_value,
+            changed_by=changed_by,
+        )
     )
-    db.add(audit)
 
 
 # Marketing Channels
 
 @router.get("/channels", response_model=List[MarketingChannelSchema])
-def get_channels(db: Session = Depends(get_db)):
+async def get_channels(db: AsyncSession = Depends(get_session)):
     """Get all marketing channels"""
-    return db.query(MarketingChannel).all()
+    result = await db.execute(select(models.MarketingChannel))
+    return result.scalars().all()
 
 
 # Channel Accounts
 
 @router.get("/channel-accounts", response_model=List[ChannelAccountSchema])
-def get_channel_accounts(
+async def get_channel_accounts(
     tenant_id: str = Query(...),
     channel_key: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session)
 ):
     """Get channel accounts with filters"""
-    query = db.query(ChannelAccount).filter(ChannelAccount.tenant_id == tenant_id)
+    query = select(models.ChannelAccount).where(models.ChannelAccount.tenant_id == tenant_id)
     
     if channel_key:
-        query = query.join(MarketingChannel).filter(MarketingChannel.key == channel_key)
+        query = query.join(models.MarketingChannel).where(models.MarketingChannel.key == channel_key)
     
     if status:
-        query = query.filter(ChannelAccount.status == status)
+        query = query.where(models.ChannelAccount.status == status)
     
     if search:
-        query = query.filter(
+        query = query.where(
             or_(
-                ChannelAccount.name.ilike(f"%{search}%"),
-                ChannelAccount.login_email.ilike(f"%{search}%")
+                models.ChannelAccount.name.ilike(f"%{search}%"),
+                models.ChannelAccount.login_email.ilike(f"%{search}%")
             )
         )
     
-    return query.all()
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 @router.post("/channel-accounts", response_model=ChannelAccountSchema)
-def create_channel_account(
+async def create_channel_account(
     account: ChannelAccountCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Create a new channel account"""
-    db_account = ChannelAccount(**account.model_dump())
+    db_account = models.ChannelAccount(**account.model_dump())
     db.add(db_account)
-    db.commit()
-    db.refresh(db_account)
+    await db.flush()
     
-    log_audit(db, "channel_account", db_account.id, "create", "admin", account.tenant_id)
-    db.commit()
+    await write_audit_marketing(
+        db, account.tenant_id, "channel_account", db_account.id, "create", current_user.username
+    )
+    
+    await db.commit()
+    await db.refresh(db_account)
     
     return db_account
 
 
 @router.get("/channel-accounts/{account_id}", response_model=ChannelAccountSchema)
-def get_channel_account(account_id: UUID, db: Session = Depends(get_db)):
+async def get_channel_account(account_id: UUID, db: AsyncSession = Depends(get_session)):
     """Get a specific channel account"""
-    account = db.query(ChannelAccount).filter(ChannelAccount.id == account_id).first()
+    result = await db.execute(
+        select(models.ChannelAccount).where(models.ChannelAccount.id == account_id)
+    )
+    account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Channel account not found")
     return account
 
 
 @router.patch("/channel-accounts/{account_id}", response_model=ChannelAccountSchema)
-def update_channel_account(
+async def update_channel_account(
     account_id: UUID,
     account_update: ChannelAccountUpdate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Update a channel account"""
-    db_account = db.query(ChannelAccount).filter(ChannelAccount.id == account_id).first()
+    result = await db.execute(
+        select(models.ChannelAccount).where(models.ChannelAccount.id == account_id)
+    )
+    db_account = result.scalar_one_or_none()
     if not db_account:
         raise HTTPException(status_code=404, detail="Channel account not found")
     
     update_data = account_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        old_value = getattr(db_account, field)
         setattr(db_account, field, value)
+        await write_audit_marketing(
+            db,
+            db_account.tenant_id,
+            "channel_account",
+            db_account.id,
+            "update",
+            current_user.username,
+            field,
+            str(old_value) if old_value is not None else None,
+            str(value) if value is not None else None,
+        )
     
-    db.commit()
-    db.refresh(db_account)
-    
-    log_audit(db, "channel_account", db_account.id, "update", "admin", db_account.tenant_id)
-    db.commit()
+    await db.commit()
+    await db.refresh(db_account)
     
     return db_account
 
 
 @router.delete("/channel-accounts/{account_id}")
-def delete_channel_account(account_id: UUID, db: Session = Depends(get_db)):
+async def delete_channel_account(
+    account_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
     """Delete a channel account"""
-    db_account = db.query(ChannelAccount).filter(ChannelAccount.id == account_id).first()
+    result = await db.execute(
+        select(models.ChannelAccount).where(models.ChannelAccount.id == account_id)
+    )
+    db_account = result.scalar_one_or_none()
     if not db_account:
         raise HTTPException(status_code=404, detail="Channel account not found")
     
     tenant_id = db_account.tenant_id
-    log_audit(db, "channel_account", db_account.id, "delete", "admin", tenant_id)
+    await write_audit_marketing(
+        db, tenant_id, "channel_account", db_account.id, "delete", current_user.username
+    )
     
-    db.delete(db_account)
-    db.commit()
+    await db.delete(db_account)
+    await db.commit()
     
     return {"message": "Channel account deleted"}
 
@@ -142,76 +189,109 @@ def delete_channel_account(account_id: UUID, db: Session = Depends(get_db)):
 # Content Posts
 
 @router.get("/content-posts", response_model=List[ContentPostSchema])
-def get_content_posts(
+async def get_content_posts(
     tenant_id: str = Query(...),
     status: Optional[str] = None,
     channel_key: Optional[str] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     search: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session)
 ):
     """Get content posts with filters"""
-    query = db.query(ContentPost).filter(ContentPost.tenant_id == tenant_id)
+    query = select(models.ContentPost).where(models.ContentPost.tenant_id == tenant_id)
     
     if status:
-        query = query.filter(ContentPost.status == status)
+        query = query.where(models.ContentPost.status == status)
     
     if channel_key:
-        query = query.join(ChannelAccount).join(MarketingChannel).filter(MarketingChannel.key == channel_key)
+        # For channel_key filter, we need to check if any channel_ids match accounts with that channel
+        # This is complex with async, so we'll filter in Python after fetching
+        pass  # Will handle after query
     
     if date_from:
-        query = query.filter(ContentPost.scheduled_for >= date_from)
+        query = query.where(models.ContentPost.scheduled_for >= date_from)
     
     if date_to:
-        query = query.filter(ContentPost.scheduled_for <= date_to)
+        query = query.where(models.ContentPost.scheduled_for <= date_to)
     
     if search:
-        query = query.filter(
+        query = query.where(
             or_(
-                ContentPost.title.ilike(f"%{search}%"),
-                ContentPost.body_text.ilike(f"%{search}%"),
-                ContentPost.tags.contains([search])
+                models.ContentPost.title.ilike(f"%{search}%"),
+                models.ContentPost.body_text.ilike(f"%{search}%"),
             )
         )
     
-    return query.order_by(ContentPost.scheduled_for.desc()).all()
+    query = query.order_by(models.ContentPost.scheduled_for.desc())
+    
+    result = await db.execute(query)
+    posts = result.scalars().all()
+    
+    # Filter by channel_key if specified (post-processing)
+    if channel_key:
+        # Get channel ID for the key
+        channel_result = await db.execute(
+            select(models.MarketingChannel).where(models.MarketingChannel.key == channel_key)
+        )
+        channel = channel_result.scalar_one_or_none()
+        if channel:
+            # Get account IDs for this channel
+            accounts_result = await db.execute(
+                select(models.ChannelAccount.id).where(models.ChannelAccount.channel_id == channel.id)
+            )
+            account_ids = {str(acc_id) for acc_id in accounts_result.scalars().all()}
+            # Filter posts that have any matching channel_id
+            posts = [p for p in posts if p.channel_ids and any(str(cid) in account_ids for cid in p.channel_ids)]
+    
+    return posts
 
 
 @router.post("/content-posts", response_model=ContentPostSchema)
-def create_content_post(
+async def create_content_post(
     post: ContentPostCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Create a new content post"""
-    db_post = ContentPost(**post.model_dump())
+    db_post = models.ContentPost(**post.model_dump())
     db.add(db_post)
-    db.commit()
-    db.refresh(db_post)
+    await db.flush()
     
-    log_audit(db, "content_post", db_post.id, "create", post.owner, post.tenant_id)
-    db.commit()
+    await write_audit_marketing(
+        db, post.tenant_id, "content_post", db_post.id, "create", current_user.username
+    )
+    
+    await db.commit()
+    await db.refresh(db_post)
     
     return db_post
 
 
 @router.get("/content-posts/{post_id}", response_model=ContentPostSchema)
-def get_content_post(post_id: UUID, db: Session = Depends(get_db)):
+async def get_content_post(post_id: UUID, db: AsyncSession = Depends(get_session)):
     """Get a specific content post"""
-    post = db.query(ContentPost).filter(ContentPost.id == post_id).first()
+    result = await db.execute(
+        select(models.ContentPost).where(models.ContentPost.id == post_id)
+    )
+    post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Content post not found")
     return post
 
 
 @router.patch("/content-posts/{post_id}", response_model=ContentPostSchema)
-def update_content_post(
+async def update_content_post(
     post_id: UUID,
     post_update: ContentPostUpdate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Update a content post"""
-    db_post = db.query(ContentPost).filter(ContentPost.id == post_id).first()
+    result = await db.execute(
+        select(models.ContentPost).where(models.ContentPost.id == post_id)
+    )
+    db_post = result.scalar_one_or_none()
     if not db_post:
         raise HTTPException(status_code=404, detail="Content post not found")
     
@@ -221,8 +301,8 @@ def update_content_post(
     if 'status' in update_data:
         new_status = update_data['status']
         
-        if new_status == 'Needs_Approval' and not (db_post.caption or db_post.notes):
-            raise HTTPException(status_code=400, detail="Caption or notes required for approval")
+        if new_status == 'Needs_Approval' and not (db_post.body_text or db_post.notes):
+            raise HTTPException(status_code=400, detail="Body text or notes required for approval")
         
         if new_status == 'Approved' and not db_post.reviewer:
             raise HTTPException(status_code=400, detail="Reviewer required for approval")
@@ -234,30 +314,47 @@ def update_content_post(
             update_data['posted_at'] = datetime.utcnow()
     
     for field, value in update_data.items():
+        old_value = getattr(db_post, field)
         setattr(db_post, field, value)
+        await write_audit_marketing(
+            db,
+            db_post.tenant_id,
+            "content_post",
+            db_post.id,
+            "update",
+            current_user.username,
+            field,
+            str(old_value) if old_value is not None else None,
+            str(value) if value is not None else None,
+        )
     
-    db.commit()
-    db.refresh(db_post)
-    
-    log_audit(db, "content_post", db_post.id, "update", db_post.owner, db_post.tenant_id)
-    db.commit()
+    await db.commit()
+    await db.refresh(db_post)
     
     return db_post
 
 
 @router.delete("/content-posts/{post_id}")
-def delete_content_post(post_id: UUID, db: Session = Depends(get_db)):
+async def delete_content_post(
+    post_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
     """Delete a content post"""
-    db_post = db.query(ContentPost).filter(ContentPost.id == post_id).first()
+    result = await db.execute(
+        select(models.ContentPost).where(models.ContentPost.id == post_id)
+    )
+    db_post = result.scalar_one_or_none()
     if not db_post:
         raise HTTPException(status_code=404, detail="Content post not found")
     
     tenant_id = db_post.tenant_id
-    owner = db_post.owner
-    log_audit(db, "content_post", db_post.id, "delete", owner, tenant_id)
+    await write_audit_marketing(
+        db, tenant_id, "content_post", db_post.id, "delete", current_user.username
+    )
     
-    db.delete(db_post)
-    db.commit()
+    await db.delete(db_post)
+    await db.commit()
     
     return {"message": "Content post deleted"}
 
@@ -265,20 +362,23 @@ def delete_content_post(post_id: UUID, db: Session = Depends(get_db)):
 # Calendar View
 
 @router.get("/calendar")
-def get_calendar(
+async def get_calendar(
     tenant_id: str = Query(...),
     date_from: datetime = Query(...),
     date_to: datetime = Query(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session)
 ):
     """Get content posts for calendar view"""
-    posts = db.query(ContentPost).filter(
-        and_(
-            ContentPost.tenant_id == tenant_id,
-            ContentPost.scheduled_for >= date_from,
-            ContentPost.scheduled_for <= date_to
-        )
-    ).order_by(ContentPost.scheduled_for).all()
+    result = await db.execute(
+        select(models.ContentPost).where(
+            and_(
+                models.ContentPost.tenant_id == tenant_id,
+                models.ContentPost.scheduled_for >= date_from,
+                models.ContentPost.scheduled_for <= date_to
+            )
+        ).order_by(models.ContentPost.scheduled_for)
+    )
+    posts = result.scalars().all()
     
     # Group by date
     calendar_data = {}
@@ -287,7 +387,7 @@ def get_calendar(
             date_key = post.scheduled_for.date().isoformat()
             if date_key not in calendar_data:
                 calendar_data[date_key] = []
-            calendar_data[date_key].append(ContentPostSchema.from_orm(post))
+            calendar_data[date_key].append(post)
     
     # Return as array of {date, posts} objects for easier frontend consumption
     return [
@@ -299,13 +399,17 @@ def get_calendar(
 # Publishing Actions
 
 @router.post("/content-posts/{post_id}/mark-posted", response_model=ContentPostSchema)
-def mark_post_as_posted(
+async def mark_post_as_posted(
     post_id: UUID,
     request: MarkPostedRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Mark a post as manually posted"""
-    db_post = db.query(ContentPost).filter(ContentPost.id == post_id).first()
+    result = await db.execute(
+        select(models.ContentPost).where(models.ContentPost.id == post_id)
+    )
+    db_post = result.scalar_one_or_none()
     if not db_post:
         raise HTTPException(status_code=404, detail="Content post not found")
     
@@ -313,46 +417,56 @@ def mark_post_as_posted(
     db_post.posted_at = request.posted_at or datetime.utcnow()
     db_post.last_error = None
     
-    db.commit()
-    db.refresh(db_post)
+    await write_audit_marketing(
+        db, db_post.tenant_id, "content_post", db_post.id, "mark_posted", current_user.username
+    )
     
-    log_audit(db, "content_post", db_post.id, "mark_posted", db_post.owner, db_post.tenant_id)
-    db.commit()
+    await db.commit()
+    await db.refresh(db_post)
     
     return db_post
 
 
 @router.post("/content-posts/{post_id}/mark-failed", response_model=ContentPostSchema)
-def mark_post_as_failed(
+async def mark_post_as_failed(
     post_id: UUID,
     request: MarkFailedRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Mark a post as failed with error"""
-    db_post = db.query(ContentPost).filter(ContentPost.id == post_id).first()
+    result = await db.execute(
+        select(models.ContentPost).where(models.ContentPost.id == post_id)
+    )
+    db_post = result.scalar_one_or_none()
     if not db_post:
         raise HTTPException(status_code=404, detail="Content post not found")
     
     db_post.status = 'Failed'
     db_post.last_error = request.error
     
-    db.commit()
-    db.refresh(db_post)
+    await write_audit_marketing(
+        db, db_post.tenant_id, "content_post", db_post.id, "mark_failed", current_user.username
+    )
     
-    log_audit(db, "content_post", db_post.id, "mark_failed", db_post.owner, db_post.tenant_id)
-    db.commit()
+    await db.commit()
+    await db.refresh(db_post)
     
     return db_post
 
 
 @router.post("/content-posts/{post_id}/queue-publish")
-def queue_publish(
+async def queue_publish(
     post_id: UUID,
     request: QueuePublishRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
 ):
     """Queue a post for API publishing (stub for now)"""
-    db_post = db.query(ContentPost).filter(ContentPost.id == post_id).first()
+    result = await db.execute(
+        select(models.ContentPost).where(models.ContentPost.id == post_id)
+    )
+    db_post = result.scalar_one_or_none()
     if not db_post:
         raise HTTPException(status_code=404, detail="Content post not found")
     
@@ -360,12 +474,15 @@ def queue_publish(
     if not db_post.channel_ids:
         raise HTTPException(status_code=400, detail="No channels assigned to post")
     
-    account = db.query(ChannelAccount).filter(ChannelAccount.id == db_post.channel_ids[0]).first()
+    account_result = await db.execute(
+        select(models.ChannelAccount).where(models.ChannelAccount.id == db_post.channel_ids[0])
+    )
+    account = account_result.scalar_one_or_none()
     if not account or not account.oauth_connected:
         raise HTTPException(status_code=400, detail="Account not connected for auto-posting")
     
     # Create publish job (stub - actual publishing would be done by worker)
-    job = PublishJob(
+    job = models.PublishJob(
         tenant_id=db_post.tenant_id,
         content_post_id=db_post.id,
         attempt_no=1,
@@ -374,7 +491,13 @@ def queue_publish(
         status='queued'
     )
     db.add(job)
-    db.commit()
+    await db.flush()
+    
+    await write_audit_marketing(
+        db, db_post.tenant_id, "publish_job", job.id, "create", current_user.username
+    )
+    
+    await db.commit()
     
     return {"message": "Post queued for publishing", "job_id": str(job.id)}
 
@@ -382,28 +505,31 @@ def queue_publish(
 # Weekly Scoreboard
 
 @router.get("/scoreboard")
-def get_weekly_scoreboard(
+async def get_weekly_scoreboard(
     tenant_id: str = Query(...),
     week_start: datetime = Query(...),
     week_end: datetime = Query(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session)
 ):
     """Get weekly accountability scoreboard by owner"""
-    posts = db.query(ContentPost).filter(
-        and_(
-            ContentPost.tenant_id == tenant_id,
-            or_(
-                and_(
-                    ContentPost.scheduled_for >= week_start,
-                    ContentPost.scheduled_for <= week_end
-                ),
-                and_(
-                    ContentPost.created_at >= week_start,
-                    ContentPost.created_at <= week_end
+    result = await db.execute(
+        select(models.ContentPost).where(
+            and_(
+                models.ContentPost.tenant_id == tenant_id,
+                or_(
+                    and_(
+                        models.ContentPost.scheduled_for >= week_start,
+                        models.ContentPost.scheduled_for <= week_end
+                    ),
+                    and_(
+                        models.ContentPost.created_at >= week_start,
+                        models.ContentPost.created_at <= week_end
+                    )
                 )
             )
         )
-    ).all()
+    )
+    posts = result.scalars().all()
     
     # Group by owner
     scoreboard = {}
@@ -449,18 +575,21 @@ def get_weekly_scoreboard(
 # Audit Trail
 
 @router.get("/audit-trail/{entity_id}")
-def get_audit_trail(
+async def get_audit_trail(
     entity_id: UUID,
     entity_type: str = Query("content_post"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_session)
 ):
     """Get audit trail for an entity"""
-    logs = db.query(AuditLog).filter(
-        and_(
-            AuditLog.entity_type == entity_type,
-            AuditLog.entity_id == entity_id
-        )
-    ).order_by(AuditLog.changed_at.desc()).all()
+    result = await db.execute(
+        select(models.AuditLog).where(
+            and_(
+                models.AuditLog.entity_type == entity_type,
+                models.AuditLog.entity_id == entity_id
+            )
+        ).order_by(models.AuditLog.changed_at.desc())
+    )
+    logs = result.scalars().all()
     
     return [
         {

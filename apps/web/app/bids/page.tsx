@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { API_BASE_URL } from '../lib/config'
 
 export default function BidsPage(){
   const [bids, setBids] = useState<any[]>([])
@@ -14,16 +15,16 @@ export default function BidsPage(){
     const token = localStorage.getItem('token')
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
     async function load(){
-      const b = await axios.get('/api/builders')
+      const b = await axios.get(`${API_BASE_URL}/builders`, { withCredentials: true })
       setBuilders(b.data)
-      const res = await axios.get('/api/bids', { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined } })
+      const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
       setBids(res.data)
     }
     load()
   }, [])
 
   async function searchNow(){
-    const res = await axios.get('/api/bids', { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined } })
+    const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
     setBids(res.data)
   }
 
@@ -37,7 +38,7 @@ export default function BidsPage(){
         status: 'Draft',
         builder_id: builderId || builders[0]?.id
       }
-      await axios.post('/api/bids', body)
+      await axios.post(`${API_BASE_URL}/bids`, body, { withCredentials: true })
       await searchNow()
     } catch (err: any){
       alert(err?.response?.data?.detail || 'Failed to create')

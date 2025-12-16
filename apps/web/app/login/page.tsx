@@ -1,9 +1,10 @@
 'use client'
 import { useState } from 'react'
 import axios from 'axios'
-import { API_URL } from '../../lib/config'
+import { API_BASE_URL } from '../../lib/config'
 
 export default function Login() {
+  const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,8 +15,8 @@ export default function Login() {
     setLoading(true)
     
     try {
-      const res = await axios.post(`${API_URL}/login`, 
-        { password },
+      const res = await axios.post(`${API_BASE_URL}/login`, 
+        { username, password },
         { withCredentials: true }
       )
       
@@ -32,7 +33,22 @@ export default function Login() {
     <main className="p-8">
       <form onSubmit={submit} className="max-w-md">
         <h1 className="text-xl font-bold">Login</h1>
-        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" className="border p-2 mt-4 w-full" required />
+        <input 
+          value={username} 
+          onChange={e => setUsername(e.target.value)} 
+          placeholder="Username" 
+          type="text" 
+          className="border p-2 mt-4 w-full" 
+          required 
+        />
+        <input 
+          value={password} 
+          onChange={e => setPassword(e.target.value)} 
+          placeholder="Password" 
+          type="password" 
+          className="border p-2 mt-4 w-full" 
+          required 
+        />
         {error && <div className="text-red-600 mt-2">{error}</div>}
         <button disabled={loading} className="bg-blue-600 text-white px-4 py-2 mt-2 disabled:opacity-50">
           {loading ? 'Logging in...' : 'Login'}

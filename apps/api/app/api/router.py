@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Request
 from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
+from datetime import datetime
 from .. schemas import (
     BuilderCreate, BuilderOut, BuilderUpdate, BuilderContactCreate, BuilderContactOut, BuilderContactUpdate, Token,
     BidCreate, BidOut, BidUpdate, BidLineItemCreate, BidLineItemOut, BidLineItemUpdate,
@@ -9,20 +10,26 @@ from .. schemas import (
     ServiceCallCreate, ServiceCallOut, ServiceCallUpdate,
     AuditLogOut,
 )
-from ..core.auth import create_access_token, get_current_user
+from ..core.auth import create_access_token, get_current_user, CurrentUser
 from ..core.config import settings
+from ..core.password import hash_password, verify_password
 from ..db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from .. import crud, models
+from ..core.tenant_config import validate_tenant_feature, TenantFeature
+from ..schemas import UserCreate, UserUpdate, UserOut
 from uuid import UUID
 
-# Import marketing routes (sync-based for now)
+# Import marketing routes (async-based)
 try:
     from ..routes_marketing import router as marketing_router
 except ImportError:
     marketing_router = None
+
+from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
 
@@ -31,13 +38,47 @@ if marketing_router:
     router.include_router(marketing_router)
 
 class LoginRequest(BaseModel):
+    username: str
     password: str
 
 @router.post('/login')
-async def login(login_data: LoginRequest, response: Response):
-    if login_data.password != settings.admin_password:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    token = create_access_token({"username": "admin", "role": "admin"})
+@limiter.limit(get_rate_limit("auth"))  # Rate limit login attempts
+async def login(request: Request, login_data: LoginRequest, response: Response, db: AsyncSession = Depends(get_session)):
+    """Login endpoint - supports both user table and legacy admin password"""
+    # Try to find user in database first
+    result = await db.execute(
+        select(models.User).where(models.User.username == login_data.username)
+    )
+    user = result.scalar_one_or_none()
+    
+    if user:
+        # User exists in database - verify password
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
+        
+        if not verify_password(login_data.password, user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        await db.commit()
+        
+        token = create_access_token({
+            "username": user.username,
+            "role": user.role,
+            "user_id": str(user.id)
+        })
+        
+        username = user.username
+        role = user.role
+    else:
+        # Fallback to legacy admin password for backward compatibility
+        if login_data.username != "admin" or login_data.password != settings.admin_password:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        
+        token = create_access_token({"username": "admin", "role": "admin"})
+        username = "admin"
+        role = "admin"
     
     # Set httpOnly cookie
     response.set_cookie(
@@ -49,7 +90,7 @@ async def login(login_data: LoginRequest, response: Response):
         max_age=28800  # 8 hours
     )
     
-    return {"message": "Login successful", "username": "admin"}
+    return {"message": "Login successful", "username": username, "role": role}
 
 @router.get('/health')
 async def health():
@@ -196,8 +237,10 @@ async def delete_bid_line_item(id: UUID, db: AsyncSession = Depends(get_session)
 # Jobs
 @router.post('/jobs', response_model=JobOut)
 async def create_job(job_in: JobCreate, db: AsyncSession = Depends(get_session), current_user=Depends(get_current_user)):
-    if job_in.tenant_id != 'all_county':
-        raise HTTPException(status_code=400, detail='tenant_id must be all_county for jobs')
+    try:
+        validate_tenant_feature(job_in.tenant_id, TenantFeature.JOBS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     try:
         job = await crud.create_job(db, job_in, current_user.username)
     except ValueError as e:
@@ -252,8 +295,10 @@ async def delete_job_contact(id: UUID, builder_contact_id: UUID, db: AsyncSessio
 # Service calls
 @router.post('/service-calls', response_model=ServiceCallOut)
 async def create_service_call(sc_in: ServiceCallCreate, db: AsyncSession = Depends(get_session), current_user=Depends(get_current_user)):
-    if sc_in.tenant_id != 'h2o':
-        raise HTTPException(status_code=400, detail='tenant_id must be h2o for service calls')
+    try:
+        validate_tenant_feature(sc_in.tenant_id, TenantFeature.SERVICE_CALLS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     try:
         sc = await crud.create_service_call(db, sc_in, current_user.username)
     except ValueError as e:
@@ -293,3 +338,162 @@ async def delete_service_call(id: UUID, db: AsyncSession = Depends(get_session),
 async def list_audit(entity_type: Optional[str] = None, entity_id: Optional[UUID] = None, tenant_id: Optional[str] = None, limit: int = 50, offset: int = 0, db: AsyncSession = Depends(get_session)):
     logs = await crud.list_audit(db, entity_type, entity_id, tenant_id, limit, offset)
     return logs
+
+# User Management
+
+@router.post('/users', response_model=UserOut)
+async def create_user(
+    user_in: UserCreate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Create a new user (admin only)"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can create users")
+    
+    # Check if username already exists
+    result = await db.execute(
+        select(models.User).where(models.User.username == user_in.username)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Username already exists")
+    
+    # Create user
+    user = models.User(
+        username=user_in.username,
+        email=user_in.email,
+        full_name=user_in.full_name,
+        role=user_in.role,
+        tenant_id=user_in.tenant_id,
+        hashed_password=hash_password(user_in.password)
+    )
+    db.add(user)
+    await db.flush()
+    
+    # Audit log
+    await crud.write_audit(
+        db, None, 'user', user.id, 'create', current_user.username
+    )
+    
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+@router.get('/users', response_model=list[UserOut])
+async def list_users(
+    tenant_id: Optional[str] = None,
+    role: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """List users (admin only)"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can list users")
+    
+    query = select(models.User)
+    if tenant_id:
+        query = query.where(models.User.tenant_id == tenant_id)
+    if role:
+        query = query.where(models.User.role == role)
+    
+    query = query.limit(limit).offset(offset).order_by(models.User.username)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+@router.get('/users/{user_id}', response_model=UserOut)
+async def get_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get a specific user"""
+    # Users can view their own profile, admins can view any
+    if current_user.role != "admin" and str(user_id) != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    
+    result = await db.execute(
+        select(models.User).where(models.User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@router.patch('/users/{user_id}', response_model=UserOut)
+async def update_user(
+    user_id: UUID,
+    user_update: UserUpdate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update a user"""
+    # Users can update their own profile (except role), admins can update any
+    if current_user.role != "admin" and str(user_id) != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    
+    result = await db.execute(
+        select(models.User).where(models.User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Non-admins cannot change role
+    if current_user.role != "admin" and user_update.role is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot change role")
+    
+    update_data = user_update.model_dump(exclude_unset=True)
+    
+    # Handle password update
+    if "password" in update_data:
+        update_data["hashed_password"] = hash_password(update_data.pop("password"))
+    
+    for field, value in update_data.items():
+        old_value = getattr(user, field)
+        setattr(user, field, value)
+        await crud.write_audit(
+            db,
+            None,
+            'user',
+            user.id,
+            'update',
+            current_user.username,
+            field,
+            str(old_value) if old_value is not None else None,
+            str(value) if value is not None else None,
+        )
+    
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+@router.delete('/users/{user_id}')
+async def delete_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Delete a user (admin only)"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can delete users")
+    
+    result = await db.execute(
+        select(models.User).where(models.User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Don't allow deleting yourself
+    if str(user_id) == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    await crud.write_audit(
+        db, None, 'user', user.id, 'delete', current_user.username
+    )
+    
+    await db.delete(user)
+    await db.commit()
+    return {"deleted": True}

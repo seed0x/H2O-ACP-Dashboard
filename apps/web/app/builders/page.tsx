@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { API_URL } from '../../lib/config'
+import { API_BASE_URL } from '../../lib/config'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Table } from '../../components/ui/Table'
@@ -29,7 +29,7 @@ export default function BuildersPage() {
 
   async function loadBuilders() {
     try {
-      const response = await axios.get(`${API_URL}/builders`, { 
+      const response = await axios.get(`${API_BASE_URL}/builders`, { 
         withCredentials: true 
       })
       setBuilders(response.data)
@@ -45,7 +45,7 @@ export default function BuildersPage() {
     
     setSubmitting(true)
     try {
-      await axios.post(`${API_URL}/builders`, {
+      await axios.post(`${API_BASE_URL}/builders`, {
         name: newBuilderName,
         notes: newBuilderNotes || null
       }, { withCredentials: true })

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
-import { API_URL } from '../../lib/config'
+import { API_BASE_URL } from '../../lib/config'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Table } from '../../components/ui/Table'
@@ -36,7 +36,7 @@ export default function JobsPage() {
 
   async function loadJobs() {
     try {
-      const response = await axios.get(`${API_URL}/jobs?tenant_id=all_county`, { 
+      const response = await axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { 
         withCredentials: true 
       })
       setJobs(response.data)

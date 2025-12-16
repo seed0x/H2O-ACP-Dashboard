@@ -7,6 +7,36 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+# User Management Schemas
+
+class UserBase(BaseModel):
+    username: str
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    role: str = "user"
+    tenant_id: Optional[str] = None
+
+class UserCreate(UserBase):
+    password: str
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    tenant_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+
+class UserOut(UserBase):
+    id: UUID
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
 class BuilderBase(BaseModel):
     name: str
     notes: Optional[str] = None
