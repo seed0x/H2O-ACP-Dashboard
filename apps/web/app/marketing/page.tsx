@@ -108,6 +108,8 @@ function PostsView() {
   const [showNewPostModal, setShowNewPostModal] = useState(false)
   const [selectedPost, setSelectedPost] = useState<any>(null)
   const [channels, setChannels] = useState<any[]>([])
+  const [error, setError] = useState<string>('')
+  const [submitting, setSubmitting] = useState(false)
   const [postForm, setPostForm] = useState({
     title: '',
     body_text: '',
@@ -161,6 +163,8 @@ function PostsView() {
 
   async function handleCreatePost(e: React.FormEvent) {
     e.preventDefault()
+    setError('')
+    setSubmitting(true)
     try {
       const response = await fetch('/api/marketing/content-posts', {
         method: 'POST',
@@ -168,13 +172,20 @@ function PostsView() {
         credentials: 'include',
         body: JSON.stringify({ ...postForm, tenant_id: 'h2o' })
       })
-      if (response.ok) {
-        setShowNewPostModal(false)
-        setPostForm({ title: '', body_text: '', scheduled_for: '', channel_ids: [], status: 'Draft', owner: 'admin' })
-        loadPosts()
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to create post' }))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
       }
-    } catch (error) {
+      
+      setShowNewPostModal(false)
+      setPostForm({ title: '', body_text: '', scheduled_for: '', channel_ids: [], status: 'Draft', owner: 'admin' })
+      await loadPosts()
+    } catch (error: any) {
       console.error('Failed to create post:', error)
+      setError(error.message || 'Failed to create post. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -238,6 +249,19 @@ function PostsView() {
             <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
               Create New Post
             </h3>
+            {error && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                border: '1px solid #EF5350',
+                borderRadius: '8px',
+                color: '#EF5350',
+                fontSize: '14px',
+                marginBottom: '16px'
+              }}>
+                {error}
+              </div>
+            )}
             <form onSubmit={handleCreatePost}>
               <div style={{ display: 'grid', gap: '16px' }}>
                 <div>
@@ -307,41 +331,49 @@ function PostsView() {
                     Channels
                   </label>
                   <div style={{ display: 'grid', gap: '8px' }}>
-                    {channels.map(ch => (
-                      <label key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={postForm.channel_ids.includes(ch.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setPostForm({ ...postForm, channel_ids: [...postForm.channel_ids, ch.id] })
-                            } else {
-                              setPostForm({ ...postForm, channel_ids: postForm.channel_ids.filter(id => id !== ch.id) })
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.name}</span>
-                      </label>
-                    ))}
+                    {Array.isArray(channels) && channels.length > 0 ? (
+                      channels.map(ch => (
+                        <label key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={postForm.channel_ids.includes(ch.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setPostForm({ ...postForm, channel_ids: [...postForm.channel_ids, ch.id] })
+                              } else {
+                                setPostForm({ ...postForm, channel_ids: postForm.channel_ids.filter(id => id !== ch.id) })
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.name}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '8px' }}>
+                        No channels available. Please add channels first.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
                 <button
                   type="submit"
+                  disabled={submitting}
                   style={{
                     padding: '10px 20px',
-                    backgroundColor: 'var(--color-primary)',
+                    backgroundColor: submitting ? 'var(--color-hover)' : 'var(--color-primary)',
                     border: 'none',
                     borderRadius: '8px',
                     color: '#ffffff',
                     fontSize: '14px',
                     fontWeight: '500',
-                    cursor: 'pointer'
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    opacity: submitting ? 0.6 : 1
                   }}
                 >
-                  Create Post
+                  {submitting ? 'Creating...' : 'Create Post'}
                 </button>
                 <button
                   type="button"
@@ -929,19 +961,23 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
   const [editForm, setEditForm] = useState({
     title: post.title || '',
     body_text: post.body_text || '',
-    scheduled_for: post.scheduled_for ? post.scheduled_for.slice(0, 16) : '',
-    draft_due_date: post.draft_due_date ? post.draft_due_date.slice(0, 16) : '',
-    channel_ids: post.channel_ids || [],
+    scheduled_for: post.scheduled_for && typeof post.scheduled_for === 'string' ? post.scheduled_for.slice(0, 16) : '',
+    draft_due_date: post.draft_due_date && typeof post.draft_due_date === 'string' ? post.draft_due_date.slice(0, 16) : '',
+    channel_ids: Array.isArray(post.channel_ids) ? post.channel_ids : [],
     status: post.status || 'Draft',
     owner: post.owner || 'admin',
     reviewer: post.reviewer || '',
-    tags: post.tags || [],
+    tags: Array.isArray(post.tags) ? post.tags : [],
     target_city: post.target_city || '',
     cta_type: post.cta_type || 'None',
     cta_url: post.cta_url || ''
   })
+  const [updateError, setUpdateError] = useState<string>('')
+  const [updating, setUpdating] = useState(false)
 
   async function handleUpdate() {
+    setUpdateError('')
+    setUpdating(true)
     try {
       const response = await fetch(`/api/marketing/content-posts/${post.id}`, {
         method: 'PATCH',
@@ -949,11 +985,18 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
         credentials: 'include',
         body: JSON.stringify(editForm)
       })
-      if (response.ok) {
-        onUpdate()
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to update post' }))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
       }
-    } catch (error) {
+      
+      onUpdate()
+    } catch (error: any) {
       console.error('Failed to update post:', error)
+      setUpdateError(error.message || 'Failed to update post. Please try again.')
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -991,9 +1034,11 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
     }
   }
 
-  const postChannels = post.channel_ids?.map((cid: string) => 
-    channels.find(ch => ch.id === cid)?.name
-  ).filter(Boolean).join(', ') || 'No channel'
+  const postChannels = Array.isArray(post.channel_ids) && Array.isArray(channels)
+    ? post.channel_ids.map((cid: string) => 
+        channels.find(ch => ch.id === cid)?.name
+      ).filter(Boolean).join(', ') || 'No channel'
+    : 'No channel'
 
   async function loadAuditTrail() {
     try {
@@ -1070,6 +1115,21 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
             {editForm.status}
           </span>
         </div>
+
+        {/* Error Message */}
+        {updateError && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'rgba(239, 83, 80, 0.1)',
+            border: '1px solid #EF5350',
+            borderRadius: '8px',
+            color: '#EF5350',
+            fontSize: '14px',
+            marginBottom: '20px'
+          }}>
+            {updateError}
+          </div>
+        )}
 
         {/* Edit Form */}
         <div style={{ display: 'grid', gap: '16px' }}>
@@ -1254,23 +1314,29 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
               Channels
             </label>
             <div style={{ display: 'grid', gap: '8px' }}>
-              {channels.map(ch => (
-                <label key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={editForm.channel_ids.includes(ch.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setEditForm({ ...editForm, channel_ids: [...editForm.channel_ids, ch.id] })
-                      } else {
-                        setEditForm({ ...editForm, channel_ids: editForm.channel_ids.filter(id => id !== ch.id) })
-                      }
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.name}</span>
-                </label>
-              ))}
+              {Array.isArray(channels) && channels.length > 0 ? (
+                channels.map(ch => (
+                  <label key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.channel_ids.includes(ch.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setEditForm({ ...editForm, channel_ids: [...editForm.channel_ids, ch.id] })
+                        } else {
+                          setEditForm({ ...editForm, channel_ids: editForm.channel_ids.filter(id => id !== ch.id) })
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.name}</span>
+                  </label>
+                ))
+              ) : (
+                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '8px' }}>
+                  No channels available
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1279,18 +1345,20 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
         <div style={{ display: 'flex', gap: '12px', marginTop: '24px', flexWrap: 'wrap' }}>
           <button
             onClick={handleUpdate}
+            disabled={updating}
             style={{
               padding: '10px 20px',
-              backgroundColor: 'var(--color-primary)',
+              backgroundColor: updating ? 'var(--color-hover)' : 'var(--color-primary)',
               border: 'none',
               borderRadius: '8px',
               color: '#ffffff',
               fontSize: '14px',
               fontWeight: '500',
-              cursor: 'pointer'
+              cursor: updating ? 'not-allowed' : 'pointer',
+              opacity: updating ? 0.6 : 1
             }}
           >
-            Save Changes
+            {updating ? 'Saving...' : 'Save Changes'}
           </button>
           {post.status === 'Scheduled' && (
             <>
@@ -1830,7 +1898,7 @@ function AccountsView() {
                   }}
                 >
                   <option value="">Select a channel</option>
-                  {channels.map(ch => (
+                  {Array.isArray(channels) && channels.map(ch => (
                     <option key={ch.id} value={ch.id}>{ch.name}</option>
                   ))}
                 </select>
