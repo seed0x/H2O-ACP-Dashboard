@@ -379,3 +379,239 @@ async def list_audit(db: AsyncSession, entity_type: str | None, entity_id: UUID 
     q = q.order_by(models.AuditLog.changed_at.desc()).limit(limit).offset(offset)
     res = await db.execute(q)
     return res.scalars().all()
+
+### Import/Migration Functions
+async def find_or_create_builder(db: AsyncSession, builder_name: str, changed_by: str) -> models.Builder:
+    """Find builder by name (case-insensitive) or create if not found"""
+    if not builder_name:
+        raise ValueError("Builder name is required")
+    
+    # Try exact match (case-insensitive)
+    q = select(models.Builder).where(func.lower(models.Builder.name) == func.lower(builder_name))
+    res = await db.execute(q)
+    builder = res.scalar_one_or_none()
+    
+    if builder:
+        return builder
+    
+    # Try fuzzy match - look for similar names
+    q = select(models.Builder).where(models.Builder.name.ilike(f"%{builder_name}%"))
+    res = await db.execute(q)
+    builder = res.scalar_one_or_none()
+    
+    if builder:
+        return builder
+    
+    # Create new builder
+    builder = models.Builder(name=builder_name, notes=f"Auto-created during import by {changed_by}")
+    db.add(builder)
+    await db.flush()
+    await write_audit(db, None, 'builder', builder.id, 'create', changed_by)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        # Try one more time to find it (race condition)
+        q = select(models.Builder).where(func.lower(models.Builder.name) == func.lower(builder_name))
+        res = await db.execute(q)
+        builder = res.scalar_one_or_none()
+        if builder:
+            return builder
+        raise ValueError('Builder name must be unique')
+    await db.refresh(builder)
+    return builder
+
+async def find_duplicate_job(db: AsyncSession, tenant_id: str, builder_id: UUID, community: str, lot_number: str, phase: str) -> Optional[models.Job]:
+    """Find duplicate job based on uniqueness constraint"""
+    q = select(models.Job).where(
+        models.Job.tenant_id == tenant_id,
+        models.Job.builder_id == builder_id,
+        func.lower(models.Job.community) == func.lower(community),
+        func.lower(models.Job.lot_number) == func.lower(lot_number),
+        func.lower(models.Job.phase) == func.lower(phase)
+    )
+    res = await db.execute(q)
+    return res.scalar_one_or_none()
+
+async def bulk_import_jobs(
+    db: AsyncSession,
+    parsed_events: List,
+    tenant_id: str,
+    changed_by: str,
+    skip_duplicates: bool = True
+) -> dict:
+    """
+    Bulk import jobs from parsed Outlook calendar events
+    
+    Returns:
+        dict with counts: created, updated, skipped, errors
+    """
+    # Import here to avoid circular dependencies
+    from app.core.outlook_parser import ParsedCalendarEvent
+    
+    stats = {
+        'created': 0,
+        'updated': 0,
+        'skipped': 0,
+        'errors': 0,
+        'error_details': []
+    }
+    
+    for event in parsed_events:
+        if not isinstance(event, ParsedCalendarEvent):
+            continue
+        
+        # Skip if not a job type
+        if event.job_type not in ['job', 'warranty']:
+            continue
+        
+        # Require builder name
+        if not event.builder_name:
+            stats['skipped'] += 1
+            stats['error_details'].append({
+                'title': event.title,
+                'reason': 'No builder name found'
+            })
+            continue
+        
+        try:
+            # Find or create builder
+            builder = await find_or_create_builder(db, event.builder_name, changed_by)
+            
+            # Check for duplicates
+            if event.community and event.lot_number and event.phase:
+                duplicate = await find_duplicate_job(
+                    db, tenant_id, builder.id, event.community, event.lot_number, event.phase
+                )
+                
+                if duplicate:
+                    if skip_duplicates:
+                        stats['skipped'] += 1
+                        continue
+                    else:
+                        # Update existing job
+                        update_data = schemas.JobUpdate(
+                            scheduled_start=event.start_time,
+                            scheduled_end=event.end_time,
+                            notes=event.notes
+                        )
+                        await update_job(db, duplicate, update_data, changed_by)
+                        stats['updated'] += 1
+                        continue
+            
+            # Create new job
+            # Set defaults for required fields
+            community = event.community or 'Unknown'
+            lot_number = event.lot_number or 'Unknown'
+            phase = event.phase or 'TO'
+            address = event.address_line1 or 'Address not provided'
+            city = event.city or 'Vancouver'
+            zip_code = event.zip or '98660'
+            
+            job_data = schemas.JobCreate(
+                tenant_id=tenant_id,
+                builder_id=builder.id,
+                community=community,
+                lot_number=lot_number,
+                phase=phase,
+                status=event.status or 'scheduled',
+                address_line1=address,
+                city=city,
+                state=event.state or 'WA',
+                zip=zip_code,
+                scheduled_start=event.start_time,
+                scheduled_end=event.end_time,
+                notes=event.notes
+            )
+            
+            await create_job(db, job_data, changed_by)
+            stats['created'] += 1
+            
+        except Exception as e:
+            stats['errors'] += 1
+            stats['error_details'].append({
+                'title': event.title,
+                'reason': str(e)
+            })
+            continue
+    
+    return stats
+
+async def bulk_import_service_calls(
+    db: AsyncSession,
+    parsed_events: List,
+    tenant_id: str,
+    changed_by: str,
+    skip_duplicates: bool = True
+) -> dict:
+    """
+    Bulk import service calls from parsed Outlook calendar events
+    
+    Returns:
+        dict with counts: created, updated, skipped, errors
+    """
+    # Import here to avoid circular dependencies
+    from app.core.outlook_parser import ParsedCalendarEvent
+    
+    stats = {
+        'created': 0,
+        'updated': 0,
+        'skipped': 0,
+        'errors': 0,
+        'error_details': []
+    }
+    
+    for event in parsed_events:
+        if not isinstance(event, ParsedCalendarEvent):
+            continue
+        
+        # Only process service calls and go_back types
+        if event.job_type not in ['service_call', 'go_back']:
+            continue
+        
+        # Require address
+        if not event.address_line1:
+            stats['skipped'] += 1
+            stats['error_details'].append({
+                'title': event.title,
+                'reason': 'No address found'
+            })
+            continue
+        
+        try:
+            builder = None
+            if event.builder_name:
+                builder = await find_or_create_builder(db, event.builder_name, changed_by)
+            
+            # Extract customer name from title or use default
+            customer_name = event.title.split('-')[0].strip() if '-' in event.title else 'Customer'
+            
+            # Create service call
+            sc_data = schemas.ServiceCallCreate(
+                tenant_id=tenant_id,
+                builder_id=builder.id if builder else None,
+                customer_name=customer_name,
+                address_line1=event.address_line1,
+                city=event.city or 'Vancouver',
+                state=event.state or 'WA',
+                zip=event.zip or '98660',
+                issue_description=event.title,
+                priority='Normal',
+                status=event.status or 'open',
+                scheduled_start=event.start_time,
+                scheduled_end=event.end_time,
+                notes=event.notes
+            )
+            
+            await create_service_call(db, sc_data, changed_by)
+            stats['created'] += 1
+            
+        except Exception as e:
+            stats['errors'] += 1
+            stats['error_details'].append({
+                'title': event.title,
+                'reason': str(e)
+            })
+            continue
+    
+    return stats

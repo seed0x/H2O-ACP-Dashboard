@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
@@ -348,6 +348,75 @@ async def delete_service_call(id: UUID, db: AsyncSession = Depends(get_session),
         raise HTTPException(status_code=404, detail='Service call not found')
     await crud.delete_service_call(db, sc, current_user.username)
     return {"deleted": True}
+
+# Import/Migration endpoints
+@router.post('/import/outlook-calendar')
+async def import_outlook_calendar(
+    file: UploadFile = File(...),
+    tenant_id: str = Query(..., description="Tenant ID for imported records"),
+    skip_duplicates: bool = Query(True, description="Skip duplicate jobs instead of updating"),
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    """
+    Import jobs and service calls from Outlook calendar export (CSV or ICS format)
+    
+    The file should be exported from Outlook calendar. Supports:
+    - CSV format (File > Save Calendar > CSV)
+    - ICS format (File > Save Calendar > iCalendar Format)
+    """
+    try:
+        validate_tenant_feature(tenant_id, TenantFeature.JOBS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Read file content
+    content = await file.read()
+    file_content = content.decode('utf-8-sig')  # Handle BOM
+    
+    # Determine file type
+    file_type = 'auto'
+    if file.filename:
+        if file.filename.lower().endswith('.csv'):
+            file_type = 'csv'
+        elif file.filename.lower().endswith('.ics'):
+            file_type = 'ics'
+    
+    # Parse calendar events
+    from ..core.outlook_parser import OutlookParser
+    parser = OutlookParser()
+    
+    try:
+        if file_type == 'csv':
+            parsed_events = parser.parse_csv(file_content)
+        elif file_type == 'ics':
+            parsed_events = parser.parse_ics(file_content)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Please use CSV or ICS format.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse calendar file: {str(e)}")
+    
+    if not parsed_events:
+        raise HTTPException(status_code=400, detail="No events found in calendar file")
+    
+    # Import jobs
+    job_stats = await crud.bulk_import_jobs(
+        db, parsed_events, tenant_id, current_user.username, skip_duplicates
+    )
+    
+    # Import service calls
+    service_call_stats = await crud.bulk_import_service_calls(
+        db, parsed_events, tenant_id, current_user.username, skip_duplicates
+    )
+    
+    return {
+        "message": "Import completed",
+        "summary": {
+            "total_events_parsed": len(parsed_events),
+            "jobs": job_stats,
+            "service_calls": service_call_stats
+        }
+    }
 
 # Audit log
 @router.get('/audit', response_model=list[AuditLogOut])
