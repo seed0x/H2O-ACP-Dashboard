@@ -36,7 +36,7 @@ def run_migrations_online() -> None:
             await conn.run_sync(do_run_migrations_sync)
         await connectable.dispose()
 
-    async def do_run_migrations_sync(connection: Connection):
+    def do_run_migrations_sync(connection: Connection):
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
