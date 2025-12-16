@@ -109,6 +109,8 @@ async def main():
                     for err in sc_stats['error_details'][:3]:
                         print(f"    - {err.get('title', 'Unknown')[:60]}: {err.get('reason', 'Unknown error')}")
                 
+                # Final commit (bulk_import functions handle their own commits)
+                
                 created = job_stats['created'] + sc_stats['created']
                 errors = job_stats['errors'] + sc_stats['errors']
                 

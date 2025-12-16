@@ -249,17 +249,18 @@ async def delete_bid_line_item(db: AsyncSession, item: models.BidLineItem, chang
     await db.commit()
 
 ### Jobs
-async def create_job(db: AsyncSession, job_in: schemas.JobCreate, changed_by: str) -> models.Job:
+async def create_job(db: AsyncSession, job_in: schemas.JobCreate, changed_by: str, commit: bool = True) -> models.Job:
     job = models.Job(**job_in.dict())
     db.add(job)
     await db.flush()
     await write_audit(db, job.tenant_id, 'job', job.id, 'create', changed_by)
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise ValueError('Job uniqueness constraint violated')
-    await db.refresh(job)
+    if commit:
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise ValueError('Job uniqueness constraint violated')
+        await db.refresh(job)
     return job
 
 async def get_job(db: AsyncSession, job_id: UUID) -> models.Job | None:
@@ -321,17 +322,18 @@ async def remove_job_contact(db: AsyncSession, job_id: UUID, contact_id: UUID, c
     return True
 
 ### Service Calls
-async def create_service_call(db: AsyncSession, sc_in: schemas.ServiceCallCreate, changed_by: str) -> models.ServiceCall:
+async def create_service_call(db: AsyncSession, sc_in: schemas.ServiceCallCreate, changed_by: str, commit: bool = True) -> models.ServiceCall:
     sc = models.ServiceCall(**sc_in.dict())
     db.add(sc)
     await db.flush()
     await write_audit(db, sc.tenant_id, 'service_call', sc.id, 'create', changed_by)
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise ValueError('Failed to create service call')
-    await db.refresh(sc)
+    if commit:
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            raise ValueError('Failed to create service call')
+        await db.refresh(sc)
     return sc
 
 async def get_service_call(db: AsyncSession, sc_id: UUID) -> models.ServiceCall | None:
@@ -443,6 +445,7 @@ async def bulk_import_jobs(
     
     total = len([e for e in parsed_events if isinstance(e, ParsedCalendarEvent) and e.job_type in ['job', 'warranty']])
     processed = 0
+    commit_batch_size = 50  # Commit every 50 successful records
     
     for event in parsed_events:
         if not isinstance(event, ParsedCalendarEvent):
@@ -482,43 +485,57 @@ async def bulk_import_jobs(
             city = event.city or 'Vancouver'
             zip_code = event.zip or '98660'
             
-            job_data = schemas.JobCreate(
-                tenant_id=tenant_id,
-                builder_id=builder.id,
-                community=community,
-                lot_number=lot_number,
-                plan=None,
-                phase=phase,
-                status=event.status or 'scheduled',
-                address_line1=address,
-                city=city,
-                state=event.state or 'WA',
-                zip=zip_code,
-                scheduled_start=event.start_time,
-                scheduled_end=event.end_time,
-                notes=event.notes,
-                tech_name=event.tech_name if hasattr(event, 'tech_name') else None
-            )
-            
+            # Create job directly (bypass create_job to avoid transaction issues)
             try:
-                await create_job(db, job_data, changed_by)
+                job = models.Job(
+                    tenant_id=tenant_id,
+                    builder_id=builder.id,
+                    community=community,
+                    lot_number=lot_number,
+                    plan=None,
+                    phase=phase,
+                    status=event.status or 'scheduled',
+                    address_line1=address,
+                    city=city,
+                    state=event.state or 'WA',
+                    zip=zip_code,
+                    scheduled_start=event.start_time,
+                    scheduled_end=event.end_time,
+                    notes=event.notes,
+                    tech_name=event.tech_name if hasattr(event, 'tech_name') else None
+                )
+                db.add(job)
+                await db.flush()  # Get the ID
+                
+                # Write audit log
+                await write_audit(db, tenant_id, 'job', job.id, 'create', changed_by)
+                
                 stats['created'] += 1
                 processed += 1
+                
+                # Commit in batches to avoid losing progress on errors
+                if stats['created'] % commit_batch_size == 0:
+                    try:
+                        await db.commit()
+                    except Exception as commit_err:
+                        await db.rollback()
+                        stats['errors'] += 1
+                        if len(stats['error_details']) < 10:
+                            stats['error_details'].append({'title': 'Batch commit', 'reason': str(commit_err)[:100]})
+                
                 if processed % 50 == 0:
                     print(f"  Progress: {processed}/{total} jobs processed...")
-            except (IntegrityError, ValueError) as e:
-                # Unique constraint violation - treat as duplicate/skip
-                # create_job already rolled back, so just continue
+                    
+            except IntegrityError:
+                # Duplicate - rollback just this flush and continue (don't lose previous records)
+                await db.rollback()
                 stats['skipped'] += 1
                 processed += 1
                 if processed % 50 == 0:
                     print(f"  Progress: {processed}/{total} jobs processed...")
             except Exception as e:
-                # Other errors - create_job may have rolled back, but ensure clean state
-                try:
-                    await db.rollback()
-                except:
-                    pass
+                # Other errors - rollback just this record and continue
+                await db.rollback()
                 stats['errors'] += 1
                 processed += 1
                 if processed % 50 == 0:
@@ -529,10 +546,7 @@ async def bulk_import_jobs(
             
         except Exception as e:
             # Outer exception handler for builder creation, etc.
-            try:
-                await db.rollback()
-            except:
-                pass
+            await db.rollback()
             stats['errors'] += 1
             processed += 1
             if processed % 50 == 0:
@@ -541,6 +555,12 @@ async def bulk_import_jobs(
             if len(stats['error_details']) < 10:
                 stats['error_details'].append({'title': event.title[:50] if hasattr(event, 'title') else 'Unknown', 'reason': error_msg})
             continue
+    
+    # Final commit for any remaining records
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
     
     return stats
 
@@ -558,6 +578,7 @@ async def bulk_import_service_calls(
     
     total = len([e for e in parsed_events if isinstance(e, ParsedCalendarEvent) and e.job_type in ['service_call', 'go_back']])
     processed = 0
+    commit_batch_size = 50  # Commit every 50 successful records
     
     for event in parsed_events:
         if not isinstance(event, ParsedCalendarEvent):
@@ -580,43 +601,57 @@ async def bulk_import_service_calls(
                 event.title.split('-')[0].strip() if '-' in event.title else 'Customer'
             )
             
-            sc_data = schemas.ServiceCallCreate(
-                tenant_id=tenant_id,
-                builder_id=builder.id if builder else None,
-                customer_name=customer_name,
-                phone=event.phone if hasattr(event, 'phone') else None,
-                email=event.email if hasattr(event, 'email') else None,
-                address_line1=event.address_line1,
-                city=event.city or 'Vancouver',
-                state=event.state or 'WA',
-                zip=event.zip or '98660',
-                issue_description=event.title,
-                priority='Normal',
-                status=event.status or 'open',
-                scheduled_start=event.start_time,
-                scheduled_end=event.end_time,
-                notes=event.notes
-            )
-            
+            # Create service call directly (bypass create_service_call to avoid transaction issues)
             try:
-                await create_service_call(db, sc_data, changed_by)
+                sc = models.ServiceCall(
+                    tenant_id=tenant_id,
+                    builder_id=builder.id if builder else None,
+                    customer_name=customer_name,
+                    phone=event.phone if hasattr(event, 'phone') else None,
+                    email=event.email if hasattr(event, 'email') else None,
+                    address_line1=event.address_line1,
+                    city=event.city or 'Vancouver',
+                    state=event.state or 'WA',
+                    zip=event.zip or '98660',
+                    issue_description=event.title,
+                    priority='Normal',
+                    status=event.status or 'open',
+                    scheduled_start=event.start_time,
+                    scheduled_end=event.end_time,
+                    notes=event.notes
+                )
+                db.add(sc)
+                await db.flush()  # Get the ID
+                
+                # Write audit log
+                await write_audit(db, tenant_id, 'service_call', sc.id, 'create', changed_by)
+                
                 stats['created'] += 1
                 processed += 1
+                
+                # Commit in batches to avoid losing progress on errors
+                if stats['created'] % commit_batch_size == 0:
+                    try:
+                        await db.commit()
+                    except Exception as commit_err:
+                        await db.rollback()
+                        stats['errors'] += 1
+                        if len(stats['error_details']) < 10:
+                            stats['error_details'].append({'title': 'Batch commit', 'reason': str(commit_err)[:100]})
+                
                 if processed % 50 == 0:
                     print(f"  Progress: {processed}/{total} service calls processed...")
-            except (IntegrityError, ValueError) as e:
-                # Unique constraint violation - treat as duplicate/skip
-                # create_service_call already rolled back, so just continue
+                    
+            except IntegrityError:
+                # Duplicate - rollback just this flush and continue (don't lose previous records)
+                await db.rollback()
                 stats['skipped'] += 1
                 processed += 1
                 if processed % 50 == 0:
                     print(f"  Progress: {processed}/{total} service calls processed...")
             except Exception as e:
-                # Other errors - create_service_call may have rolled back, but ensure clean state
-                try:
-                    await db.rollback()
-                except:
-                    pass
+                # Other errors - rollback just this record and continue
+                await db.rollback()
                 stats['errors'] += 1
                 processed += 1
                 if processed % 50 == 0:
@@ -627,10 +662,7 @@ async def bulk_import_service_calls(
             
         except Exception as e:
             # Outer exception handler for builder creation, etc.
-            try:
-                await db.rollback()
-            except:
-                pass
+            await db.rollback()
             stats['errors'] += 1
             processed += 1
             if processed % 50 == 0:
@@ -639,5 +671,11 @@ async def bulk_import_service_calls(
             if len(stats['error_details']) < 10:
                 stats['error_details'].append({'title': event.title[:50] if hasattr(event, 'title') else 'Unknown', 'reason': error_msg})
             continue
+    
+    # Final commit for any remaining records
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
     
     return stats

@@ -292,12 +292,16 @@ class OutlookParser:
         return 'TO'
     
     def _extract_lot_number(self, text: str) -> Optional[str]:
-        """Extract lot number from text"""
+        """Extract lot number from text - handles typos like LOLT instead of LOT"""
         patterns = [
             r'LOT\s*[#]?\s*(\d+)',
             r'LOT[#]?(\d+)',
             r'-LOT\s*(\d+)',
             r'-LOT(\d+)',
+            r'LOLT\s*[#]?\s*(\d+)',  # Handle typo: LOLT instead of LOT
+            r'LOLT[#]?(\d+)',
+            r'-LOLT\s*(\d+)',
+            r'-LOLT(\d+)',
             r'#(\d+)',
         ]
         
