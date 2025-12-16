@@ -54,7 +54,7 @@ class BuilderOut(BuilderBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BuilderContactBase(BaseModel):
     name: str
@@ -84,7 +84,7 @@ class BuilderContactOut(BuilderContactBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BidBase(BaseModel):
     tenant_id: str
@@ -113,7 +113,7 @@ class BidOut(BidBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BidLineItemBase(BaseModel):
     category: str
@@ -141,7 +141,7 @@ class BidLineItemOut(BidLineItemBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class JobBase(BaseModel):
     tenant_id: str
@@ -183,7 +183,7 @@ class JobOut(JobBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ServiceCallBase(BaseModel):
     tenant_id: str
@@ -217,7 +217,7 @@ class ServiceCallOut(ServiceCallBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AuditLogOut(BaseModel):
     id: UUID
@@ -232,5 +232,5 @@ class AuditLogOut(BaseModel):
     changed_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
