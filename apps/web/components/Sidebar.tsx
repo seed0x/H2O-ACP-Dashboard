@@ -8,6 +8,7 @@ import UilUserCircle from '@iconscout/react-unicons/icons/uil-user-circle'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
 import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
+import UilImport from '@iconscout/react-unicons/icons/uil-import'
 
 interface NavItem {
   name: string
@@ -22,6 +23,7 @@ const navItems: NavItem[] = [
   { name: 'Marketing', href: '/marketing', icon: UilCalendarAlt },
   { name: 'Builders', href: '/builders', icon: UilUserCircle },
   { name: 'Bids', href: '/bids', icon: UilFileAlt },
+  { name: 'Import Data', href: '/admin/import', icon: UilImport },
 ]
 
 export function Sidebar() {
