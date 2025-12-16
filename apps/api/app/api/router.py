@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, 
 from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from .. schemas import (
     BuilderCreate, BuilderOut, BuilderUpdate, BuilderContactCreate, BuilderContactOut, BuilderContactUpdate, Token,
     BidCreate, BidOut, BidUpdate, BidLineItemCreate, BidLineItemOut, BidLineItemUpdate,
@@ -69,7 +69,7 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
             
             # Update last login
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             await db.commit()
             
             token = create_access_token({
@@ -82,6 +82,11 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
             role = user.role
         else:
             # Fallback to legacy admin password for backward compatibility
+            if not settings.admin_password:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Admin password not configured"
+                )
             if login_data.username != "admin" or login_data.password != settings.admin_password:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
             
@@ -113,11 +118,15 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
     except Exception as e:
         # Log unexpected errors and return 500 with error details
         import traceback
+        import logging
         error_details = traceback.format_exc()
+        logging.error(f"Login error: {error_details}")
         print(f"Login error: {error_details}")  # Log to console for debugging
+        # Return more detailed error in development, generic in production
+        error_message = f"Internal server error during login: {str(e)}" if settings.environment == "development" else "Internal server error during login"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error during login: {str(e)}"
+            detail=error_message
         )
 
 @router.get('/health')
