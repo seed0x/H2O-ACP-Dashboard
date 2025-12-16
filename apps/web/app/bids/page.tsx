@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { API_BASE_URL } from '../lib/config'
+import { API_BASE_URL } from '../../lib/config'
 
 export default function BidsPage(){
   const [bids, setBids] = useState<any[]>([])
