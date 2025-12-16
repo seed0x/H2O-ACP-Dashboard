@@ -143,11 +143,18 @@ function PostsView() {
       const response = await fetch(`/api/marketing/content-posts?${params}`, {
         credentials: 'include'
       })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load posts: ${response.statusText}`)
+      }
+      
       const data = await response.json()
-      setPosts(data)
+      // Ensure data is always an array
+      setPosts(Array.isArray(data) ? data : [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load posts:', error)
+      setPosts([]) // Set to empty array on error
       setLoading(false)
     }
   }
@@ -488,7 +495,7 @@ function PostsView() {
       </div>
 
       {/* Posts Table */}
-      {posts.length === 0 ? (
+      {!Array.isArray(posts) || posts.length === 0 ? (
         <div style={{
           backgroundColor: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -519,7 +526,7 @@ function PostsView() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((post, index) => (
+              {Array.isArray(posts) && posts.map((post, index) => (
                 <tr
                   key={post.id}
                   onClick={() => setSelectedPost(post)}
@@ -594,10 +601,14 @@ function CalendarView() {
       const response = await fetch('/api/marketing/channels?tenant_id=h2o', {
         credentials: 'include'
       })
+      if (!response.ok) {
+        throw new Error(`Failed to load channels: ${response.statusText}`)
+      }
       const data = await response.json()
-      setChannels(data)
+      setChannels(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Failed to load channels:', error)
+      setChannels([]) // Set to empty array on error
     }
   }
 
@@ -617,11 +628,15 @@ function CalendarView() {
       const response = await fetch(`/api/marketing/calendar?${params}`, {
         credentials: 'include'
       })
+      if (!response.ok) {
+        throw new Error(`Failed to load calendar: ${response.statusText}`)
+      }
       const data = await response.json()
-      setCalendarData(data)
+      setCalendarData(Array.isArray(data) ? data : [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load calendar:', error)
+      setCalendarData([]) // Set to empty array on error
       setLoading(false)
     }
   }
@@ -1434,11 +1449,17 @@ function ScoreboardView() {
       const response = await fetch(`/api/marketing/scoreboard?${params}`, {
         credentials: 'include'
       })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load scoreboard: ${response.statusText}`)
+      }
+      
       const data = await response.json()
-      setScoreboard(data)
+      setScoreboard(Array.isArray(data) ? data : [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load scoreboard:', error)
+      setScoreboard([]) // Set to empty array on error
       setLoading(false)
     }
   }
@@ -1520,7 +1541,7 @@ function ScoreboardView() {
       </div>
 
       {/* Scoreboard Grid */}
-      {scoreboard.length === 0 ? (
+      {!Array.isArray(scoreboard) || scoreboard.length === 0 ? (
         <div style={{
           backgroundColor: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -1533,7 +1554,7 @@ function ScoreboardView() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '16px' }}>
-          {scoreboard.map(owner => {
+          {Array.isArray(scoreboard) && scoreboard.map(owner => {
             const completionRate = owner.planned > 0 ? Math.round((owner.posted / owner.planned) * 100) : 0
             const hasIssues = owner.overdue_drafts > 0 || owner.missed > 0 || owner.failed > 0
             
@@ -1694,13 +1715,20 @@ function AccountsView() {
         fetch('/api/marketing/channel-accounts?tenant_id=h2o', { credentials: 'include' }),
         fetch('/api/marketing/channels?tenant_id=h2o', { credentials: 'include' })
       ])
+      
+      if (!accountsRes.ok || !channelsRes.ok) {
+        throw new Error('Failed to load data')
+      }
+      
       const accountsData = await accountsRes.json()
       const channelsData = await channelsRes.json()
-      setAccounts(accountsData)
-      setChannels(channelsData)
+      setAccounts(Array.isArray(accountsData) ? accountsData : [])
+      setChannels(Array.isArray(channelsData) ? channelsData : [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load accounts:', error)
+      setAccounts([]) // Set to empty array on error
+      setChannels([]) // Set to empty array on error
       setLoading(false)
     }
   }
@@ -1908,7 +1936,7 @@ function AccountsView() {
       )}
 
       {/* Accounts List */}
-      {accounts.length === 0 ? (
+      {!Array.isArray(accounts) || accounts.length === 0 ? (
         <div style={{
           backgroundColor: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -1921,7 +1949,7 @@ function AccountsView() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '16px' }}>
-          {accounts.map(account => {
+          {Array.isArray(accounts) && accounts.map(account => {
             const channel = channels.find(ch => ch.id === account.channel_id)
             return (
               <div
