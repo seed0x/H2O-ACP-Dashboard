@@ -1,13 +1,23 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
 
 export default function Login() {
+  const router = useRouter()
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Redirect if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      router.push('/')
+    }
+  }, [router])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -19,6 +29,11 @@ export default function Login() {
         { username, password },
         { withCredentials: true }
       )
+      
+      // Store token in localStorage for Authorization headers
+      if (res.data.access_token) {
+        localStorage.setItem('token', res.data.access_token)
+      }
       
       // Redirect on success (cookie is automatically set by server)
       window.location.href = '/'

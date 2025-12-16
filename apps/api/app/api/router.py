@@ -90,7 +90,14 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
         max_age=28800  # 8 hours
     )
     
-    return {"message": "Login successful", "username": username, "role": role}
+    # Also return token in response body for frontend to store in localStorage
+    return {
+        "message": "Login successful", 
+        "username": username, 
+        "role": role,
+        "access_token": token,
+        "token_type": "bearer"
+    }
 
 @router.get('/health')
 async def health():
