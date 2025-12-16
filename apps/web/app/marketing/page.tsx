@@ -138,11 +138,20 @@ function PostsView() {
 
   async function loadPosts() {
     try {
+      const token = localStorage.getItem('token')
       const params = new URLSearchParams({ tenant_id: 'h2o' })
       if (statusFilter) params.append('status', statusFilter)
       if (search) params.append('search', search)
       
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
       const response = await fetch(`/api/marketing/content-posts?${params}`, {
+        headers,
         credentials: 'include'
       })
       
@@ -166,11 +175,48 @@ function PostsView() {
     setError('')
     setSubmitting(true)
     try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
+      // Prepare the request body
+      const requestBody: any = {
+        tenant_id: 'h2o',
+        title: postForm.title.trim(),
+        body_text: postForm.body_text.trim(),
+        status: postForm.status,
+        owner: postForm.owner,
+        channel_ids: postForm.channel_ids || [] // Channel IDs should be UUIDs (strings are fine, API will convert)
+      }
+
+      // Add scheduled_for if provided (convert to ISO string)
+      if (postForm.scheduled_for) {
+        // Convert datetime-local format to ISO string
+        const scheduledDate = new Date(postForm.scheduled_for)
+        if (!isNaN(scheduledDate.getTime())) {
+          requestBody.scheduled_for = scheduledDate.toISOString()
+        }
+      }
+
+      // Validate required fields
+      if (!requestBody.title) {
+        throw new Error('Title is required')
+      }
+      if (!requestBody.body_text) {
+        throw new Error('Content is required')
+      }
+      
+      console.log('Submitting post:', requestBody) // Debug log
+
       const response = await fetch('/api/marketing/content-posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         credentials: 'include',
-        body: JSON.stringify({ ...postForm, tenant_id: 'h2o' })
+        body: JSON.stringify(requestBody)
       })
       
       if (!response.ok) {
@@ -630,7 +676,16 @@ function CalendarView() {
 
   async function loadChannels() {
     try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
       const response = await fetch('/api/marketing/channels?tenant_id=h2o', {
+        headers,
         credentials: 'include'
       })
       if (!response.ok) {
