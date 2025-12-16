@@ -30,30 +30,138 @@ export default function Login() {
   }
 
   return (
-    <main className="p-8">
-      <form onSubmit={submit} className="max-w-md">
-        <h1 className="text-xl font-bold">Login</h1>
-        <input 
-          value={username} 
-          onChange={e => setUsername(e.target.value)} 
-          placeholder="Username" 
-          type="text" 
-          className="border p-2 mt-4 w-full" 
-          required 
-        />
-        <input 
-          value={password} 
-          onChange={e => setPassword(e.target.value)} 
-          placeholder="Password" 
-          type="password" 
-          className="border p-2 mt-4 w-full" 
-          required 
-        />
-        {error && <div className="text-red-600 mt-2">{error}</div>}
-        <button disabled={loading} className="bg-blue-600 text-white px-4 py-2 mt-2 disabled:opacity-50">
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
-    </main>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      backgroundColor: 'var(--color-bg)'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        padding: '32px'
+      }}>
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '16px',
+          padding: '32px'
+        }}>
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: '700',
+            color: 'var(--color-text-primary)',
+            marginBottom: '8px'
+          }}>Login</h1>
+          <p style={{
+            fontSize: '14px',
+            color: 'var(--color-text-secondary)',
+            marginBottom: '24px'
+          }}>Sign in to your account</p>
+          
+          <form onSubmit={submit}>
+            <div style={{ marginBottom: '16px' }}>
+              <input 
+                value={username} 
+                onChange={e => setUsername(e.target.value)} 
+                placeholder="Username" 
+                type="text" 
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-primary)'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(96, 165, 250, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '20px' }}>
+              <input 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                placeholder="Password" 
+                type="password" 
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-primary)'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(96, 165, 250, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+            {error && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                border: '1px solid #EF5350',
+                borderRadius: '8px',
+                color: '#EF5350',
+                fontSize: '14px',
+                marginBottom: '16px'
+              }}>
+                {error}
+              </div>
+            )}
+            <button 
+              disabled={loading} 
+              type="submit"
+              style={{
+                width: '100%',
+                padding: '12px 24px',
+                backgroundColor: loading ? 'var(--color-hover)' : 'var(--color-primary)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+                }
+              }}
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
   )
 }

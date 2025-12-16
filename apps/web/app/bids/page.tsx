@@ -2,6 +2,11 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
+import { PageHeader } from '../../components/ui/PageHeader'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { Select } from '../../components/ui/Select'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 export default function BidsPage(){
   const [bids, setBids] = useState<any[]>([])
@@ -10,22 +15,33 @@ export default function BidsPage(){
   const [builderId, setBuilderId] = useState('')
   const [status, setStatus] = useState('')
   const [builders, setBuilders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(()=>{
     const token = localStorage.getItem('token')
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
     async function load(){
-      const b = await axios.get(`${API_BASE_URL}/builders`, { withCredentials: true })
-      setBuilders(b.data)
-      const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
-      setBids(res.data)
+      try {
+        const b = await axios.get(`${API_BASE_URL}/builders`, { withCredentials: true })
+        setBuilders(b.data)
+        const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
+        setBids(res.data)
+      } catch (err) {
+        console.error('Failed to load bids:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
 
   async function searchNow(){
-    const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
-    setBids(res.data)
+    try {
+      const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
+      setBids(res.data)
+    } catch (err) {
+      console.error('Failed to search bids:', err)
+    }
   }
 
   async function create(){
@@ -45,41 +61,142 @@ export default function BidsPage(){
     }
   }
 
+  if (loading) {
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '400px',
+          color: 'var(--color-text-secondary)'
+        }}>
+          Loading bids...
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <main className="p-6">
-      <h1 className="text-xl font-bold">Bids</h1>
-      <div className="flex gap-2 mt-4 mb-4">
-        <select value={tenant} onChange={e=>setTenant(e.target.value)} className="border p-1">
-          <option value="all_county">All County</option>
-          <option value="h2o">H2O</option>
-        </select>
-        <input placeholder="search" value={search} onChange={e=>setSearch(e.target.value)} className="border p-1" />
-        <select value={builderId} onChange={e=>setBuilderId(e.target.value)} className="border p-1">
-          <option value="">Any builder</option>
-          {builders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <select value={status} onChange={e=>setStatus(e.target.value)} className="border p-1">
-          <option value="">Any status</option>
-          <option value="Draft">Draft</option>
-          <option value="Sent">Sent</option>
-          <option value="Won">Won</option>
-          <option value="Lost">Lost</option>
-        </select>
-        <button onClick={searchNow} className="btn bg-gray-200 px-3">Search</button>
-        <button onClick={create} className="btn bg-blue-600 text-white px-3">Create</button>
+    <div style={{ padding: '32px' }}>
+      <PageHeader
+        title="Bids"
+        description="Manage project bids and proposals"
+        action={<Button onClick={create}>+ New Bid</Button>}
+      />
+
+      {/* Filters */}
+      <div style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '24px'
+      }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px',
+          marginBottom: '16px'
+        }}>
+          <Select
+            options={[
+              { value: 'all_county', label: 'All County' },
+              { value: 'h2o', label: 'H2O' }
+            ]}
+            value={tenant}
+            onChange={(e) => setTenant(e.target.value)}
+          />
+          <Input
+            placeholder="Search bids..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select
+            options={[
+              { value: '', label: 'Any Builder' },
+              ...builders.map(b => ({ value: b.id.toString(), label: b.name }))
+            ]}
+            value={builderId}
+            onChange={(e) => setBuilderId(e.target.value)}
+          />
+          <Select
+            options={[
+              { value: '', label: 'Any Status' },
+              { value: 'Draft', label: 'Draft' },
+              { value: 'Sent', label: 'Sent' },
+              { value: 'Won', label: 'Won' },
+              { value: 'Lost', label: 'Lost' }
+            ]}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          />
+        </div>
+        <Button onClick={searchNow} variant="secondary">Search</Button>
       </div>
 
-      <ul>
-        {bids.map(b => (
-          <li key={b.id} className="border rounded p-2 mb-2">
-            <a href={`/bids/${b.id}`} className="block">
-              <div className="font-bold">{b.project_name}</div>
-              <div className="text-sm text-gray-600">Status: {b.status}</div>
-              <div className="text-sm text-gray-600">Tenant: {b.tenant_id}</div>
+      {/* Bids List */}
+      {bids.length === 0 ? (
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          padding: '48px',
+          textAlign: 'center',
+          color: 'var(--color-text-secondary)'
+        }}>
+          No bids found. Create your first bid to get started.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {bids.map(b => (
+            <a
+              key={b.id}
+              href={`/bids/${b.id}`}
+              style={{
+                display: 'block',
+                backgroundColor: 'var(--color-card)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '12px',
+                padding: '20px',
+                textDecoration: 'none',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-primary)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-border)'
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: 'var(--color-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    {b.project_name}
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: '4px'
+                  }}>
+                    Tenant: {b.tenant_id}
+                  </div>
+                </div>
+                <StatusBadge status={b.status} />
+              </div>
             </a>
-          </li>
-        ))}
-      </ul>
-    </main>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

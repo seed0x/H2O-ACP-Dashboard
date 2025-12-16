@@ -3,32 +3,44 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../lib/config'
 
-export default function ServiceCallDetail({ params }: { params: { id: string } }){
+export default function ServiceCallDetail({ params }: { params: Promise<{ id: string }> | { id: string } }){
   const [sc, setSc] = useState<any>(null)
   const [notes, setNotes] = useState('')
   const [audit, setAudit] = useState<any[]>([])
+  const [id, setId] = useState<string>('')
 
   useEffect(()=>{
+    async function getParams(){
+      const resolvedParams = params instanceof Promise ? await params : params
+      setId(resolvedParams.id)
+    }
+    getParams()
+  }, [params])
+
+  useEffect(()=>{
+    if (!id) return
     async function load(){
       const token = localStorage.getItem('token')
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      const res = await axios.get(`${API_BASE_URL}/service-calls/${params.id}`, { withCredentials: true })
+      const res = await axios.get(`${API_BASE_URL}/service-calls/${id}`, { withCredentials: true })
       setSc(res.data)
       await loadAudit()
     }
     load()
-  }, [])
+  }, [id])
 
   async function patch(){
+    if (!id) return
     const token = localStorage.getItem('token')
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    await axios.patch(`${API_BASE_URL}/service-calls/${params.id}`, { notes }, { withCredentials: true })
-    const res = await axios.get(`${API_BASE_URL}/service-calls/${params.id}`, { withCredentials: true })
+    await axios.patch(`${API_BASE_URL}/service-calls/${id}`, { notes }, { withCredentials: true })
+    const res = await axios.get(`${API_BASE_URL}/service-calls/${id}`, { withCredentials: true })
     setSc(res.data)
   }
 
   async function loadAudit(){
-    const res = await axios.get(`${API_BASE_URL}/audit`, { params: { entity_type: 'service_call', entity_id: params.id }, withCredentials: true })
+    if (!id) return
+    const res = await axios.get(`${API_BASE_URL}/audit`, { params: { entity_type: 'service_call', entity_id: id }, withCredentials: true })
     setAudit(res.data)
   }
 

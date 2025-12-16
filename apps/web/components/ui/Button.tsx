@@ -60,13 +60,23 @@ export function Button({
       }}
       onMouseEnter={(e) => {
         if (!props.disabled) {
-          e.currentTarget.style.transform = 'translateY(-1px)'
-          e.currentTarget.style.opacity = '0.9'
+          if (variant === 'primary') {
+            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+          } else {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.opacity = '0.9'
+          }
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.opacity = '1'
+        if (!props.disabled) {
+          if (variant === 'primary') {
+            e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+          } else {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.opacity = '1'
+          }
+        }
       }}
       {...props}
     >

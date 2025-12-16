@@ -6,28 +6,58 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options: { value: string; label: string }[]
 }
 
-export function Select({ label, error, options, className = '', ...props }: SelectProps) {
+export function Select({ label, error, options, ...props }: SelectProps) {
   return (
-    <div className="w-full">
+    <div style={{ width: '100%' }}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label style={{
+          display: 'block',
+          fontSize: '13px',
+          fontWeight: '500',
+          color: 'var(--color-text-primary)',
+          marginBottom: '6px'
+        }}>
           {label}
         </label>
       )}
       <select
-        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          error ? 'border-red-500' : 'border-gray-300'
-        } ${className}`}
+        style={{
+          width: '100%',
+          padding: '10px 14px',
+          backgroundColor: 'var(--color-hover)',
+          border: `1px solid ${error ? '#EF5350' : 'var(--color-border)'}`,
+          borderRadius: '8px',
+          color: 'var(--color-text-primary)',
+          fontSize: '14px',
+          outline: 'none',
+          transition: 'all 0.2s',
+          cursor: 'pointer'
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = 'var(--color-primary)'
+          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(96, 165, 250, 0.1)'
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = error ? '#EF5350' : 'var(--color-border)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}
         {...props}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} style={{
+            backgroundColor: 'var(--color-card)',
+            color: 'var(--color-text-primary)'
+          }}>
             {option.label}
           </option>
         ))}
       </select>
       {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
+        <p style={{
+          marginTop: '6px',
+          fontSize: '12px',
+          color: '#EF5350'
+        }}>{error}</p>
       )}
     </div>
   )

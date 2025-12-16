@@ -79,7 +79,7 @@ export default function Dashboard() {
         <StatCard
           title="Active Jobs"
           value={stats.activeJobs}
-          color="#7C5CFC"
+          color="#60A5FA"
         />
         <StatCard
           title="Pending Service Calls"
@@ -323,12 +323,12 @@ function StatCard({ title, value, color }: {
 
 function getStatusStyle(status: string): React.CSSProperties {
   const statusStyles: Record<string, React.CSSProperties> = {
-    'New': { backgroundColor: 'rgba(33, 150, 243, 0.2)', color: '#42A5F5' },
-    'Scheduled': { backgroundColor: 'rgba(255, 152, 0, 0.2)', color: '#FFA726' },
-    'In Progress': { backgroundColor: 'rgba(124, 92, 252, 0.2)', color: '#9B7FFF' },
-    'Dispatched': { backgroundColor: 'rgba(255, 152, 0, 0.2)', color: '#FFA726' },
-    'Completed': { backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#66BB6A' },
-    'On Hold': { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' },
+    'New': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
+    'Scheduled': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
+    'In Progress': { backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#60A5FA' },
+    'Dispatched': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
+    'Completed': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
+    'On Hold': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
   }
-  return statusStyles[status] || { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' }
+  return statusStyles[status] || { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' }
 }

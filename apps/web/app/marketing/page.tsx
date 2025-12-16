@@ -565,13 +565,13 @@ function PostsView() {
 
 function getStatusColor(status: string) {
   const colors: Record<string, any> = {
-    'Idea': { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' },
-    'Draft': { backgroundColor: 'rgba(33, 150, 243, 0.2)', color: '#42A5F5' },
-    'Needs_Approval': { backgroundColor: 'rgba(255, 152, 0, 0.2)', color: '#FFA726' },
-    'Approved': { backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#66BB6A' },
-    'Scheduled': { backgroundColor: 'rgba(124, 92, 252, 0.2)', color: '#9B7FFF' },
-    'Posted': { backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#66BB6A' },
-    'Failed': { backgroundColor: 'rgba(244, 67, 54, 0.2)', color: '#EF5350' }
+    'Idea': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
+    'Draft': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
+    'Needs_Approval': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
+    'Approved': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
+    'Scheduled': { backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#60A5FA' },
+    'Posted': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
+    'Failed': { backgroundColor: 'rgba(244, 67, 54, 0.15)', color: '#EF5350' }
   }
   return colors[status] || colors['Idea']
 }
