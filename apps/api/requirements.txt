@@ -15,4 +15,3 @@ slowapi
 pytest
 pytest-asyncio
 httpx
-icalendar

@@ -5,7 +5,7 @@ Parses Outlook calendar exports (CSV/ICS) and extracts job/service call informat
 import re
 import csv
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 import icalendar
 from io import StringIO
@@ -17,9 +17,8 @@ class ParsedCalendarEvent:
     title: str
     start_time: Optional[datetime]
     end_time: Optional[datetime]
-    description: Optional[str]
-    location: Optional[str]
-    # Extracted fields
+    description: Optional[str] = None
+    location: Optional[str] = None
     builder_name: Optional[str] = None
     community: Optional[str] = None
     lot_number: Optional[str] = None
@@ -28,15 +27,18 @@ class ParsedCalendarEvent:
     city: Optional[str] = None
     state: Optional[str] = None
     zip: Optional[str] = None
-    job_type: Optional[str] = None  # 'job', 'service_call', 'warranty', 'go_back'
+    job_type: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    customer_name: Optional[str] = None
+    tech_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
 
 
 class OutlookParser:
     """Parser for Outlook calendar exports"""
     
-    # Common builder name patterns (case-insensitive)
     BUILDER_PATTERNS = [
         r'TOLL\s+BROTHERS',
         r'DR\s+HORTON',
@@ -49,22 +51,16 @@ class OutlookParser:
         r'URBAN\s+NW',
     ]
     
-    # Phase abbreviations
-    # TO = Top Out / Rough In
-    # PB = Post & Beam
-    # TRIM = Finish
     PHASE_PATTERNS = {
         'TO': ['TO', 'TOP OUT', 'TOP-OUT', 'TOPOUT', 'ROUGH IN', 'ROUGH-IN', 'ROUGHIN', 'ROUGH'],
-        'PB': ['PB', 'POST AND BEAM', 'POST & BEAM', 'POST&BEAM', 'POST AND BEAM'],
+        'PB': ['PB', 'POST AND BEAM', 'POST & BEAM', 'POST&BEAM'],
         'TRIM': ['TRIM', 'FINISH'],
-        'SCT': ['SCT', 'ROUGH', 'ROUGH-IN'],
         'WARRANTY': ['WARRANTY', 'WARR'],
         'GO BACK': ['GO BACK', 'GOBACK', 'GB'],
         'PAY CALL': ['PAY CALL', 'PAYCALL'],
         'PUNCH': ['PUNCH', 'PUNCHLIST', 'PUNCH-LIST', 'PUNCH LIST'],
     }
     
-    # Job type indicators
     JOB_TYPE_INDICATORS = {
         'warranty': ['WARRANTY', 'WARR'],
         'go_back': ['GO BACK', 'GOBACK', 'GB'],
@@ -72,16 +68,12 @@ class OutlookParser:
         'job': ['TO', 'PB', 'SCT', 'ROUGH', 'PUNCH'],
     }
     
-    def __init__(self):
-        self.builder_cache: Dict[str, str] = {}
-    
     def parse_csv(self, csv_content: str) -> List[ParsedCalendarEvent]:
         """Parse Outlook CSV export"""
         events = []
         reader = csv.DictReader(StringIO(csv_content))
         
         for row in reader:
-            # Outlook CSV typically has: Subject, Start Date, Start Time, End Date, End Time, etc.
             title = row.get('Subject', '') or row.get('Title', '')
             start_date = row.get('Start Date', '') or row.get('Start', '')
             start_time = row.get('Start Time', '')
@@ -90,7 +82,6 @@ class OutlookParser:
             location = row.get('Location', '')
             description = row.get('Description', '') or row.get('Body', '')
             
-            # Parse dates
             start_dt = self._parse_datetime(start_date, start_time)
             end_dt = self._parse_datetime(end_date, end_time)
             
@@ -102,7 +93,6 @@ class OutlookParser:
                 location=location
             )
             
-            # Extract job information
             self._extract_job_info(event)
             events.append(event)
         
@@ -157,14 +147,7 @@ class OutlookParser:
             return None
         
         try:
-            # Try common date formats
-            date_formats = [
-                '%m/%d/%Y',
-                '%Y-%m-%d',
-                '%m-%d-%Y',
-                '%d/%m/%Y',
-            ]
-            
+            date_formats = ['%m/%d/%Y', '%Y-%m-%d', '%m-%d-%Y', '%d/%m/%Y']
             date_part = None
             for fmt in date_formats:
                 try:
@@ -176,7 +159,6 @@ class OutlookParser:
             if not date_part:
                 return None
             
-            # Parse time if provided
             time_part = datetime.min.time()
             if time_str:
                 time_formats = ['%H:%M:%S', '%H:%M', '%I:%M %p', '%I:%M:%S %p']
@@ -194,22 +176,37 @@ class OutlookParser:
     def _extract_job_info(self, event: ParsedCalendarEvent):
         """Extract job information from event title and description"""
         title_upper = event.title.upper()
-        # Combine title, description, and location for full text search
         full_text = f"{event.title} {event.description or ''} {event.location or ''}".upper()
         
-        # Extract builder name
-        event.builder_name = self._extract_builder_name(title_upper)
+        # Extract phone and email from description/notes (search description first, then notes)
+        search_text = (event.description or '') + ' ' + (event.notes or '')
+        event.phone = self._extract_phone(search_text)
+        event.email = self._extract_email(search_text)
         
-        # Extract phase
-        event.phase = self._extract_phase(title_upper)
+        # Check for H2O service call format: "PatS-est01" (customer code - call description)
+        # Pattern: 3+ letters + 1 letter (e.g., "PatS" = first 3 of last name + first letter of first name)
+        h2o_match = re.match(r'^([A-Za-z]{3,}[A-Za-z]?)\s*-\s*(.+)$', event.title)
+        if h2o_match:
+            customer_code = h2o_match.group(1)
+            call_description = h2o_match.group(2).strip()
+            event.job_type = 'service_call'
+            event.status = 'open'
+            event.customer_name = customer_code  # Use customer code as customer name
+            # Store the full title as issue description, customer code in notes
+            event.notes = f"Imported from Outlook: {event.title}\nCustomer Code: {customer_code}\nCall: {call_description}"
+            if event.description:
+                event.notes += f"\n\nDescription:\n{event.description}"
+        else:
+            # All County job parsing
+            event.builder_name = self._extract_builder_name(title_upper)
+            event.phase = self._extract_phase(title_upper)
+            event.lot_number = self._extract_lot_number(title_upper)
+            event.community = self._extract_community(title_upper)
+            
+            # Extract tech name from description/body for All County jobs
+            if event.description:
+                event.tech_name = self._extract_tech_name(event.description)
         
-        # Extract lot number
-        event.lot_number = self._extract_lot_number(title_upper)
-        
-        # Extract community
-        event.community = self._extract_community(title_upper)
-        
-        # Extract address - prioritize location field, then description, then title
         address_info = None
         if event.location:
             address_info = self._extract_address(event.location.upper())
@@ -224,10 +221,9 @@ class OutlookParser:
             event.state = address_info.get('state', 'WA')
             event.zip = address_info.get('zip')
         
-        # Determine job type
-        event.job_type = self._determine_job_type(title_upper)
+        if not event.job_type:
+            event.job_type = self._determine_job_type(title_upper)
         
-        # Set default status based on job type and categories
         if event.job_type == 'warranty':
             event.status = 'scheduled'
         elif event.job_type == 'go_back':
@@ -237,12 +233,12 @@ class OutlookParser:
         else:
             event.status = 'scheduled'
         
-        # Store original text as notes
-        event.notes = f"Imported from Outlook: {event.title}"
-        if event.description:
-            event.notes += f"\n\nDescription:\n{event.description}"
-        if event.location and not event.address_line1:
-            event.notes += f"\n\nLocation: {event.location}"
+        if not event.notes:
+            event.notes = f"Imported from Outlook: {event.title}"
+            if event.description:
+                event.notes += f"\n\nDescription:\n{event.description}"
+            if event.location and not event.address_line1:
+                event.notes += f"\n\nLocation: {event.location}"
     
     def _extract_builder_name(self, text: str) -> Optional[str]:
         """Extract builder name from text"""
@@ -250,7 +246,6 @@ class OutlookParser:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 builder_name = match.group(0).strip()
-                # Normalize common variations
                 if 'DR HORTON' in builder_name.upper() or 'DRH' in text.upper():
                     return 'DR HORTON'
                 elif 'TOLL BROTHERS' in builder_name.upper():
@@ -267,16 +262,11 @@ class OutlookParser:
                     return 'SONGBIRD'
                 elif 'URBAN NW' in builder_name.upper():
                     return 'URBAN NW'
-                return builder_name.title()  # Capitalize properly
+                return builder_name.title()
         return None
     
     def _extract_phase(self, text: str) -> Optional[str]:
-        """Extract phase from text
-        TO = Top Out / Rough In
-        PB = Post & Beam
-        TRIM = Finish
-        """
-        # First check for hyphenated format like "TO-LOT", "PB-LOT", "TRIM-LOT"
+        """Extract phase from text - TO=Top Out, PB=Post & Beam, TRIM=Finish"""
         hyphenated_phases = {
             'TO': r'TO\s*-\s*LOT',
             'PB': r'PB\s*-\s*LOT',
@@ -288,30 +278,26 @@ class OutlookParser:
             if re.search(pattern, text, re.IGNORECASE):
                 return phase_key
         
-        # Then check for full text patterns (longer patterns first)
         phase_matches = []
         for phase_key, patterns in self.PHASE_PATTERNS.items():
             for pattern in patterns:
-                # Use word boundaries but allow hyphens and spaces
                 pattern_escaped = re.escape(pattern).replace(r'\-', r'[- ]?').replace(r'\ ', r'[ -]?')
                 if re.search(rf'\b{pattern_escaped}\b', text, re.IGNORECASE):
-                    phase_matches.append((phase_key, len(pattern)))  # Store phase and pattern length
+                    phase_matches.append((phase_key, len(pattern)))
         
         if phase_matches:
-            # Return the phase with the longest matching pattern (most specific)
             phase_matches.sort(key=lambda x: x[1], reverse=True)
             return phase_matches[0][0]
         
-        return 'TO'  # Default phase (Top Out / Rough In)
+        return 'TO'
     
     def _extract_lot_number(self, text: str) -> Optional[str]:
         """Extract lot number from text"""
-        # Patterns: LOT 110, LOT-110, LOT110, #110, -LOT 110, -LOT110
         patterns = [
             r'LOT\s*[#]?\s*(\d+)',
             r'LOT[#]?(\d+)',
-            r'-LOT\s*(\d+)',  # Handle "TO-LOT 110" format
-            r'-LOT(\d+)',     # Handle "TO-LOT110" format
+            r'-LOT\s*(\d+)',
+            r'-LOT(\d+)',
             r'#(\d+)',
         ]
         
@@ -324,23 +310,15 @@ class OutlookParser:
     
     def _extract_community(self, text: str) -> Optional[str]:
         """Extract community name from text"""
-        # Look for patterns like "COMMUNITY-TO-LOT" or "COMMUNITY NAME"
-        # Common patterns: LACAMAS HILLS, MEADOWVIEW, etc.
-        
-        # Remove common prefixes
         text_clean = re.sub(r'(TO|PB|SCT|WARRANTY|LOT).*', '', text, flags=re.IGNORECASE)
         
-        # Look for builder-community pattern: BUILDER-COMMUNITY
         match = re.search(r'-\s*([A-Z\s]+?)(?:-|TO|LOT|$)', text_clean)
         if match:
             community = match.group(1).strip()
-            if len(community) > 2:  # Filter out short matches
+            if len(community) > 2:
                 return community
         
-        # Look for standalone community names (common ones)
-        common_communities = [
-            'LACAMAS HILLS', 'MEADOWVIEW', 'FAIRWINDS', 'CUTTER',
-        ]
+        common_communities = ['LACAMAS HILLS', 'MEADOWVIEW', 'FAIRWINDS', 'CUTTER', 'CURTAIN CREEK', 'NORTHSIDE', 'LUDEN ESTATES']
         for community in common_communities:
             if community in text_clean:
                 return community
@@ -349,16 +327,9 @@ class OutlookParser:
     
     def _extract_address(self, text: str) -> Optional[Dict[str, str]]:
         """Extract address from text"""
-        # Address patterns: "123 STREET NAME CITY, STATE ZIP"
-        # Common format: "4826 N ADAMS ST CAMAS" or "1106 SE 194TH PL VANCOUVER WA 98607"
-        
-        # Pattern for street address with city, state, zip
         address_patterns = [
-            # "2726 N 48TH AVE CAMAS WA 98607" - full address with state and zip
             r'(\d+\s+[NESW]?\s*\d+\w*\s+(?:ST|STREET|AVE|AVENUE|RD|ROAD|PL|PLACE|LN|LANE|DR|DRIVE|CT|COURT|BLVD|BOULEVARD|LOOP|WAY|CIR|CIRCLE|CT)\s+([A-Z\s]+?)\s+([A-Z]{2})\s+(\d{5}))',
-            # "4826 N ADAMS ST CAMAS" or "1106 SE 194TH PL VANCOUVER" - address with city
             r'(\d+\s+[NESW]?\s*\d+\w*\s+(?:ST|STREET|AVE|AVENUE|RD|ROAD|PL|PLACE|LN|LANE|DR|DRIVE|CT|COURT|BLVD|BOULEVARD|LOOP|WAY|CIR|CIRCLE|CT)\s+([A-Z\s]+?)(?:,\s*([A-Z]{2}))?\s*(\d{5})?)',
-            # "762 SE FAIRWINDS LOOP" - simple address
             r'(\d+\s+[NESW]?\s*[A-Z\s]+?\s+(?:ST|STREET|AVE|AVENUE|RD|ROAD|PL|PLACE|LN|LANE|DR|DRIVE|CT|COURT|BLVD|BOULEVARD|LOOP|WAY|CIR|CIRCLE|CT)\s+([A-Z\s]+?)(?:,\s*([A-Z]{2}))?\s*(\d{5})?)',
         ]
         
@@ -370,7 +341,6 @@ class OutlookParser:
                 state = match.group(3).strip() if match.lastindex >= 3 and match.group(3) else 'WA'
                 zip_code = match.group(4).strip() if match.lastindex >= 4 and match.group(4) else None
                 
-                # Clean up city name (remove extra spaces, normalize)
                 if city:
                     city = ' '.join(city.split())
                 
@@ -383,6 +353,88 @@ class OutlookParser:
         
         return None
     
+    def _extract_phone(self, text: str) -> Optional[str]:
+        """Extract phone numbers from text, concatenate multiple with commas"""
+        if not text:
+            return None
+        
+        # Phone patterns: various formats
+        patterns = [
+            r'\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}',  # Standard US format
+            r'\(\d{3}\)\s?\d{3}[-.\s]?\d{4}',  # (123) 456-7890
+            r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}',  # 123-456-7890
+            r'\d{10}',  # 1234567890
+        ]
+        
+        phones = []
+        for pattern in patterns:
+            matches = re.findall(pattern, text)
+            for match in matches:
+                # Clean up the phone number
+                cleaned = re.sub(r'[^\d]', '', match)
+                if len(cleaned) == 10 or (len(cleaned) == 11 and cleaned.startswith('1')):
+                    # Format as (XXX) XXX-XXXX
+                    if len(cleaned) == 11:
+                        cleaned = cleaned[1:]
+                    formatted = f"({cleaned[:3]}) {cleaned[3:6]}-{cleaned[6:]}"
+                    if formatted not in phones:
+                        phones.append(formatted)
+        
+        if phones:
+            return ', '.join(phones)
+        return None
+    
+    def _extract_email(self, text: str) -> Optional[str]:
+        """Extract email addresses from text, concatenate multiple with commas"""
+        if not text:
+            return None
+        
+        # Email pattern
+        pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        emails = re.findall(pattern, text)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_emails = []
+        for email in emails:
+            email_lower = email.lower()
+            if email_lower not in seen:
+                seen.add(email_lower)
+                unique_emails.append(email)
+        
+        if unique_emails:
+            return ', '.join(unique_emails)
+        return None
+    
+    def _extract_tech_name(self, text: str) -> Optional[str]:
+        """Extract tech name from description/body (usually a single word or name)"""
+        if not text:
+            return None
+        
+        # Remove common prefixes/suffixes
+        text = text.strip()
+        
+        # If it's a single word or short phrase (likely a name)
+        words = text.split()
+        if len(words) <= 3:
+            # Check if it looks like a name (starts with capital, mostly letters)
+            cleaned = ' '.join(words)
+            if re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$', cleaned):
+                return cleaned
+        
+        # Look for patterns like "Tech: name" or "Assigned: name"
+        patterns = [
+            r'(?:tech|assigned|technician)[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)',
+            r'^([A-Z][a-z]+)$',  # Single capitalized word
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+        
+        return None
+    
     def _determine_job_type(self, text: str) -> str:
         """Determine job type from text"""
         text_upper = text.upper()
@@ -392,7 +444,7 @@ class OutlookParser:
                 if indicator in text_upper:
                     return job_type
         
-        return 'job'  # Default
+        return 'job'
 
 
 def parse_outlook_export(file_path: str, file_type: str = 'auto') -> List[ParsedCalendarEvent]:

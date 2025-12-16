@@ -386,7 +386,6 @@ async def find_or_create_builder(db: AsyncSession, builder_name: str, changed_by
     if not builder_name:
         raise ValueError("Builder name is required")
     
-    # Try exact match (case-insensitive)
     q = select(models.Builder).where(func.lower(models.Builder.name) == func.lower(builder_name))
     res = await db.execute(q)
     builder = res.scalar_one_or_none()
@@ -394,7 +393,6 @@ async def find_or_create_builder(db: AsyncSession, builder_name: str, changed_by
     if builder:
         return builder
     
-    # Try fuzzy match - look for similar names
     q = select(models.Builder).where(models.Builder.name.ilike(f"%{builder_name}%"))
     res = await db.execute(q)
     builder = res.scalar_one_or_none()
@@ -402,7 +400,6 @@ async def find_or_create_builder(db: AsyncSession, builder_name: str, changed_by
     if builder:
         return builder
     
-    # Create new builder
     builder = models.Builder(name=builder_name, notes=f"Auto-created during import by {changed_by}")
     db.add(builder)
     await db.flush()
@@ -411,7 +408,6 @@ async def find_or_create_builder(db: AsyncSession, builder_name: str, changed_by
         await db.commit()
     except IntegrityError:
         await db.rollback()
-        # Try one more time to find it (race condition)
         q = select(models.Builder).where(func.lower(models.Builder.name) == func.lower(builder_name))
         res = await db.execute(q)
         builder = res.scalar_one_or_none()
@@ -440,56 +436,36 @@ async def bulk_import_jobs(
     changed_by: str,
     skip_duplicates: bool = True
 ) -> dict:
-    """
-    Bulk import jobs from parsed Outlook calendar events
-    
-    Returns:
-        dict with counts: created, updated, skipped, errors
-    """
-    # Import here to avoid circular dependencies
+    """Bulk import jobs from parsed Outlook calendar events"""
     from app.core.outlook_parser import ParsedCalendarEvent
     
-    stats = {
-        'created': 0,
-        'updated': 0,
-        'skipped': 0,
-        'errors': 0,
-        'error_details': []
-    }
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': 0, 'error_details': []}
+    
+    total = len([e for e in parsed_events if isinstance(e, ParsedCalendarEvent) and e.job_type in ['job', 'warranty']])
+    processed = 0
     
     for event in parsed_events:
         if not isinstance(event, ParsedCalendarEvent):
             continue
         
-        # Skip if not a job type
         if event.job_type not in ['job', 'warranty']:
             continue
         
-        # Require builder name
         if not event.builder_name:
             stats['skipped'] += 1
-            stats['error_details'].append({
-                'title': event.title,
-                'reason': 'No builder name found'
-            })
             continue
         
         try:
-            # Find or create builder
             builder = await find_or_create_builder(db, event.builder_name, changed_by)
             
-            # Check for duplicates
             if event.community and event.lot_number and event.phase:
-                duplicate = await find_duplicate_job(
-                    db, tenant_id, builder.id, event.community, event.lot_number, event.phase
-                )
+                duplicate = await find_duplicate_job(db, tenant_id, builder.id, event.community, event.lot_number, event.phase)
                 
                 if duplicate:
                     if skip_duplicates:
                         stats['skipped'] += 1
                         continue
                     else:
-                        # Update existing job
                         update_data = schemas.JobUpdate(
                             scheduled_start=event.start_time,
                             scheduled_end=event.end_time,
@@ -499,8 +475,6 @@ async def bulk_import_jobs(
                         stats['updated'] += 1
                         continue
             
-            # Create new job
-            # Set defaults for required fields
             community = event.community or 'Unknown'
             lot_number = event.lot_number or 'Unknown'
             phase = event.phase or 'TO'
@@ -513,6 +487,7 @@ async def bulk_import_jobs(
                 builder_id=builder.id,
                 community=community,
                 lot_number=lot_number,
+                plan=None,
                 phase=phase,
                 status=event.status or 'scheduled',
                 address_line1=address,
@@ -521,18 +496,50 @@ async def bulk_import_jobs(
                 zip=zip_code,
                 scheduled_start=event.start_time,
                 scheduled_end=event.end_time,
-                notes=event.notes
+                notes=event.notes,
+                tech_name=event.tech_name if hasattr(event, 'tech_name') else None
             )
             
-            await create_job(db, job_data, changed_by)
-            stats['created'] += 1
+            try:
+                await create_job(db, job_data, changed_by)
+                stats['created'] += 1
+                processed += 1
+                if processed % 50 == 0:
+                    print(f"  Progress: {processed}/{total} jobs processed...")
+            except (IntegrityError, ValueError) as e:
+                # Unique constraint violation - treat as duplicate/skip
+                # create_job already rolled back, so just continue
+                stats['skipped'] += 1
+                processed += 1
+                if processed % 50 == 0:
+                    print(f"  Progress: {processed}/{total} jobs processed...")
+            except Exception as e:
+                # Other errors - create_job may have rolled back, but ensure clean state
+                try:
+                    await db.rollback()
+                except:
+                    pass
+                stats['errors'] += 1
+                processed += 1
+                if processed % 50 == 0:
+                    print(f"  Progress: {processed}/{total} jobs processed...")
+                error_msg = str(e)[:100]
+                if len(stats['error_details']) < 10:
+                    stats['error_details'].append({'title': event.title[:50], 'reason': error_msg})
             
         except Exception as e:
+            # Outer exception handler for builder creation, etc.
+            try:
+                await db.rollback()
+            except:
+                pass
             stats['errors'] += 1
-            stats['error_details'].append({
-                'title': event.title,
-                'reason': str(e)
-            })
+            processed += 1
+            if processed % 50 == 0:
+                print(f"  Progress: {processed}/{total} jobs processed...")
+            error_msg = str(e)[:100]
+            if len(stats['error_details']) < 10:
+                stats['error_details'].append({'title': event.title[:50] if hasattr(event, 'title') else 'Unknown', 'reason': error_msg})
             continue
     
     return stats
@@ -544,38 +551,23 @@ async def bulk_import_service_calls(
     changed_by: str,
     skip_duplicates: bool = True
 ) -> dict:
-    """
-    Bulk import service calls from parsed Outlook calendar events
-    
-    Returns:
-        dict with counts: created, updated, skipped, errors
-    """
-    # Import here to avoid circular dependencies
+    """Bulk import service calls from parsed Outlook calendar events"""
     from app.core.outlook_parser import ParsedCalendarEvent
     
-    stats = {
-        'created': 0,
-        'updated': 0,
-        'skipped': 0,
-        'errors': 0,
-        'error_details': []
-    }
+    stats = {'created': 0, 'updated': 0, 'skipped': 0, 'errors': 0, 'error_details': []}
+    
+    total = len([e for e in parsed_events if isinstance(e, ParsedCalendarEvent) and e.job_type in ['service_call', 'go_back']])
+    processed = 0
     
     for event in parsed_events:
         if not isinstance(event, ParsedCalendarEvent):
             continue
         
-        # Only process service calls and go_back types
         if event.job_type not in ['service_call', 'go_back']:
             continue
         
-        # Require address
         if not event.address_line1:
             stats['skipped'] += 1
-            stats['error_details'].append({
-                'title': event.title,
-                'reason': 'No address found'
-            })
             continue
         
         try:
@@ -583,14 +575,17 @@ async def bulk_import_service_calls(
             if event.builder_name:
                 builder = await find_or_create_builder(db, event.builder_name, changed_by)
             
-            # Extract customer name from title or use default
-            customer_name = event.title.split('-')[0].strip() if '-' in event.title else 'Customer'
+            # Use customer_name from parsed event if available (for H2O format), otherwise extract from title
+            customer_name = event.customer_name if hasattr(event, 'customer_name') and event.customer_name else (
+                event.title.split('-')[0].strip() if '-' in event.title else 'Customer'
+            )
             
-            # Create service call
             sc_data = schemas.ServiceCallCreate(
                 tenant_id=tenant_id,
                 builder_id=builder.id if builder else None,
                 customer_name=customer_name,
+                phone=event.phone if hasattr(event, 'phone') else None,
+                email=event.email if hasattr(event, 'email') else None,
                 address_line1=event.address_line1,
                 city=event.city or 'Vancouver',
                 state=event.state or 'WA',
@@ -603,15 +598,46 @@ async def bulk_import_service_calls(
                 notes=event.notes
             )
             
-            await create_service_call(db, sc_data, changed_by)
-            stats['created'] += 1
+            try:
+                await create_service_call(db, sc_data, changed_by)
+                stats['created'] += 1
+                processed += 1
+                if processed % 50 == 0:
+                    print(f"  Progress: {processed}/{total} service calls processed...")
+            except (IntegrityError, ValueError) as e:
+                # Unique constraint violation - treat as duplicate/skip
+                # create_service_call already rolled back, so just continue
+                stats['skipped'] += 1
+                processed += 1
+                if processed % 50 == 0:
+                    print(f"  Progress: {processed}/{total} service calls processed...")
+            except Exception as e:
+                # Other errors - create_service_call may have rolled back, but ensure clean state
+                try:
+                    await db.rollback()
+                except:
+                    pass
+                stats['errors'] += 1
+                processed += 1
+                if processed % 50 == 0:
+                    print(f"  Progress: {processed}/{total} service calls processed...")
+                error_msg = str(e)[:100]
+                if len(stats['error_details']) < 10:
+                    stats['error_details'].append({'title': event.title[:50], 'reason': error_msg})
             
         except Exception as e:
+            # Outer exception handler for builder creation, etc.
+            try:
+                await db.rollback()
+            except:
+                pass
             stats['errors'] += 1
-            stats['error_details'].append({
-                'title': event.title,
-                'reason': str(e)
-            })
+            processed += 1
+            if processed % 50 == 0:
+                print(f"  Progress: {processed}/{total} service calls processed...")
+            error_msg = str(e)[:100]
+            if len(stats['error_details']) < 10:
+                stats['error_details'].append({'title': event.title[:50] if hasattr(event, 'title') else 'Unknown', 'reason': error_msg})
             continue
     
     return stats

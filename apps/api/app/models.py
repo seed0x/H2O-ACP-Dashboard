@@ -115,6 +115,7 @@ class Job(Base):
     scheduled_start = Column(DateTime(timezone=True), nullable=True)
     scheduled_end = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+    tech_name = Column(Text, nullable=True)
     
     # Warranty tracking
     warranty_start_date = Column(Date, nullable=True)
