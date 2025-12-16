@@ -42,71 +42,83 @@ class LoginRequest(BaseModel):
     password: str
 
 @router.post('/login')
-@limiter.limit(get_rate_limit("auth"))  # Rate limit login attempts
 async def login(request: Request, login_data: LoginRequest, response: Response, db: AsyncSession = Depends(get_session)):
     """Login endpoint - supports both user table and legacy admin password"""
-    # Try to find user in database first
-    result = await db.execute(
-        select(models.User).where(models.User.username == login_data.username)
-    )
-    user = result.scalar_one_or_none()
-    
-    if user:
-        # User exists in database - verify password
-        if not user.is_active:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
+    try:
+        # Try to find user in database first
+        result = await db.execute(
+            select(models.User).where(models.User.username == login_data.username)
+        )
+        user = result.scalar_one_or_none()
         
-        # Check password - if username is "admin" and password doesn't match, also try ADMIN_PASSWORD env var
-        password_valid = verify_password(login_data.password, user.hashed_password)
+        if user:
+            # User exists in database - verify password
+            if not user.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
+            
+            # Check password - if username is "admin" and password doesn't match, also try ADMIN_PASSWORD env var
+            password_valid = verify_password(login_data.password, user.hashed_password)
+            
+            # Special case: if admin user exists but password doesn't match, check env var as fallback
+            if not password_valid and user.username == "admin" and login_data.password == settings.admin_password:
+                password_valid = True
+                # Update admin user's password to match env var for future logins
+                user.hashed_password = hash_password(settings.admin_password)
+            
+            if not password_valid:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            
+            # Update last login
+            user.last_login = datetime.utcnow()
+            await db.commit()
+            
+            token = create_access_token({
+                "username": user.username,
+                "role": user.role,
+                "user_id": str(user.id)
+            })
+            
+            username = user.username
+            role = user.role
+        else:
+            # Fallback to legacy admin password for backward compatibility
+            if login_data.username != "admin" or login_data.password != settings.admin_password:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            
+            token = create_access_token({"username": "admin", "role": "admin"})
+            username = "admin"
+            role = "admin"
         
-        # Special case: if admin user exists but password doesn't match, check env var as fallback
-        if not password_valid and user.username == "admin" and login_data.password == settings.admin_password:
-            password_valid = True
-            # Update admin user's password to match env var for future logins
-            user.hashed_password = hash_password(settings.admin_password)
+        # Set httpOnly cookie
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,
+            secure=settings.environment == "production",
+            samesite="lax",
+            max_age=28800  # 8 hours
+        )
         
-        if not password_valid:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        
-        # Update last login
-        user.last_login = datetime.utcnow()
-        await db.commit()
-        
-        token = create_access_token({
-            "username": user.username,
-            "role": user.role,
-            "user_id": str(user.id)
-        })
-        
-        username = user.username
-        role = user.role
-    else:
-        # Fallback to legacy admin password for backward compatibility
-        if login_data.username != "admin" or login_data.password != settings.admin_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        
-        token = create_access_token({"username": "admin", "role": "admin"})
-        username = "admin"
-        role = "admin"
-    
-    # Set httpOnly cookie
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=settings.environment == "production",
-        samesite="lax",
-        max_age=28800  # 8 hours
-    )
-    
-    # Also return token in response body for frontend to store in localStorage
-    return {
-        "message": "Login successful", 
-        "username": username, 
-        "role": role,
-        "access_token": token,
-        "token_type": "bearer"
-    }
+        # Also return token in response body for frontend to store in localStorage
+        return {
+            "message": "Login successful", 
+            "username": username, 
+            "role": role,
+            "access_token": token,
+            "token_type": "bearer"
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions (401, 403, etc.)
+        raise
+    except Exception as e:
+        # Log unexpected errors and return 500 with error details
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Login error: {error_details}")  # Log to console for debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error during login: {str(e)}"
+        )
 
 @router.get('/health')
 async def health():
