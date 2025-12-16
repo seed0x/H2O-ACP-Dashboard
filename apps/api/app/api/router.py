@@ -56,7 +56,16 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled")
         
-        if not verify_password(login_data.password, user.hashed_password):
+        # Check password - if username is "admin" and password doesn't match, also try ADMIN_PASSWORD env var
+        password_valid = verify_password(login_data.password, user.hashed_password)
+        
+        # Special case: if admin user exists but password doesn't match, check env var as fallback
+        if not password_valid and user.username == "admin" and login_data.password == settings.admin_password:
+            password_valid = True
+            # Update admin user's password to match env var for future logins
+            user.hashed_password = hash_password(settings.admin_password)
+        
+        if not password_valid:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         
         # Update last login

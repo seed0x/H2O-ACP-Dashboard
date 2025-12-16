@@ -1,13 +1,41 @@
 import asyncio
 from app.db.session import engine, AsyncSessionLocal
-from app.models import Base, Builder, BuilderContact, Job, ServiceCall, Bid, BidLineItem
+from app.models import Base, Builder, BuilderContact, Job, ServiceCall, Bid, BidLineItem, User
+from app.core.password import hash_password
+from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 async def seed():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal() as db:
+        # Ensure admin user exists with correct password
+        result = await db.execute(
+            select(User).where(User.username == "admin")
+        )
+        admin_user = result.scalar_one_or_none()
+        
+        if admin_user:
+            # Update password if user exists
+            admin_user.hashed_password = hash_password(settings.admin_password)
+            admin_user.role = "admin"
+            admin_user.is_active = True
+            print(f"Updated admin user password")
+        else:
+            # Create admin user
+            admin_user = User(
+                username="admin",
+                email="admin@example.com",
+                hashed_password=hash_password(settings.admin_password),
+                role="admin",
+                is_active=True
+            )
+            db.add(admin_user)
+            print(f"Created admin user with password from ADMIN_PASSWORD env var")
+        
+        await db.flush()
         # create builders
         b1 = Builder(name='Starline Plumbing', notes='Large builder')
         b2 = Builder(name='Cascade Homes', notes='Local builder')

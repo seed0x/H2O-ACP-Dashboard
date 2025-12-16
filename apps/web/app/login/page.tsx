@@ -38,7 +38,17 @@ export default function Login() {
       // Redirect on success (cookie is automatically set by server)
       window.location.href = '/'
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed')
+      console.error('Login error:', err)
+      if (err.response) {
+        // API responded with error
+        setError(err.response?.data?.detail || err.response?.data?.message || `Login failed: ${err.response.status}`)
+      } else if (err.request) {
+        // Request made but no response (network error)
+        setError('Cannot connect to API. Is the API server running on http://localhost:8000?')
+      } else {
+        // Something else
+        setError(err.message || 'Login failed')
+      }
     } finally {
       setLoading(false)
     }
