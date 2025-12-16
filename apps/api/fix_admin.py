@@ -36,7 +36,7 @@ async def fix_admin():
             db.add(admin_user)
         
         await db.commit()
-        print(f"✅ Admin user fixed!")
+        print(f"[OK] Admin user fixed!")
         print(f"   Username: admin")
         print(f"   Password: {settings.admin_password}")
         print(f"   (from ADMIN_PASSWORD env var)")
@@ -45,6 +45,6 @@ if __name__ == '__main__':
     try:
         asyncio.run(fix_admin())
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
