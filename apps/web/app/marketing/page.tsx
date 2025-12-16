@@ -48,37 +48,37 @@ function MarketingContent() {
           marginBottom: '32px'
         }}>
           <div className="marketing-tabs" style={{ display: 'flex', gap: '8px' }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
-                color: activeTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = 'var(--color-text-primary)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = 'var(--color-text-secondary)'
-                }
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                  color: activeTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  fontWeight: activeTab === tab.id ? '600' : '500',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTab !== tab.id) {
+                    e.currentTarget.style.color = 'var(--color-text-primary)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTab !== tab.id) {
+                    e.currentTarget.style.color = 'var(--color-text-secondary)'
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
         {/* Tab Content */}
         <div>
