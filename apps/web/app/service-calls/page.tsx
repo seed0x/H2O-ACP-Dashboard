@@ -37,13 +37,17 @@ export default function ServiceCallsPage() {
 
   async function loadServiceCalls() {
     try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       const response = await axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { 
+        headers,
         withCredentials: true 
       })
-      setServiceCalls(response.data)
+      setServiceCalls(Array.isArray(response.data) ? response.data : [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load service calls:', error)
+      setServiceCalls([])
       setLoading(false)
     }
   }

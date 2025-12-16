@@ -20,15 +20,19 @@ export default function BidDetail({ params }: { params: Promise<{ id: string }> 
     getParams()
   }, [params])
 
+  function getAuthHeaders() {
+    const token = localStorage.getItem('token')
+    return token ? { 'Authorization': `Bearer ${token}` } : {}
+  }
+
   useEffect(()=>{
     if (!id) return
     async function load(){
       try {
         setLoading(true)
         setError('')
-        const token = localStorage.getItem('token')
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-        const res = await axios.get(`${API_BASE_URL}/bids/${id}`, { withCredentials: true })
+        const headers = getAuthHeaders()
+        const res = await axios.get(`${API_BASE_URL}/bids/${id}`, { headers, withCredentials: true })
         setBid(res.data)
         setNotes(res.data.notes || '')
         await loadAudit()
@@ -48,13 +52,16 @@ export default function BidDetail({ params }: { params: Promise<{ id: string }> 
       setSaving(true)
       setError('')
       const token = localStorage.getItem('token')
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      await axios.patch(`${API_BASE_URL}/bids/${id}`, { notes }, { withCredentials: true })
-      const res = await axios.get(`${API_BASE_URL}/bids/${id}`, { withCredentials: true })
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+      const headers = { 'Authorization': `Bearer ${token}` }
+      await axios.patch(`${API_BASE_URL}/bids/${id}`, { notes }, { headers, withCredentials: true })
+      const res = await axios.get(`${API_BASE_URL}/bids/${id}`, { headers, withCredentials: true })
       setBid(res.data)
     } catch (err: any) {
       console.error('Failed to save bid:', err)
-      setError(err.response?.data?.detail || 'Failed to save bid')
+      setError(err.response?.data?.detail || err.message || 'Failed to save bid')
     } finally {
       setSaving(false)
     }
@@ -63,7 +70,12 @@ export default function BidDetail({ params }: { params: Promise<{ id: string }> 
   async function loadAudit(){
     if (!id) return
     try {
-      const res = await axios.get(`${API_BASE_URL}/audit`, { params: { entity_type: 'bid', entity_id: id }, withCredentials: true })
+      const headers = getAuthHeaders()
+      const res = await axios.get(`${API_BASE_URL}/audit`, { 
+        headers,
+        params: { entity_type: 'bid', entity_id: id }, 
+        withCredentials: true 
+      })
       setAudit(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       console.error('Failed to load audit:', err)

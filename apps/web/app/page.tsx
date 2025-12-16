@@ -20,10 +20,12 @@ export default function Dashboard() {
 
   async function loadDashboard() {
     try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       const [jobs, serviceCalls, builders] = await Promise.all([
-        axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { withCredentials: true }),
-        axios.get(`${API_BASE_URL}/builders`, { withCredentials: true })
+        axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { headers, withCredentials: true }),
+        axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { headers, withCredentials: true }),
+        axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true })
       ])
 
       const activeJobs = jobs.data.filter((j: any) => j.status !== 'Completed').length

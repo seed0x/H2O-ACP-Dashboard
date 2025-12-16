@@ -27,36 +27,62 @@ export default function BuildersPage() {
     loadBuilders()
   }, [])
 
+  const [error, setError] = useState<string>('')
+
   async function loadBuilders() {
     try {
+      const token = localStorage.getItem('token')
+      const headers: any = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
       const response = await axios.get(`${API_BASE_URL}/builders`, { 
+        headers,
         withCredentials: true 
       })
-      setBuilders(response.data)
+      setBuilders(Array.isArray(response.data) ? response.data : [])
       setLoading(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load builders:', error)
+      setBuilders([])
       setLoading(false)
     }
   }
 
   async function createBuilder() {
-    if (!newBuilderName.trim()) return
+    if (!newBuilderName.trim()) {
+      setError('Builder name is required')
+      return
+    }
     
     setSubmitting(true)
+    setError('')
     try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
       await axios.post(`${API_BASE_URL}/builders`, {
-        name: newBuilderName,
-        notes: newBuilderNotes || null
-      }, { withCredentials: true })
+        name: newBuilderName.trim(),
+        notes: newBuilderNotes.trim() || null
+      }, { 
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        withCredentials: true 
+      })
       
       setNewBuilderName('')
       setNewBuilderNotes('')
       setShowAddForm(false)
+      setError('')
       await loadBuilders()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create builder:', error)
-      alert('Failed to create builder')
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create builder'
+      setError(errorMessage)
     } finally {
       setSubmitting(false)
     }
@@ -125,6 +151,19 @@ export default function BuildersPage() {
             color: 'var(--color-text-primary)',
             marginBottom: '16px'
           }}>Add New Builder</h3>
+          {error && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: 'rgba(239, 83, 80, 0.1)',
+              border: '1px solid #EF5350',
+              borderRadius: '8px',
+              color: '#EF5350',
+              fontSize: '14px',
+              marginBottom: '16px'
+            }}>
+              {error}
+            </div>
+          )}
           <div style={{ 
             display: 'grid', 
             gap: '16px', 

@@ -36,13 +36,17 @@ export default function JobsPage() {
 
   async function loadJobs() {
     try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       const response = await axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { 
+        headers,
         withCredentials: true 
       })
-      setJobs(response.data)
+      setJobs(Array.isArray(response.data) ? response.data : [])
       setLoading(false)
     } catch (error) {
       console.error('Failed to load jobs:', error)
+      setJobs([])
       setLoading(false)
     }
   }

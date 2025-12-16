@@ -17,17 +17,30 @@ export default function BidsPage(){
   const [builders, setBuilders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(()=>{
+  const [error, setError] = useState<string>('')
+
+  function getAuthHeaders() {
     const token = localStorage.getItem('token')
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    return token ? { 'Authorization': `Bearer ${token}` } : {}
+  }
+
+  useEffect(()=>{
     async function load(){
       try {
-        const b = await axios.get(`${API_BASE_URL}/builders`, { withCredentials: true })
-        setBuilders(b.data)
-        const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
-        setBids(res.data)
-      } catch (err) {
+        setLoading(true)
+        const headers = getAuthHeaders()
+        const b = await axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true })
+        setBuilders(Array.isArray(b.data) ? b.data : [])
+        const res = await axios.get(`${API_BASE_URL}/bids`, { 
+          headers,
+          params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, 
+          withCredentials: true 
+        })
+        setBids(Array.isArray(res.data) ? res.data : [])
+      } catch (err: any) {
         console.error('Failed to load bids:', err)
+        setBids([])
+        setBuilders([])
       } finally {
         setLoading(false)
       }
@@ -37,27 +50,43 @@ export default function BidsPage(){
 
   async function searchNow(){
     try {
-      const res = await axios.get(`${API_BASE_URL}/bids`, { params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, withCredentials: true })
-      setBids(res.data)
-    } catch (err) {
+      setError('')
+      const headers = getAuthHeaders()
+      const res = await axios.get(`${API_BASE_URL}/bids`, { 
+        headers,
+        params: { tenant_id: tenant, search, builder_id: builderId || undefined, status: status || undefined }, 
+        withCredentials: true 
+      })
+      setBids(Array.isArray(res.data) ? res.data : [])
+    } catch (err: any) {
       console.error('Failed to search bids:', err)
+      setError(err.response?.data?.detail || 'Failed to search bids')
+      setBids([])
     }
   }
 
   async function create(){
     try{
-      const tok = localStorage.getItem('token')
-      axios.defaults.headers.common['Authorization'] = `Bearer ${tok}`
+      setError('')
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
       const body = {
         tenant_id: tenant,
         project_name: 'Project ' + Math.random().toString(36).slice(2,6),
         status: 'Draft',
         builder_id: builderId || builders[0]?.id
       }
-      await axios.post(`${API_BASE_URL}/bids`, body, { withCredentials: true })
+      await axios.post(`${API_BASE_URL}/bids`, body, { 
+        headers: { 'Authorization': `Bearer ${token}` },
+        withCredentials: true 
+      })
       await searchNow()
     } catch (err: any){
-      alert(err?.response?.data?.detail || 'Failed to create')
+      console.error('Failed to create bid:', err)
+      setError(err?.response?.data?.detail || err.message || 'Failed to create bid')
     }
   }
 
@@ -84,6 +113,20 @@ export default function BidsPage(){
         description="Manage project bids and proposals"
         action={<Button onClick={create}>+ New Bid</Button>}
       />
+
+      {error && (
+        <div style={{
+          padding: '12px',
+          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+          border: '1px solid #EF5350',
+          borderRadius: '8px',
+          color: '#EF5350',
+          fontSize: '14px',
+          marginBottom: '24px'
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{
