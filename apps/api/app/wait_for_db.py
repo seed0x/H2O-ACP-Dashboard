@@ -8,6 +8,9 @@ def wait_for_db(retries=30, delay=2):
     if not url:
         print("DATABASE_URL not set, exit")
         sys.exit(1)
+    # Convert postgresql+asyncpg:// to postgresql:// for psycopg (synchronous driver)
+    if url.startswith('postgresql+asyncpg://'):
+        url = url.replace('postgresql+asyncpg://', 'postgresql://', 1)
     for i in range(retries):
         try:
             with psycopg.connect(url) as conn:
