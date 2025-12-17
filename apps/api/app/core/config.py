@@ -7,7 +7,15 @@ except Exception:
     from pydantic import BaseSettings
 
 class Settings(BaseSettings):
-    database_url: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@db:5432/plumbing")
+    _database_url: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@db:5432/plumbing")
+    
+    @property
+    def database_url(self) -> str:
+        """Convert postgresql:// to postgresql+asyncpg:// for async operations"""
+        url = self._database_url
+        if url.startswith('postgresql://') and '+asyncpg' not in url:
+            return url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+        return url
     admin_password: str = os.getenv("ADMIN_PASSWORD", "adminpassword")
     jwt_secret: str = os.getenv("JWT_SECRET", "changemeplease")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
