@@ -51,6 +51,22 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
         )
         user = result.scalar_one_or_none()
         
+        # If admin user doesn't exist and login is for admin, create it
+        if not user and login_data.username == "admin" and settings.admin_password:
+            if login_data.password == settings.admin_password:
+                # Create admin user on-the-fly
+                from ..core.password import hash_password
+                user = models.User(
+                    username="admin",
+                    email="admin@example.com",
+                    hashed_password=hash_password(settings.admin_password),
+                    role="admin",
+                    is_active=True
+                )
+                db.add(user)
+                await db.flush()
+                await db.refresh(user)
+        
         if user:
             # User exists in database - verify password
             if not user.is_active:
