@@ -132,24 +132,20 @@ export default function ReviewsPage() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{ width: '200px' }}
-          >
-            <option value="">All Statuses</option>
-            {activeTab === 'requests' ? (
-              <>
-                <option value="pending">Pending</option>
-                <option value="sent">Sent</option>
-                <option value="completed">Completed</option>
-                <option value="expired">Expired</option>
-              </>
-            ) : (
-              <>
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </>
-            )}
-          </Select>
+            options={activeTab === 'requests' ? [
+              { value: '', label: 'All Statuses' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'sent', label: 'Sent' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'expired', label: 'Expired' },
+            ] : [
+              { value: '', label: 'All Statuses' },
+              { value: 'open', label: 'Open' },
+              { value: 'in_progress', label: 'In Progress' },
+              { value: 'resolved', label: 'Resolved' },
+              { value: 'closed', label: 'Closed' },
+            ]}
+          />
         )}
       </div>
 
@@ -159,11 +155,11 @@ export default function ReviewsPage() {
       ) : activeTab === 'requests' ? (
         <Table
           columns={[
-            { key: 'customer_name', label: 'Customer' },
-            { key: 'customer_email', label: 'Email' },
-            { key: 'status', label: 'Status' },
-            { key: 'sent_at', label: 'Sent' },
-            { key: 'created_at', label: 'Created' },
+            { header: 'Customer', accessor: 'customer_name' },
+            { header: 'Email', accessor: 'customer_email' },
+            { header: 'Status', accessor: 'status' },
+            { header: 'Sent', accessor: 'sent_at' },
+            { header: 'Created', accessor: 'created_at' },
           ]}
           data={filteredRequests.map(r => ({
             ...r,
@@ -175,12 +171,12 @@ export default function ReviewsPage() {
       ) : activeTab === 'reviews' ? (
         <Table
           columns={[
-            { key: 'customer_name', label: 'Customer' },
-            { key: 'rating', label: 'Rating' },
-            { key: 'comment', label: 'Comment' },
-            { key: 'is_public', label: 'Public' },
-            { key: 'created_at', label: 'Created' },
-            { key: 'actions', label: 'Actions' },
+            { header: 'Customer', accessor: 'customer_name' },
+            { header: 'Rating', accessor: 'rating' },
+            { header: 'Comment', accessor: 'comment' },
+            { header: 'Public', accessor: 'is_public' },
+            { header: 'Created', accessor: 'created_at' },
+            { header: 'Actions', accessor: 'actions' },
           ]}
           data={filteredReviews.map(r => ({
             ...r,
@@ -189,7 +185,7 @@ export default function ReviewsPage() {
             is_public: r.is_public ? 'Yes' : 'No',
             created_at: new Date(r.created_at).toLocaleDateString(),
             actions: !r.is_public ? (
-              <Button onClick={() => handleMakePublic(r.id)} size="small">
+              <Button onClick={() => handleMakePublic(r.id)} size="sm">
                 Make Public
               </Button>
             ) : '-',
@@ -198,12 +194,12 @@ export default function ReviewsPage() {
       ) : (
         <Table
           columns={[
-            { key: 'customer_name', label: 'Customer' },
-            { key: 'issue_description', label: 'Issue' },
-            { key: 'status', label: 'Status' },
-            { key: 'assigned_to', label: 'Assigned To' },
-            { key: 'created_at', label: 'Created' },
-            { key: 'actions', label: 'Actions' },
+            { header: 'Customer', accessor: 'customer_name' },
+            { header: 'Issue', accessor: 'issue_description' },
+            { header: 'Status', accessor: 'status' },
+            { header: 'Assigned To', accessor: 'assigned_to' },
+            { header: 'Created', accessor: 'created_at' },
+            { header: 'Actions', accessor: 'actions' },
           ]}
           data={filteredTickets.map(t => ({
             ...t,
@@ -216,12 +212,13 @@ export default function ReviewsPage() {
                 value={t.status}
                 onChange={(e) => handleUpdateTicketStatus(t.id, e.target.value)}
                 style={{ width: '150px' }}
-              >
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </Select>
+                options={[
+                  { value: 'open', label: 'Open' },
+                  { value: 'in_progress', label: 'In Progress' },
+                  { value: 'resolved', label: 'Resolved' },
+                  { value: 'closed', label: 'Closed' },
+                ]}
+              />
             ),
           }))}
         />
