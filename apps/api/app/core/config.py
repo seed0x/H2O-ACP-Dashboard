@@ -14,7 +14,11 @@ class Settings(BaseSettings):
         """Convert postgresql:// to postgresql+asyncpg:// for async operations"""
         url = self._database_url
         if url.startswith('postgresql://') and '+asyncpg' not in url:
-            return url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+            url = url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+        # Remove sslmode query parameter - asyncpg handles SSL automatically for remote hosts
+        # and doesn't accept sslmode as a URL parameter
+        if '?sslmode=' in url:
+            url = url.split('?')[0]
         return url
     admin_password: str = os.getenv("ADMIN_PASSWORD", "adminpassword")
     jwt_secret: str = os.getenv("JWT_SECRET", "changemeplease")

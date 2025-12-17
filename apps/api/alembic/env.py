@@ -29,6 +29,10 @@ if db_url:
     # Convert postgresql:// to postgresql+asyncpg:// for async operations
     if db_url.startswith('postgresql://') and '+asyncpg' not in db_url:
         db_url = db_url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+    # Remove sslmode query parameter - asyncpg handles SSL automatically for remote hosts
+    # and doesn't accept sslmode as a URL parameter
+    if '?sslmode=' in db_url:
+        db_url = db_url.split('?')[0]
     config.set_main_option('sqlalchemy.url', db_url)
 
 
