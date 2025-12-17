@@ -16,7 +16,9 @@ fileConfig(config.config_file_name)
 
 # Add your model's MetaData object here
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# Add /app to Python path so we can import app.models
+# __file__ is /app/alembic/env.py, so dirname(dirname(__file__)) = /app
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.models import Base
 
 target_metadata = Base.metadata
