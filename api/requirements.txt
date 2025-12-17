@@ -11,4 +11,5 @@ pydantic-settings
 email-validator
 bcrypt
 slowapi
+mangum
 

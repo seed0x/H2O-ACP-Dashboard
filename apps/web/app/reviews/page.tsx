@@ -10,6 +10,8 @@ import { Select } from '../../components/ui/Select'
 import { reviewApi, ReviewRequest, Review, RecoveryTicket } from '../../lib/api/reviews'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
+import { showToast } from '../../components/Toast'
+import { handleApiError, logError } from '../../lib/error-handler'
 
 export default function ReviewsPage() {
   const router = useRouter()
@@ -44,7 +46,11 @@ export default function ReviewsPage() {
         setRecoveryTickets(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Failed to load data:', error)
+      logError(error, 'loadData')
+      // Don't show toast for initial load errors, just log them
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load data:', error)
+      }
     } finally {
       setLoading(false)
     }
@@ -69,9 +75,10 @@ export default function ReviewsPage() {
     try {
       await reviewApi.updateReview(reviewId, { is_public: true })
       await loadData()
+      showToast('Review made public successfully', 'success')
     } catch (error) {
-      console.error('Failed to make review public:', error)
-      alert('Failed to make review public')
+      logError(error, 'makeReviewPublic')
+      showToast(handleApiError(error), 'error')
     }
   }
 
@@ -79,9 +86,10 @@ export default function ReviewsPage() {
     try {
       await reviewApi.updateRecoveryTicket(ticketId, { status })
       await loadData()
+      showToast('Ticket status updated successfully', 'success')
     } catch (error) {
-      console.error('Failed to update ticket:', error)
-      alert('Failed to update ticket status')
+      logError(error, 'updateTicketStatus')
+      showToast(handleApiError(error), 'error')
     }
   }
 

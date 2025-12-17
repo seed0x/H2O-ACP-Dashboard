@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from .api.router import router
 from .core.config import settings
 from .core.rate_limit import limiter
+from .core.auth import get_current_user
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -46,128 +47,50 @@ async def ensure_admin_user():
             
             await db.commit()
             logger.info("✓ Admin user ready")
-            print("✓ Admin user ready", flush=True)
             return True
     except Exception as e:
-        logger.warning(f"⚠ Could not create admin user: {e}")
-        print(f"⚠ Could not create admin user: {e}", flush=True)
-        import traceback
-        print(traceback.format_exc(), flush=True)
+        logger.warning(f"⚠ Could not create admin user: {e}", exc_info=True)
         return False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown"""
     # Startup
-    print("=" * 50, flush=True)
-    print("Starting Plumbing Ops API - Lifespan Startup", flush=True)
-    print("=" * 50, flush=True)
+    logger.info("=" * 50)
+    logger.info("Starting Plumbing Ops API")
+    logger.info("=" * 50)
     
     try:
-        # #region agent log
-        import json
-        import os
-        from urllib.parse import urlparse
-        raw_url = os.getenv("DATABASE_URL", "NOT_SET")
-        parsed = urlparse(raw_url) if raw_url != "NOT_SET" else None
-        settings_parsed = urlparse(settings.database_url) if settings.database_url else None
-        print(f"[DEBUG HYPOTHESIS A] Raw DATABASE_URL from env: {'SET' if raw_url != 'NOT_SET' else 'NOT_SET'}", flush=True)
-        print(f"[DEBUG HYPOTHESIS A] Raw URL host: {parsed.hostname if parsed else 'N/A'}", flush=True)
-        print(f"[DEBUG HYPOTHESIS A] Raw URL port: {parsed.port if parsed else 'N/A'}", flush=True)
-        print(f"[DEBUG HYPOTHESIS A] Settings URL host: {settings_parsed.hostname if settings_parsed else 'N/A'}", flush=True)
-        print(f"[DEBUG HYPOTHESIS A] Settings URL port: {settings_parsed.port if settings_parsed else 'N/A'}", flush=True)
-        print(f"[DEBUG HYPOTHESIS A] Is default URL: {settings.database_url == 'postgresql+asyncpg://postgres:postgres@db:5432/plumbing'}", flush=True)
-        # #endregion
-        
         # Check DATABASE_URL
         if not settings.database_url or settings.database_url == "postgresql+asyncpg://postgres:postgres@db:5432/plumbing":
             logger.error("ERROR: DATABASE_URL not set correctly!")
-            print("ERROR: DATABASE_URL not set correctly!", flush=True)
         else:
-            logger.info(f"Database URL configured")
-            print(f"Database URL configured", flush=True)
+            logger.info("Database URL configured")
             
             # Test database connection
             try:
-                # #region agent log
-                from urllib.parse import urlparse
-                conn_parsed = urlparse(settings.database_url)
-                print(f"[DEBUG HYPOTHESIS D] Attempting connection to host: {conn_parsed.hostname}", flush=True)
-                print(f"[DEBUG HYPOTHESIS D] Port: {conn_parsed.port}", flush=True)
-                print(f"[DEBUG HYPOTHESIS D] Full connection URL (masked): {conn_parsed.scheme}://{conn_parsed.username}:***@{conn_parsed.hostname}:{conn_parsed.port}{conn_parsed.path}", flush=True)
-                # #endregion
-                
                 from .db.session import engine
                 from sqlalchemy import text
-                
-                # #region agent log
-                log_data = {
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "E",
-                    "location": "main.py:129",
-                    "message": "Engine created, attempting connection",
-                    "timestamp": int(__import__('time').time() * 1000),
-                    "data": {"engine_created": True}
-                }
-                try:
-                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
-                        f.write(json.dumps(log_data) + "\n")
-                except:
-                    pass
-                # #endregion
                 
                 async with engine.begin() as conn:
                     await conn.execute(text("SELECT 1"))
                 
-                # #region agent log
-                log_data = {
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "ALL",
-                    "location": "main.py:145",
-                    "message": "Database connection successful",
-                    "timestamp": int(__import__('time').time() * 1000),
-                    "data": {"connection_success": True}
-                }
-                try:
-                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
-                        f.write(json.dumps(log_data) + "\n")
-                except:
-                    pass
-                # #endregion
-                
                 logger.info("✓ Database connection successful")
-                print("✓ Database connection successful", flush=True)
                 
                 # Create admin user
                 await ensure_admin_user()
             except Exception as e:
-                # #region agent log
-                import traceback
-                print(f"[DEBUG HYPOTHESIS B,C,D,E] Error type: {type(e).__name__}", flush=True)
-                print(f"[DEBUG HYPOTHESIS B,C,D,E] Error message: {str(e)}", flush=True)
-                print(f"[DEBUG HYPOTHESIS B,C,D,E] Error args: {list(e.args) if hasattr(e, 'args') else []}", flush=True)
-                print(f"[DEBUG HYPOTHESIS B,C,D,E] Full traceback:", flush=True)
-                print(traceback.format_exc(), flush=True)
-                # #endregion
-                
-                logger.error(f"✗ Database connection failed: {e}")
-                print(f"✗ Database connection failed: {e}", flush=True)
+                logger.error(f"✗ Database connection failed: {e}", exc_info=True)
         
         logger.info("Startup complete - API ready!")
-        print("Startup complete - API ready!", flush=True)
         global _startup_complete
         _startup_complete = True
     except Exception as e:
-        logger.error(f"Startup error: {e}")
-        print(f"Startup error: {e}", flush=True)
-        import traceback
-        print(traceback.format_exc(), flush=True)
+        logger.error(f"Startup error: {e}", exc_info=True)
     
     yield
     
-    # Shutdown (if needed)
+    # Shutdown
     logger.info("Shutting down...")
 
 app = FastAPI(title="Plumbing Ops Platform API", version="1.0.0", lifespan=lifespan)
@@ -209,13 +132,17 @@ async def health():
         }
 
 @app.get("/debug/startup")
-async def debug_startup():
-    """Debug endpoint to check startup status"""
+async def debug_startup(current_user=Depends(get_current_user)):
+    """Debug endpoint to check startup status (admin only)"""
+    from .db.session import AsyncSessionLocal
+    from .models import User
+    from sqlalchemy import select
+    
+    # Only allow admins to access debug endpoint
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
     try:
-        from .db.session import AsyncSessionLocal
-        from .models import User
-        from sqlalchemy import select
-        
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(User).where(User.username == "admin"))
             admin_user = result.scalar_one_or_none()

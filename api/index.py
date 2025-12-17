@@ -8,5 +8,13 @@ if project_root not in sys.path:
 
 from apps.api.app.main import app
 
-# Vercel serverless handler - FastAPI app is ASGI compatible
-handler = app
+# Vercel serverless handler - Use Mangum to properly handle ASGI app
+# Mangum converts ASGI to AWS Lambda/Vercel format
+try:
+    from mangum import Mangum
+    
+    # Create handler with lifespan support disabled (Vercel handles cold starts differently)
+    handler = Mangum(app, lifespan="off")
+except ImportError:
+    # Fallback if mangum not available (shouldn't happen in production)
+    handler = app
