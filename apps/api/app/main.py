@@ -90,23 +90,11 @@ async def lifespan(app: FastAPI):
             # Test database connection
             try:
                 # #region agent log
-                log_data = {
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "D",
-                    "location": "main.py:105",
-                    "message": "Before database connection attempt",
-                    "timestamp": int(__import__('time').time() * 1000),
-                    "data": {
-                        "connection_url_host": urlparse(settings.database_url).hostname,
-                        "connection_url_port": urlparse(settings.database_url).port
-                    }
-                }
-                try:
-                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
-                        f.write(json.dumps(log_data) + "\n")
-                except:
-                    pass
+                from urllib.parse import urlparse
+                conn_parsed = urlparse(settings.database_url)
+                print(f"[DEBUG HYPOTHESIS D] Attempting connection to host: {conn_parsed.hostname}", flush=True)
+                print(f"[DEBUG HYPOTHESIS D] Port: {conn_parsed.port}", flush=True)
+                print(f"[DEBUG HYPOTHESIS D] Full connection URL (masked): {conn_parsed.scheme}://{conn_parsed.username}:***@{conn_parsed.hostname}:{conn_parsed.port}{conn_parsed.path}", flush=True)
                 # #endregion
                 
                 from .db.session import engine
@@ -157,25 +145,11 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 # #region agent log
                 import traceback
-                log_data = {
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "B,C,D,E",
-                    "location": "main.py:165",
-                    "message": "Database connection failed - full error details",
-                    "timestamp": int(__import__('time').time() * 1000),
-                    "data": {
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "error_args": list(e.args) if hasattr(e, 'args') else [],
-                        "traceback": traceback.format_exc()
-                    }
-                }
-                try:
-                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
-                        f.write(json.dumps(log_data) + "\n")
-                except:
-                    pass
+                print(f"[DEBUG HYPOTHESIS B,C,D,E] Error type: {type(e).__name__}", flush=True)
+                print(f"[DEBUG HYPOTHESIS B,C,D,E] Error message: {str(e)}", flush=True)
+                print(f"[DEBUG HYPOTHESIS B,C,D,E] Error args: {list(e.args) if hasattr(e, 'args') else []}", flush=True)
+                print(f"[DEBUG HYPOTHESIS B,C,D,E] Full traceback:", flush=True)
+                print(traceback.format_exc(), flush=True)
                 # #endregion
                 
                 logger.error(f"✗ Database connection failed: {e}")
