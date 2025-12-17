@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from ..core.config import settings
 
 # Configure connection pooling for production scalability
+# Note: Disable prepared statements for pgbouncer compatibility (Supabase uses pgbouncer)
 engine = create_async_engine(
     settings.database_url,
     pool_size=20,  # Number of connections to maintain
@@ -10,7 +11,13 @@ engine = create_async_engine(
     pool_timeout=30,  # Seconds to wait for connection from pool
     pool_pre_ping=True,  # Verify connections before use (handles stale connections)
     echo=False,
-    future=True
+    future=True,
+    connect_args={
+        "statement_cache_size": 0,  # Disable prepared statements for pgbouncer compatibility
+        "server_settings": {
+            "jit": "off"  # Disable JIT for better compatibility
+        }
+    }
 )
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

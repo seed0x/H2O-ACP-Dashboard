@@ -38,7 +38,16 @@ if db_url:
 
 def run_migrations_online() -> None:
     from sqlalchemy.ext.asyncio import create_async_engine
-    connectable = create_async_engine(config.get_main_option('sqlalchemy.url'))
+    # Disable prepared statements for pgbouncer compatibility (Supabase uses pgbouncer)
+    connectable = create_async_engine(
+        config.get_main_option('sqlalchemy.url'),
+        connect_args={
+            "statement_cache_size": 0,  # Disable prepared statements for pgbouncer
+            "server_settings": {
+                "jit": "off"
+            }
+        }
+    )
 
     async def do_run_migrations():
         async with connectable.connect() as conn:
