@@ -68,29 +68,15 @@ async def lifespan(app: FastAPI):
         import json
         import os
         from urllib.parse import urlparse
-        log_data = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": "A",
-            "location": "main.py:67",
-            "message": "Checking DATABASE_URL configuration",
-            "timestamp": int(__import__('time').time() * 1000)
-        }
-        try:
-            raw_url = os.getenv("DATABASE_URL", "NOT_SET")
-            parsed = urlparse(raw_url) if raw_url != "NOT_SET" else None
-            log_data["data"] = {
-                "raw_url_set": raw_url != "NOT_SET",
-                "raw_url_host": parsed.hostname if parsed else None,
-                "raw_url_port": parsed.port if parsed else None,
-                "settings_url_host": urlparse(settings.database_url).hostname if settings.database_url else None,
-                "settings_url_port": urlparse(settings.database_url).port if settings.database_url else None,
-                "is_default": settings.database_url == "postgresql+asyncpg://postgres:postgres@db:5432/plumbing"
-            }
-            with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
-                f.write(json.dumps(log_data) + "\n")
-        except Exception as log_err:
-            pass
+        raw_url = os.getenv("DATABASE_URL", "NOT_SET")
+        parsed = urlparse(raw_url) if raw_url != "NOT_SET" else None
+        settings_parsed = urlparse(settings.database_url) if settings.database_url else None
+        print(f"[DEBUG HYPOTHESIS A] Raw DATABASE_URL from env: {'SET' if raw_url != 'NOT_SET' else 'NOT_SET'}", flush=True)
+        print(f"[DEBUG HYPOTHESIS A] Raw URL host: {parsed.hostname if parsed else 'N/A'}", flush=True)
+        print(f"[DEBUG HYPOTHESIS A] Raw URL port: {parsed.port if parsed else 'N/A'}", flush=True)
+        print(f"[DEBUG HYPOTHESIS A] Settings URL host: {settings_parsed.hostname if settings_parsed else 'N/A'}", flush=True)
+        print(f"[DEBUG HYPOTHESIS A] Settings URL port: {settings_parsed.port if settings_parsed else 'N/A'}", flush=True)
+        print(f"[DEBUG HYPOTHESIS A] Is default URL: {settings.database_url == 'postgresql+asyncpg://postgres:postgres@db:5432/plumbing'}", flush=True)
         # #endregion
         
         # Check DATABASE_URL
