@@ -64,6 +64,35 @@ async def lifespan(app: FastAPI):
     print("=" * 50, flush=True)
     
     try:
+        # #region agent log
+        import json
+        import os
+        from urllib.parse import urlparse
+        log_data = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "A",
+            "location": "main.py:67",
+            "message": "Checking DATABASE_URL configuration",
+            "timestamp": int(__import__('time').time() * 1000)
+        }
+        try:
+            raw_url = os.getenv("DATABASE_URL", "NOT_SET")
+            parsed = urlparse(raw_url) if raw_url != "NOT_SET" else None
+            log_data["data"] = {
+                "raw_url_set": raw_url != "NOT_SET",
+                "raw_url_host": parsed.hostname if parsed else None,
+                "raw_url_port": parsed.port if parsed else None,
+                "settings_url_host": urlparse(settings.database_url).hostname if settings.database_url else None,
+                "settings_url_port": urlparse(settings.database_url).port if settings.database_url else None,
+                "is_default": settings.database_url == "postgresql+asyncpg://postgres:postgres@db:5432/plumbing"
+            }
+            with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
+                f.write(json.dumps(log_data) + "\n")
+        except Exception as log_err:
+            pass
+        # #endregion
+        
         # Check DATABASE_URL
         if not settings.database_url or settings.database_url == "postgresql+asyncpg://postgres:postgres@db:5432/plumbing":
             logger.error("ERROR: DATABASE_URL not set correctly!")
@@ -74,16 +103,95 @@ async def lifespan(app: FastAPI):
             
             # Test database connection
             try:
+                # #region agent log
+                log_data = {
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "D",
+                    "location": "main.py:105",
+                    "message": "Before database connection attempt",
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "data": {
+                        "connection_url_host": urlparse(settings.database_url).hostname,
+                        "connection_url_port": urlparse(settings.database_url).port
+                    }
+                }
+                try:
+                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
+                        f.write(json.dumps(log_data) + "\n")
+                except:
+                    pass
+                # #endregion
+                
                 from .db.session import engine
                 from sqlalchemy import text
+                
+                # #region agent log
+                log_data = {
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "E",
+                    "location": "main.py:129",
+                    "message": "Engine created, attempting connection",
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "data": {"engine_created": True}
+                }
+                try:
+                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
+                        f.write(json.dumps(log_data) + "\n")
+                except:
+                    pass
+                # #endregion
+                
                 async with engine.begin() as conn:
                     await conn.execute(text("SELECT 1"))
+                
+                # #region agent log
+                log_data = {
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "ALL",
+                    "location": "main.py:145",
+                    "message": "Database connection successful",
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "data": {"connection_success": True}
+                }
+                try:
+                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
+                        f.write(json.dumps(log_data) + "\n")
+                except:
+                    pass
+                # #endregion
+                
                 logger.info("✓ Database connection successful")
                 print("✓ Database connection successful", flush=True)
                 
                 # Create admin user
                 await ensure_admin_user()
             except Exception as e:
+                # #region agent log
+                import traceback
+                log_data = {
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "B,C,D,E",
+                    "location": "main.py:165",
+                    "message": "Database connection failed - full error details",
+                    "timestamp": int(__import__('time').time() * 1000),
+                    "data": {
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "error_args": list(e.args) if hasattr(e, 'args') else [],
+                        "traceback": traceback.format_exc()
+                    }
+                }
+                try:
+                    with open(r"c:\Users\user1\Desktop\Misellanious\Plumbing-ops-platform\.cursor\debug.log", "a") as f:
+                        f.write(json.dumps(log_data) + "\n")
+                except:
+                    pass
+                # #endregion
+                
                 logger.error(f"✗ Database connection failed: {e}")
                 print(f"✗ Database connection failed: {e}", flush=True)
         
