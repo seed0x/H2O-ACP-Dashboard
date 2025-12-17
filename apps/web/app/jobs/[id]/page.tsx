@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../../lib/config'
+import { useMobile } from '../../../lib/useMobile'
 import { PageHeader } from '../../../components/ui/PageHeader'
 import { Button } from '../../../components/ui/Button'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
@@ -65,6 +66,7 @@ interface AuditLog {
 
 export default function JobDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
+  const isMobile = useMobile()
   const [job, setJob] = useState<Job | null>(null)
   const [builder, setBuilder] = useState<Builder | null>(null)
   const [contacts, setContacts] = useState<BuilderContact[]>([])
@@ -241,7 +243,11 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
     : 0
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ 
+      padding: isMobile ? '16px' : '32px', 
+      maxWidth: '1400px', 
+      margin: '0 auto'
+    }}>
       <PageHeader
         title={`${job.community} - Lot ${job.lot_number}`}
         description={`Phase: ${job.phase} | ${job.address_line1}, ${job.city}, ${job.state} ${job.zip}`}
@@ -279,7 +285,12 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(400px, 1fr))', 
+        gap: isMobile ? '16px' : '24px', 
+        marginBottom: '24px'
+      }}>
         {/* Status & Key Info */}
         <div style={{
           backgroundColor: 'var(--color-card)',

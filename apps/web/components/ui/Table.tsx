@@ -41,7 +41,15 @@ export function Table<T extends { id: string | number }>({
       borderRadius: '12px',
       overflow: 'hidden'
     }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={{
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }}>
+        <table style={{ 
+          width: '100%', 
+          borderCollapse: 'collapse',
+          minWidth: '600px'
+        }}>
         <thead>
           <tr style={{
             backgroundColor: 'var(--color-hover)',
@@ -103,6 +111,7 @@ export function Table<T extends { id: string | number }>({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

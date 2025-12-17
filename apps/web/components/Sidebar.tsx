@@ -28,22 +28,67 @@ const navItems: NavItem[] = [
   { name: 'Bids', href: '/bids', icon: UilFileAlt },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside style={{
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      height: '100vh',
-      width: '256px',
-      backgroundColor: 'var(--color-card)',
-      borderRight: '1px solid var(--color-border)',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 100,
-    }}>
+    <>
+      {isMobile && isOpen && (
+        <div
+          onClick={onClose}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 998
+          }}
+        />
+      )}
+      <aside style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        height: '100vh',
+        width: isMobile ? '280px' : '256px',
+        backgroundColor: 'var(--color-card)',
+        borderRight: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 999,
+        transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
+        transition: 'transform 0.3s ease',
+        boxShadow: isMobile && isOpen ? '2px 0 8px rgba(0, 0, 0, 0.3)' : 'none'
+      }}>
+        {isMobile && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              padding: '8px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       {/* Logo/Brand */}
       <div style={{
         padding: '24px',
@@ -143,5 +188,6 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   )
 }

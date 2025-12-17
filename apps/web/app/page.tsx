@@ -2,8 +2,10 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
+import { useMobile } from '../lib/useMobile'
 
 export default function Dashboard() {
+  const isMobile = useMobile()
   const [stats, setStats] = useState({
     activeJobs: 0,
     pendingServiceCalls: 0,
@@ -119,7 +121,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ padding: '32px' }}>
+    <div style={{ 
+      padding: isMobile ? '16px' : '32px'
+    }}>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{
@@ -436,8 +440,8 @@ export default function Dashboard() {
       {/* Content Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-        gap: '24px'
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(400px, 1fr))',
+        gap: isMobile ? '16px' : '24px'
       }}>
         {/* Recent Jobs */}
         <div style={{

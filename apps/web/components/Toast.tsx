@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useMobile } from '../lib/useMobile'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -56,6 +57,7 @@ export function useToast() {
 
 export function ToastContainer() {
   const { toasts, removeToast } = useToast()
+  const isMobile = useMobile()
   
   if (toasts.length === 0) return null
   
@@ -63,7 +65,8 @@ export function ToastContainer() {
     <div style={{
       position: 'fixed',
       top: '20px',
-      right: '20px',
+      right: isMobile ? '20px' : '20px',
+      left: isMobile ? '20px' : 'auto',
       zIndex: 10000,
       display: 'flex',
       flexDirection: 'column',
@@ -82,10 +85,14 @@ export function ToastContainer() {
             borderRadius: '6px',
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
             cursor: 'pointer',
-            minWidth: '300px',
-            maxWidth: '500px',
+            minWidth: isMobile ? 'auto' : '300px',
+            maxWidth: isMobile ? '100%' : '500px',
+            width: isMobile ? '100%' : 'auto',
             fontSize: '14px',
-            animation: 'slideIn 0.3s ease-out'
+            animation: 'slideIn 0.3s ease-out',
+            minHeight: '44px',
+            display: 'flex',
+            alignItems: 'center'
           }}
         >
           {toast.message}
