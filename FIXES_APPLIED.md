@@ -150,3 +150,4 @@ Expected: Health endpoint test should pass ✅
 - Admin user is created fresh for each test with password "adminpassword"
 - All tests are isolated - each test gets a fresh database
 
+

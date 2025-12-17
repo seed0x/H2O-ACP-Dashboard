@@ -4,24 +4,34 @@ echo "=========================================="
 echo "Starting Plumbing Ops API"
 echo "=========================================="
 
-echo "Waiting for DB to become ready..."
-python -m app.wait_for_db
-
-echo "Running database migrations..."
-cd /app
-if alembic upgrade head; then
-    echo "✓ Migrations completed successfully"
-else
-    echo "✗ Migration failed, but continuing..."
+# Check DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo "ERROR: DATABASE_URL environment variable is not set!"
+    echo "Please set it in Render dashboard: Environment → Environment Variables"
     exit 1
 fi
 
+echo "DATABASE_URL is set (host: $(echo $DATABASE_URL | sed 's/.*@\([^:]*\).*/\1/'))"
+
+echo "Waiting for DB to become ready..."
+python -m app.wait_for_db || {
+    echo "ERROR: Could not connect to database!"
+    echo "Check your DATABASE_URL in Render environment variables"
+    exit 1
+}
+
+echo "Running database migrations..."
+cd /app
+alembic upgrade head || {
+    echo "ERROR: Migrations failed!"
+    exit 1
+}
+echo "✓ Migrations completed successfully"
+
 echo "Ensuring admin user exists..."
-if python fix_admin.py; then
-    echo "✓ Admin user ready"
-else
+python fix_admin.py || {
     echo "⚠ Warning: Could not create admin user (may already exist)"
-fi
+}
 
 echo "=========================================="
 echo "Starting uvicorn server..."
