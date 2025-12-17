@@ -28,7 +28,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
-        value: https://plumbing-ops-web.onrender.com,http://localhost:3000
+        sync: false
     healthCheckPath: /health
     
   # Web Frontend
