@@ -355,6 +355,7 @@ async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: st
     return res.scalars().all()
 
 async def update_service_call(db: AsyncSession, sc: models.ServiceCall, sc_in: schemas.ServiceCallUpdate, changed_by: str) -> models.ServiceCall:
+    old_status = sc.status
     for field, value in sc_in.dict(exclude_unset=True).items():
         old = getattr(sc, field)
         setattr(sc, field, value)
@@ -362,6 +363,18 @@ async def update_service_call(db: AsyncSession, sc: models.ServiceCall, sc_in: s
     db.add(sc)
     await db.commit()
     await db.refresh(sc)
+    
+    # Automation: If service call was just completed, create review request
+    if old_status != 'completed' and sc.status == 'completed':
+        try:
+            from ..core.service_call_automation import on_service_call_completed
+            await on_service_call_completed(db, sc, changed_by=changed_by)
+        except Exception as e:
+            # Log error but don't fail the update
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create review request for service call {sc.id}: {str(e)}")
+    
     return sc
 
 async def delete_service_call(db: AsyncSession, sc: models.ServiceCall, changed_by: str):

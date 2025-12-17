@@ -9,6 +9,9 @@ from .. schemas import (
     JobCreate, JobOut, JobUpdate,
     ServiceCallCreate, ServiceCallOut, ServiceCallUpdate,
     AuditLogOut,
+    ReviewRequestCreate, ReviewRequestOut, ReviewRequestUpdate,
+    ReviewOut, ReviewUpdate,
+    RecoveryTicketCreate, RecoveryTicketOut, RecoveryTicketUpdate,
 )
 from ..core.auth import create_access_token, get_current_user, CurrentUser
 from ..core.config import settings
@@ -29,6 +32,16 @@ try:
 except ImportError:
     marketing_router = None
 
+# Import review system routes
+try:
+    from .reviews import router as reviews_router
+    from .public_reviews import router as public_reviews_router
+    from .recovery_tickets import router as recovery_tickets_router
+except ImportError:
+    reviews_router = None
+    public_reviews_router = None
+    recovery_tickets_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -36,6 +49,14 @@ router = APIRouter()
 # Include marketing routes if available
 if marketing_router:
     router.include_router(marketing_router)
+
+# Include review system routes if available
+if reviews_router:
+    router.include_router(reviews_router)
+if public_reviews_router:
+    router.include_router(public_reviews_router)
+if recovery_tickets_router:
+    router.include_router(recovery_tickets_router)
 
 class LoginRequest(BaseModel):
     username: str

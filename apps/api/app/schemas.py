@@ -234,3 +234,93 @@ class AuditLogOut(BaseModel):
     class Config:
         from_attributes = True
 
+# Review System Schemas
+
+class ReviewRequestBase(BaseModel):
+    tenant_id: str
+    service_call_id: Optional[UUID] = None
+    job_id: Optional[UUID] = None
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class ReviewRequestCreate(ReviewRequestBase):
+    pass
+
+class ReviewRequestOut(ReviewRequestBase):
+    id: UUID
+    token: str
+    status: str
+    sent_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    reminder_sent: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ReviewRequestUpdate(BaseModel):
+    status: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    reminder_sent: Optional[bool] = None
+
+class ReviewBase(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    customer_name: str
+    customer_email: Optional[str] = None
+
+class ReviewCreate(ReviewBase):
+    token: str  # Token from review request
+
+class ReviewOut(ReviewBase):
+    id: UUID
+    review_request_id: UUID
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ReviewUpdate(BaseModel):
+    is_public: Optional[bool] = None
+
+class PublicReviewCreate(BaseModel):
+    token: str
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    customer_name: str
+    customer_email: Optional[str] = None
+
+class RecoveryTicketBase(BaseModel):
+    tenant_id: str
+    review_id: UUID
+    service_call_id: Optional[UUID] = None
+    customer_name: str
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    issue_description: str
+
+class RecoveryTicketCreate(RecoveryTicketBase):
+    pass
+
+class RecoveryTicketOut(RecoveryTicketBase):
+    id: UUID
+    status: str
+    assigned_to: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class RecoveryTicketUpdate(BaseModel):
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    resolution_notes: Optional[str] = None
+

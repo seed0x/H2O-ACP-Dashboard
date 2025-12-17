@@ -253,3 +253,58 @@ class PublishJob(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     content_post = relationship("ContentPost", back_populates="publish_jobs")
+
+# Review System Models
+
+class ReviewRequest(Base):
+    __tablename__ = "review_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    service_call_id = Column(UUID(as_uuid=True), ForeignKey("service_calls.id"), nullable=True)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=True)
+    customer_name = Column(Text, nullable=False)
+    customer_email = Column(Text, nullable=True)
+    customer_phone = Column(Text, nullable=True)
+    token = Column(String, nullable=False, unique=True)  # Unique token for public review link
+    status = Column(String, nullable=False, default='pending')  # pending, sent, completed, expired
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    reminder_sent = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    review = relationship("Review", back_populates="review_request", uselist=False)
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    review_request_id = Column(UUID(as_uuid=True), ForeignKey("review_requests.id"), nullable=False, unique=True)
+    rating = Column(Integer, nullable=False)  # 1-5 stars
+    comment = Column(Text, nullable=True)
+    customer_name = Column(Text, nullable=False)
+    customer_email = Column(Text, nullable=True)
+    is_public = Column(Boolean, nullable=False, default=False)  # Whether to show on public page
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    review_request = relationship("ReviewRequest", back_populates="review")
+
+class RecoveryTicket(Base):
+    __tablename__ = "recovery_tickets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    review_id = Column(UUID(as_uuid=True), ForeignKey("reviews.id"), nullable=False)
+    service_call_id = Column(UUID(as_uuid=True), ForeignKey("service_calls.id"), nullable=True)
+    customer_name = Column(Text, nullable=False)
+    customer_email = Column(Text, nullable=True)
+    customer_phone = Column(Text, nullable=True)
+    issue_description = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default='open')  # open, in_progress, resolved, closed
+    assigned_to = Column(String, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
