@@ -93,6 +93,28 @@ export default function ReviewsPage() {
     }
   }
 
+  const handleSendRequest = async (requestId: string) => {
+    try {
+      await reviewApi.sendRequest(requestId)
+      await loadData()
+      showToast('Review request sent successfully', 'success')
+    } catch (error) {
+      logError(error, 'sendReviewRequest')
+      showToast(handleApiError(error), 'error')
+    }
+  }
+
+  const handleBulkSend = async (requestIds: string[]) => {
+    try {
+      await Promise.all(requestIds.map(id => reviewApi.sendRequest(id)))
+      await loadData()
+      showToast(`Sent ${requestIds.length} review request(s) successfully`, 'success')
+    } catch (error) {
+      logError(error, 'bulkSendReviewRequests')
+      showToast(handleApiError(error), 'error')
+    }
+  }
+
   return (
     <div style={{ padding: '32px' }}>
       <PageHeader
@@ -161,21 +183,71 @@ export default function ReviewsPage() {
       {loading ? (
         <div>Loading...</div>
       ) : activeTab === 'requests' ? (
-        <Table
-          columns={[
-            { header: 'Customer', accessor: 'customer_name' },
-            { header: 'Email', accessor: 'customer_email' },
-            { header: 'Status', accessor: 'status' },
-            { header: 'Sent', accessor: 'sent_at' },
-            { header: 'Created', accessor: 'created_at' },
-          ]}
-          data={filteredRequests.map(r => ({
-            ...r,
-            status: <StatusBadge status={r.status} />,
-            sent_at: r.sent_at ? new Date(r.sent_at).toLocaleDateString() : '-',
-            created_at: new Date(r.created_at).toLocaleDateString(),
-          }))}
-        />
+        <div>
+          {/* Production Queue Header */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '16px',
+            padding: '16px',
+            backgroundColor: 'var(--color-card)',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)'
+          }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px', color: 'var(--color-text-primary)' }}>
+                Review Request Queue
+              </h3>
+              <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                {filteredRequests.filter(r => r.status === 'pending').length} pending • {filteredRequests.filter(r => r.status === 'sent').length} sent
+              </div>
+            </div>
+            {filteredRequests.filter(r => r.status === 'pending' && r.customer_email).length > 0 && (
+              <Button 
+                onClick={() => {
+                  const pendingIds = filteredRequests
+                    .filter(r => r.status === 'pending' && r.customer_email)
+                    .map(r => r.id)
+                  handleBulkSend(pendingIds)
+                }}
+              >
+                Send All Pending ({filteredRequests.filter(r => r.status === 'pending' && r.customer_email).length})
+              </Button>
+            )}
+          </div>
+          <Table
+            columns={[
+              { header: 'Customer', accessor: 'customer_name' },
+              { header: 'Email', accessor: 'customer_email' },
+              { header: 'Status', accessor: 'status' },
+              { header: 'Days Since', accessor: 'days_since' },
+              { header: 'Sent', accessor: 'sent_at' },
+              { header: 'Actions', accessor: 'actions' },
+            ]}
+            data={filteredRequests.map(r => {
+              const daysSince = Math.floor((new Date().getTime() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24))
+              return {
+                ...r,
+                status: <StatusBadge status={r.status} />,
+                days_since: `${daysSince} day${daysSince !== 1 ? 's' : ''}`,
+                sent_at: r.sent_at ? new Date(r.sent_at).toLocaleDateString() : '-',
+                actions: r.status === 'pending' && r.customer_email ? (
+                  <Button 
+                    size="sm" 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSendRequest(r.id)
+                    }}
+                  >
+                    Send
+                  </Button>
+                ) : '-',
+              }
+            })}
+            onRowClick={(row) => router.push(`/review-requests/${row.id}`)}
+          />
+        </div>
       ) : activeTab === 'reviews' ? (
         <Table
           columns={[
@@ -193,11 +265,18 @@ export default function ReviewsPage() {
             is_public: r.is_public ? 'Yes' : 'No',
             created_at: new Date(r.created_at).toLocaleDateString(),
             actions: !r.is_public ? (
-              <Button onClick={() => handleMakePublic(r.id)} size="sm">
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleMakePublic(r.id)
+                }} 
+                size="sm"
+              >
                 Make Public
               </Button>
             ) : '-',
           }))}
+          onRowClick={(row) => router.push(`/reviews/${row.id}`)}
         />
       ) : (
         <Table
@@ -218,7 +297,11 @@ export default function ReviewsPage() {
             actions: (
               <Select
                 value={t.status}
-                onChange={(e) => handleUpdateTicketStatus(t.id, e.target.value)}
+                onChange={(e) => {
+                  e.stopPropagation()
+                  handleUpdateTicketStatus(t.id, e.target.value)
+                }}
+                onClick={(e) => e.stopPropagation()}
                 style={{ width: '150px' }}
                 options={[
                   { value: 'open', label: 'Open' },
@@ -229,6 +312,7 @@ export default function ReviewsPage() {
               />
             ),
           }))}
+          onRowClick={(row) => router.push(`/recovery-tickets/${row.id}`)}
         />
       )}
     </div>

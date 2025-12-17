@@ -5,8 +5,9 @@ from uuid import UUID
 
 from ..db.session import get_session
 from ..core.auth import get_current_user, CurrentUser
-from .. import crud_reviews, schemas
+from .. import crud_reviews, schemas, models
 from ..core.tenant_config import validate_tenant_feature, TenantFeature
+from ..core.review_utils import send_review_request
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
@@ -81,6 +82,34 @@ async def update_review_request(
         return updated
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/requests/{request_id}/send", response_model=schemas.ReviewRequestOut)
+async def send_review_request_endpoint(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Send a review request email to the customer"""
+    review_request = await crud_reviews.get_review_request(db, request_id)
+    if not review_request:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review request not found")
+    
+    validate_tenant_feature(review_request.tenant_id, TenantFeature.SERVICE_CALLS)
+    
+    if review_request.status == 'completed':
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot send a completed review request")
+    
+    if not review_request.customer_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Customer email is required to send review request")
+    
+    success = await send_review_request(db, review_request)
+    
+    if not success:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send review request email")
+    
+    # Refresh to get updated status
+    await db.refresh(review_request)
+    return review_request
 
 @router.get("", response_model=List[schemas.ReviewOut])
 async def list_reviews(

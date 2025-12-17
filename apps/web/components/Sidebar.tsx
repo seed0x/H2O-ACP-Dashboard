@@ -8,6 +8,8 @@ import UilUserCircle from '@iconscout/react-unicons/icons/uil-user-circle'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
 import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
+import UilChart from '@iconscout/react-unicons/icons/uil-chart'
+import UilStar from '@iconscout/react-unicons/icons/uil-star'
 
 interface NavItem {
   name: string
@@ -19,6 +21,8 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: UilDashboard },
   { name: 'All County Jobs', href: '/jobs', icon: UilBuilding },
   { name: 'H2O Service Calls', href: '/service-calls', icon: UilWrench },
+  { name: 'Reviews', href: '/reviews', icon: UilStar },
+  { name: 'Analytics', href: '/analytics', icon: UilChart },
   { name: 'Marketing', href: '/marketing', icon: UilCalendarAlt },
   { name: 'Builders', href: '/builders', icon: UilUserCircle },
   { name: 'Bids', href: '/bids', icon: UilFileAlt },

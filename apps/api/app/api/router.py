@@ -42,6 +42,18 @@ except ImportError:
     public_reviews_router = None
     recovery_tickets_router = None
 
+# Import overdue tracking routes
+try:
+    from .overdue import router as overdue_router
+except ImportError:
+    overdue_router = None
+
+# Import analytics routes
+try:
+    from .analytics import router as analytics_router
+except ImportError:
+    analytics_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -57,6 +69,14 @@ if public_reviews_router:
     router.include_router(public_reviews_router)
 if recovery_tickets_router:
     router.include_router(recovery_tickets_router)
+
+# Include overdue tracking routes if available
+if overdue_router:
+    router.include_router(overdue_router)
+
+# Include analytics routes if available
+if analytics_router:
+    router.include_router(analytics_router)
 
 class LoginRequest(BaseModel):
     username: str

@@ -116,6 +116,7 @@ class Job(Base):
     scheduled_end = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
     tech_name = Column(Text, nullable=True)
+    assigned_to = Column(String, nullable=True)  # Owner/assignee for accountability
     
     # Warranty tracking
     warranty_start_date = Column(Date, nullable=True)
@@ -149,6 +150,7 @@ class ServiceCall(Base):
     scheduled_start = Column(DateTime(timezone=True), nullable=True)
     scheduled_end = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+    assigned_to = Column(String, nullable=True)  # Owner/assignee for accountability
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

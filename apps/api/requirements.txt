@@ -15,3 +15,4 @@ slowapi
 pytest
 pytest-asyncio
 httpx
+mangum

@@ -8,10 +8,22 @@ export default function Dashboard() {
     activeJobs: 0,
     pendingServiceCalls: 0,
     totalBuilders: 0,
-    completedThisWeek: 0
+    completedThisWeek: 0,
+    overdueJobs: 0,
+    overdueServiceCalls: 0,
+    overdueReviewRequests: 0,
+    overdueRecoveryTickets: 0
   })
   const [recentJobs, setRecentJobs] = useState<any[]>([])
   const [recentCalls, setRecentCalls] = useState<any[]>([])
+  const [overdueJobs, setOverdueJobs] = useState<any[]>([])
+  const [overdueServiceCalls, setOverdueServiceCalls] = useState<any[]>([])
+  const [overdueReviewRequests, setOverdueReviewRequests] = useState<any[]>([])
+  const [overdueRecoveryTickets, setOverdueRecoveryTickets] = useState<any[]>([])
+  const [todayJobs, setTodayJobs] = useState<any[]>([])
+  const [todayServiceCalls, setTodayServiceCalls] = useState<any[]>([])
+  const [thisWeekJobs, setThisWeekJobs] = useState<any[]>([])
+  const [thisWeekServiceCalls, setThisWeekServiceCalls] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -22,10 +34,14 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-      const [jobs, serviceCalls, builders] = await Promise.all([
+      const [jobs, serviceCalls, builders, overdueJobsRes, overdueCallsRes, overdueRequestsRes, overdueTicketsRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { headers, withCredentials: true }),
         axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { headers, withCredentials: true }),
-        axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true })
+        axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true }),
+        axios.get(`${API_BASE_URL}/jobs/overdue?tenant_id=all_county`, { headers, withCredentials: true }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/service-calls/overdue?tenant_id=h2o`, { headers, withCredentials: true }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/reviews/requests/overdue?tenant_id=h2o`, { headers, withCredentials: true }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/recovery-tickets/overdue?tenant_id=h2o`, { headers, withCredentials: true }).catch(() => ({ data: [] }))
       ])
 
       const activeJobs = jobs.data.filter((j: any) => j.status !== 'Completed').length
@@ -35,11 +51,58 @@ export default function Dashboard() {
         activeJobs,
         pendingServiceCalls: pendingCalls,
         totalBuilders: builders.data.length,
-        completedThisWeek: 0
+        completedThisWeek: 0,
+        overdueJobs: overdueJobsRes.data.length,
+        overdueServiceCalls: overdueCallsRes.data.length,
+        overdueReviewRequests: overdueRequestsRes.data.length,
+        overdueRecoveryTickets: overdueTicketsRes.data.length
       })
 
       setRecentJobs(jobs.data.slice(0, 5))
       setRecentCalls(serviceCalls.data.slice(0, 5))
+      setOverdueJobs(overdueJobsRes.data.slice(0, 5))
+      setOverdueServiceCalls(overdueCallsRes.data.slice(0, 5))
+      setOverdueReviewRequests(overdueRequestsRes.data.slice(0, 5))
+      setOverdueRecoveryTickets(overdueTicketsRes.data.slice(0, 5))
+      
+      // Filter today's items
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      
+      const todayJobsList = jobs.data.filter((j: any) => {
+        if (!j.scheduled_start) return false
+        const scheduled = new Date(j.scheduled_start)
+        return scheduled >= today && scheduled < tomorrow
+      })
+      setTodayJobs(todayJobsList.slice(0, 5))
+      
+      const todayCallsList = serviceCalls.data.filter((c: any) => {
+        if (!c.scheduled_start) return false
+        const scheduled = new Date(c.scheduled_start)
+        return scheduled >= today && scheduled < tomorrow
+      })
+      setTodayServiceCalls(todayCallsList.slice(0, 5))
+      
+      // Filter this week's items
+      const weekEnd = new Date(today)
+      weekEnd.setDate(weekEnd.getDate() + 7)
+      
+      const weekJobsList = jobs.data.filter((j: any) => {
+        if (!j.scheduled_start) return false
+        const scheduled = new Date(j.scheduled_start)
+        return scheduled >= today && scheduled < weekEnd
+      })
+      setThisWeekJobs(weekJobsList.slice(0, 10))
+      
+      const weekCallsList = serviceCalls.data.filter((c: any) => {
+        if (!c.scheduled_start) return false
+        const scheduled = new Date(c.scheduled_start)
+        return scheduled >= today && scheduled < weekEnd
+      })
+      setThisWeekServiceCalls(weekCallsList.slice(0, 10))
+      
       setLoading(false)
     } catch (err) {
       console.error('Failed to load dashboard', err)
@@ -99,6 +162,276 @@ export default function Dashboard() {
           color="#2196F3"
         />
       </div>
+
+      {/* Overdue Alerts Section */}
+      {(stats.overdueJobs > 0 || stats.overdueServiceCalls > 0 || stats.overdueReviewRequests > 0 || stats.overdueRecoveryTickets > 0) && (
+        <div style={{
+          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+          border: '1px solid #EF5350',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '32px'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            color: '#EF5350',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>⚠️</span> Overdue Items Requiring Attention
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '20px'
+          }}>
+            {stats.overdueJobs > 0 && (
+              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Jobs</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueJobs}</div>
+                <a href="/jobs?overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
+              </div>
+            )}
+            {stats.overdueServiceCalls > 0 && (
+              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Service Calls</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueServiceCalls}</div>
+                <a href="/service-calls?overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
+              </div>
+            )}
+            {stats.overdueReviewRequests > 0 && (
+              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Review Requests</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueReviewRequests}</div>
+                <a href="/reviews?overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
+              </div>
+            )}
+            {stats.overdueRecoveryTickets > 0 && (
+              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Recovery Tickets</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueRecoveryTickets}</div>
+                <a href="/reviews?tab=tickets&overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
+              </div>
+            )}
+          </div>
+          
+          {/* Show top overdue items */}
+          {(overdueJobs.length > 0 || overdueServiceCalls.length > 0 || overdueReviewRequests.length > 0 || overdueRecoveryTickets.length > 0) && (
+            <div style={{ marginTop: '20px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#EF5350', marginBottom: '12px' }}>Top Overdue Items</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {overdueJobs.slice(0, 3).map((job: any) => (
+                  <a
+                    key={job.id}
+                    href={`/jobs/${job.id}`}
+                    style={{
+                      display: 'block',
+                      padding: '12px',
+                      backgroundColor: 'white',
+                      borderRadius: '6px',
+                      textDecoration: 'none',
+                      borderLeft: '3px solid #EF5350'
+                    }}
+                  >
+                    <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
+                      {job.community} - Lot {job.lot_number} ({job.days_overdue} days overdue)
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Assigned to: {job.assigned_to || 'Unassigned'}</div>
+                  </a>
+                ))}
+                {overdueServiceCalls.slice(0, 3).map((call: any) => (
+                  <a
+                    key={call.id}
+                    href={`/service-calls/${call.id}`}
+                    style={{
+                      display: 'block',
+                      padding: '12px',
+                      backgroundColor: 'white',
+                      borderRadius: '6px',
+                      textDecoration: 'none',
+                      borderLeft: '3px solid #EF5350'
+                    }}
+                  >
+                    <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
+                      {call.customer_name} ({call.days_overdue} days overdue)
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Assigned to: {call.assigned_to || 'Unassigned'}</div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Today's Focus */}
+      {(todayJobs.length > 0 || todayServiceCalls.length > 0) && (
+        <div style={{
+          backgroundColor: 'rgba(96, 165, 250, 0.05)',
+          border: '1px solid #60A5FA',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '32px'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            color: '#60A5FA',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>📅</span> Today's Focus
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+            {todayJobs.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-text-primary)' }}>
+                  Jobs Scheduled Today ({todayJobs.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {todayJobs.map((job: any) => (
+                    <a
+                      key={job.id}
+                      href={`/jobs/${job.id}`}
+                      style={{
+                        display: 'block',
+                        padding: '12px',
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        textDecoration: 'none',
+                        borderLeft: '3px solid #60A5FA'
+                      }}
+                    >
+                      <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
+                        {job.community} - Lot {job.lot_number}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {job.scheduled_start ? new Date(job.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time set'}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {todayServiceCalls.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-text-primary)' }}>
+                  Service Calls Scheduled Today ({todayServiceCalls.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {todayServiceCalls.map((call: any) => (
+                    <a
+                      key={call.id}
+                      href={`/service-calls/${call.id}`}
+                      style={{
+                        display: 'block',
+                        padding: '12px',
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        textDecoration: 'none',
+                        borderLeft: '3px solid #60A5FA'
+                      }}
+                    >
+                      <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
+                        {call.customer_name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {call.scheduled_start ? new Date(call.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time set'}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* This Week */}
+      {(thisWeekJobs.length > 0 || thisWeekServiceCalls.length > 0) && (
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '32px'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            color: 'var(--color-text-primary)',
+            marginBottom: '20px'
+          }}>
+            This Week
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+            {thisWeekJobs.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
+                  Upcoming Jobs ({thisWeekJobs.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {thisWeekJobs.map((job: any) => (
+                    <a
+                      key={job.id}
+                      href={`/jobs/${job.id}`}
+                      style={{
+                        display: 'block',
+                        padding: '12px',
+                        backgroundColor: 'var(--color-hover)',
+                        borderRadius: '6px',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+                        {job.community} - Lot {job.lot_number}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        {job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString() : 'No date set'}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {thisWeekServiceCalls.length > 0 && (
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
+                  Upcoming Service Calls ({thisWeekServiceCalls.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {thisWeekServiceCalls.map((call: any) => (
+                    <a
+                      key={call.id}
+                      href={`/service-calls/${call.id}`}
+                      style={{
+                        display: 'block',
+                        padding: '12px',
+                        backgroundColor: 'var(--color-hover)',
+                        borderRadius: '6px',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+                        {call.customer_name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        {call.scheduled_start ? new Date(call.scheduled_start).toLocaleDateString() : 'No date set'}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Content Grid */}
       <div style={{

@@ -159,6 +159,7 @@ class JobBase(BaseModel):
     scheduled_end: Optional[datetime]
     notes: Optional[str]
     tech_name: Optional[str] = None
+    assigned_to: Optional[str] = None
     warranty_start_date: Optional[date] = None
     warranty_end_date: Optional[date] = None
     warranty_notes: Optional[str] = None
@@ -172,6 +173,7 @@ class JobUpdate(BaseModel):
     scheduled_start: Optional[datetime]
     scheduled_end: Optional[datetime]
     notes: Optional[str]
+    assigned_to: Optional[str] = None
     warranty_start_date: Optional[date] = None
     warranty_end_date: Optional[date] = None
     warranty_notes: Optional[str] = None
@@ -201,6 +203,7 @@ class ServiceCallBase(BaseModel):
     scheduled_start: Optional[datetime]
     scheduled_end: Optional[datetime]
     notes: Optional[str]
+    assigned_to: Optional[str] = None
 
 class ServiceCallCreate(ServiceCallBase):
     pass
@@ -210,6 +213,7 @@ class ServiceCallUpdate(BaseModel):
     scheduled_start: Optional[datetime]
     scheduled_end: Optional[datetime]
     notes: Optional[str]
+    assigned_to: Optional[str] = None
 
 class ServiceCallOut(ServiceCallBase):
     id: UUID

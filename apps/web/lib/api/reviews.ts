@@ -90,6 +90,11 @@ export const reviewApi = {
     return res.data
   },
 
+  sendRequest: async (requestId: string): Promise<ReviewRequest> => {
+    const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/send`)
+    return res.data
+  },
+
   // Reviews
   listReviews: async (tenantId?: string, isPublic?: boolean): Promise<Review[]> => {
     const params = new URLSearchParams()
