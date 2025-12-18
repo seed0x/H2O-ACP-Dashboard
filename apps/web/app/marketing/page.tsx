@@ -1547,7 +1547,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
                       }}
                       style={{ cursor: 'pointer' }}
                     />
-                    <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.name}</span>
+                    <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.display_name || ch.name}</span>
                   </label>
                 ))
               ) : (
@@ -2917,11 +2917,20 @@ function AccountsView() {
         : '/api/marketing/channel-accounts'
       const method = editingAccount ? 'PATCH' : 'POST'
       
+      // Map form data to API schema
+      const requestBody = {
+        tenant_id: 'h2o',
+        channel_id: formData.channel_id,
+        name: formData.account_name,
+        login_email: formData.account_email,
+        credential_vault_ref: formData.credential_vault_ref || null
+      }
+      
       const response = await fetch(url, {
         method,
         headers,
         credentials: 'include',
-        body: JSON.stringify({ ...formData, tenant_id: 'h2o' })
+        body: JSON.stringify(requestBody)
       })
       
       if (!response.ok) {
@@ -2975,7 +2984,7 @@ function AccountsView() {
     setEditingAccount(account)
     setFormData({
       channel_id: account.channel_id,
-      account_name: account.account_name || '',
+      account_name: account.name || account.account_name || '',
       account_email: account.login_email || account.account_email || '',
       credential_vault_ref: account.credential_vault_ref || ''
     })
@@ -3069,7 +3078,7 @@ function AccountsView() {
                 >
                   <option value="">Select a channel</option>
                   {Array.isArray(channels) && channels.map(ch => (
-                    <option key={ch.id} value={ch.id}>{ch.name}</option>
+                    <option key={ch.id} value={ch.id}>{ch.display_name || ch.name}</option>
                   ))}
                 </select>
               </div>
@@ -3210,7 +3219,7 @@ function AccountsView() {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                     <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                      {account.account_name}
+                      {account.name || account.account_name}
                     </h4>
                     <span style={{
                       padding: '4px 8px',
