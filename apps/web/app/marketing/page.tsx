@@ -241,7 +241,7 @@ function PostsView() {
         }
       }
 
-      const instancesResponse = await fetch('/api/marketing/post-instances/bulk-create', {
+      const instancesResponse = await fetch('/api/marketing/post-instances/bulk', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -1197,11 +1197,25 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
     setUpdateError('')
     setUpdating(true)
     try {
-      const response = await fetch(`/api/marketing/content-posts/${post.id}`, {
+      // Map editForm to content-item schema
+      const updateData: any = {
+        title: editForm.title,
+        base_caption: editForm.body_text,
+        status: editForm.status,
+        owner: editForm.owner,
+        reviewer: editForm.reviewer || null,
+        draft_due_date: editForm.draft_due_date || null,
+        tags: editForm.tags || [],
+        target_city: editForm.target_city || null,
+        cta_type: editForm.cta_type || null,
+        cta_url: editForm.cta_url || null
+      }
+      
+      const response = await fetch(`/api/marketing/content-items/${post.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(editForm)
+        body: JSON.stringify(updateData)
       })
       
       if (!response.ok) {
@@ -1220,6 +1234,9 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
 
   async function handleMarkPosted() {
     try {
+      // Note: mark-posted is for post-instances, not content-items
+      // This should be handled at the post-instance level
+      console.warn('mark-posted should be called on post-instance, not content-item')
       const response = await fetch(`/api/marketing/content-posts/${post.id}/mark-posted`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1260,7 +1277,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
 
   async function loadAuditTrail() {
     try {
-      const response = await fetch(`/api/marketing/audit-trail/${post.id}?entity_type=content_post`, {
+      const response = await fetch(`/api/v1/audit?entity_type=content_item&entity_id=${post.id}`, {
         credentials: 'include'
       })
       const data = await response.json()
@@ -2586,6 +2603,8 @@ function ScoreboardView() {
         week_end: end.toISOString()
       })
       
+      // Scoreboard endpoint not yet implemented in API
+      // TODO: Implement scoreboard endpoint or remove this feature
       const response = await fetch(`/api/marketing/scoreboard?${params}`, {
         credentials: 'include'
       })
