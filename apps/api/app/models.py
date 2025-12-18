@@ -368,7 +368,7 @@ class PortalDefinition(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(Text, nullable=False)
-    category = Column(Enum('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category'), nullable=False)
+    category = Column(Enum('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category', create_type=False), nullable=False)
     jurisdiction = Column(Text, nullable=True)  # e.g., "City of Vancouver", "Clark County"
     base_url = Column(Text, nullable=False)
     support_phone = Column(Text, nullable=True)
@@ -384,7 +384,7 @@ class PortalAccount(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     portal_definition_id = Column(UUID(as_uuid=True), ForeignKey("portal_definitions.id"), nullable=False)
-    tenant_id = Column(Enum('h2o', 'all_county', name='tenant_enum'), nullable=False)
+    tenant_id = Column(Enum('h2o', 'all_county', name='tenant_enum', create_type=False), nullable=False)
     login_identifier = Column(Text, nullable=False)  # email/username
     account_number = Column(Text, nullable=True)  # customer_id
     credential_vault_ref = Column(Text, nullable=True)  # e.g., "1Password → H2O → Vancouver Permits"
@@ -412,13 +412,13 @@ class PortalRule(Base):
     __tablename__ = "portal_rules"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    applies_to = Column(Enum('job', 'service_call', name='portal_rule_applies_to'), nullable=False)
-    tenant_id = Column(Enum('h2o', 'all_county', name='tenant_enum'), nullable=True)  # null = both tenants
+    applies_to = Column(Enum('job', 'service_call', name='portal_rule_applies_to', create_type=False), nullable=False)
+    tenant_id = Column(Enum('h2o', 'all_county', name='tenant_enum', create_type=False), nullable=True)  # null = both tenants
     builder_id = Column(UUID(as_uuid=True), ForeignKey("builders.id"), nullable=True)
     city = Column(Text, nullable=True)
     county = Column(Text, nullable=True)
     permit_required = Column(Boolean, nullable=True)
-    phase = Column(Enum('rough', 'trim', 'final', name='job_phase'), nullable=True)
+    phase = Column(Enum('rough', 'trim', 'final', name='job_phase', create_type=False), nullable=True)
     portal_account_id = Column(UUID(as_uuid=True), ForeignKey("portal_accounts.id"), nullable=False)
     priority = Column(Integer, nullable=False, default=100)  # Lower = higher priority
     is_active = Column(Boolean, nullable=False, default=True)
