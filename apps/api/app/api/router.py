@@ -31,7 +31,7 @@ import logging
 logger = logging.getLogger(__name__)
 marketing_router = None
 try:
-    from ..routes_marketing import router as marketing_router
+    from .marketing import router as marketing_router
     logger.info("✓ Marketing routes imported successfully")
 except ImportError as e:
     logger.error(f"✗ Marketing routes import failed (ImportError): {e}", exc_info=True)
