@@ -288,7 +288,7 @@ class PublishJob(Base):
     error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    post_instance = relationship("PostInstance")
+    post_instance = relationship("PostInstance", foreign_keys=[post_instance_id])
 
 # Review System Models
 
