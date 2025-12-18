@@ -7,8 +7,6 @@ Create Date: 2025-01-21
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, ENUM
-import json
-import os
 
 # revision identifiers, used by Alembic.
 revision = '0014'
@@ -18,21 +16,7 @@ depends_on = None
 
 
 def upgrade():
-    # #region agent log
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.cursor', 'debug.log')
-    try:
-        with open(log_path, 'a') as f:
-            f.write(json.dumps({"location": "0014_add_portals_directory.py:18", "message": "upgrade() entry", "data": {"revision": "0014"}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
-    except: pass
-    # #endregion
-    
     # Create portal_category enum (reuse if exists, otherwise create)
-    # #region agent log
-    try:
-        with open(log_path, 'a') as f:
-            f.write(json.dumps({"location": "0014_add_portals_directory.py:20", "message": "Before creating portal_category enum", "data": {}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
-    except: pass
-    # #endregion
     op.execute("""
         DO $$ BEGIN
             CREATE TYPE portal_category AS ENUM ('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other');
@@ -40,12 +24,6 @@ def upgrade():
             WHEN duplicate_object THEN null;
         END $$;
     """)
-    # #region agent log
-    try:
-        with open(log_path, 'a') as f:
-            f.write(json.dumps({"location": "0014_add_portals_directory.py:26", "message": "After creating portal_category enum", "data": {}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
-    except: pass
-    # #endregion
     
     # Create tenant_enum (reuse if exists, otherwise create)
     op.execute("""
@@ -75,13 +53,6 @@ def upgrade():
     """)
     
     # Create portal_definitions table
-    # #region agent log
-    try:
-        with open(log_path, 'a') as f:
-            f.write(json.dumps({"location": "0014_add_portals_directory.py:56", "message": "Before creating portal_definitions table", "data": {"enum_name": "portal_category"}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
-    except: pass
-    # #endregion
-    
     # Create ENUM type objects with create_type=False
     # We manually create the types above, so we tell SQLAlchemy not to create them
     # However, SQLAlchemy's _on_table_create event still fires and tries to create them

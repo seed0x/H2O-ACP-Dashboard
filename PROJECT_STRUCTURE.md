@@ -93,6 +93,7 @@ H2O-ACP-Dashboard/
 - **Root `requirements.txt`** - Legacy file, use `apps/api/requirements.txt` instead
 - **API Deployment**: API is deployed on Render, not Vercel (see [DEPLOYMENT_NOTES.md](../DEPLOYMENT_NOTES.md))
 - **Frontend Deployment**: Frontend is deployed on Vercel only (no serverless functions)
+- **`api/` directory**: Removed - no longer needed (API on Render, not Vercel)
 - **`packages/db/`** - Placeholder directory, currently unused
 - All essential documentation is in root directory for easy access
 

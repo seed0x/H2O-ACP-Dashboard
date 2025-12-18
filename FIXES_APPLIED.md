@@ -1,8 +1,8 @@
-# Test Fixes Applied - Vercel Serverless + Supabase
+# Test Fixes Applied
 
 ## Summary
 
-Fixed all test failures and ensured the application is properly configured for **Vercel serverless functions** with **Supabase database** connection.
+Fixed all test failures and ensured the application is properly configured for **Render API** with **Supabase database** connection.
 
 ## Issues Fixed
 
@@ -75,9 +75,9 @@ Tests use the same database connection as configured in `DATABASE_URL` environme
 - Role: `admin`
 - Created automatically for each test
 
-## Vercel Environment Variables Required
+## Render Environment Variables Required
 
-Set these in **Vercel Dashboard** → **Settings** → **Environment Variables**:
+Set these in **Render Dashboard** → **Your Service** → **Environment**:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://user:pass@host:port/dbname
@@ -85,10 +85,10 @@ ADMIN_PASSWORD=your-admin-password
 JWT_SECRET=your-jwt-secret-key
 JWT_ALGORITHM=HS256
 ENVIRONMENT=production
-CORS_ORIGINS=https://your-vercel-domain.vercel.app
+CORS_ORIGINS=https://dataflow-eta.vercel.app,http://localhost:3000
 ```
 
-**Note**: `NEXT_PUBLIC_API_URL` is **NOT needed** in Vercel - API runs as serverless function on same domain.
+**Note**: See [DEPLOYMENT_NOTES.md](../DEPLOYMENT_NOTES.md) for complete deployment configuration.
 
 ## Files Changed
 

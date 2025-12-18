@@ -30,7 +30,8 @@ Separated frontend and backend deployments to fix Vercel Python runtime compatib
 - `apps/web/lib/config.ts` - Updated to use Render API in production
 - `apps/web/next.config.js` - Simplified rewrites
 - `api/index.py` - **DELETED** (no longer needed)
-- `api/requirements.txt` - **DEPRECATED** (marked as deprecated)
+- `api/requirements.txt` - **DELETED** (no longer needed)
+- `api/` directory - **DELETED** (entire directory removed)
 
 ### Documentation Updated
 - `docs/ARCHITECTURE.md` - Complete architecture overview

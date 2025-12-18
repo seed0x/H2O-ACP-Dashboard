@@ -1,4 +1,2 @@
 # Root requirements.txt - Legacy file
 # Use apps/api/requirements.txt for API dependencies
-# 
-# Note: api/requirements.txt is deprecated (API no longer deployed on Vercel)
