@@ -1,6 +1,7 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import UilDashboard from '@iconscout/react-unicons/icons/uil-dashboard'
 import UilBuilding from '@iconscout/react-unicons/icons/uil-building'
 import UilWrench from '@iconscout/react-unicons/icons/uil-wrench'
@@ -15,15 +16,16 @@ interface NavItem {
   name: string
   href: string
   icon: React.ComponentType<{ size?: number | string; color?: string }>
+  badgeCategory?: 'reviews' | 'marketing' | 'dispatch'
 }
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: UilDashboard },
   { name: 'All County Jobs', href: '/jobs', icon: UilBuilding },
   { name: 'H2O Service Calls', href: '/service-calls', icon: UilWrench },
-  { name: 'Reviews', href: '/reviews', icon: UilStar },
+  { name: 'Reviews', href: '/reviews', icon: UilStar, badgeCategory: 'reviews' },
   { name: 'Analytics', href: '/analytics', icon: UilChart },
-  { name: 'Marketing', href: '/marketing', icon: UilCalendarAlt },
+  { name: 'Marketing', href: '/marketing', icon: UilCalendarAlt, badgeCategory: 'marketing' },
   { name: 'Builders', href: '/builders', icon: UilUserCircle },
   { name: 'Bids', href: '/bids', icon: UilFileAlt },
 ]
@@ -36,6 +38,44 @@ interface SidebarProps {
 
 export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const [signalCounts, setSignalCounts] = useState<{ reviews: number; marketing: number; dispatch: number }>({
+    reviews: 0,
+    marketing: 0,
+    dispatch: 0
+  })
+
+  useEffect(() => {
+    loadSignalCounts()
+    const interval = setInterval(loadSignalCounts, 30000) // Refresh every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
+
+  async function loadSignalCounts() {
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/signals/all?tenant_id=h2o', {
+        headers,
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const signals = await response.json()
+        const counts = {
+          reviews: signals.filter((s: any) => s.type === 'reviews').reduce((sum: number, s: any) => sum + s.count, 0),
+          marketing: signals.filter((s: any) => s.type === 'marketing').reduce((sum: number, s: any) => sum + s.count, 0),
+          dispatch: signals.filter((s: any) => s.type === 'dispatch').reduce((sum: number, s: any) => sum + s.count, 0)
+        }
+        setSignalCounts(counts)
+      }
+    } catch (error) {
+      console.error('Failed to load signal counts:', error)
+    }
+  }
 
   return (
     <>
@@ -146,7 +186,21 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
               }}
             >
               <Icon size="20" color="currentColor" />
-              <span style={{ fontSize: '14px', fontWeight: '500' }}>{item.name}</span>
+              <span style={{ fontSize: '14px', fontWeight: '500', flex: 1 }}>{item.name}</span>
+              {item.badgeCategory && signalCounts[item.badgeCategory] > 0 && (
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.3)' : '#EF5350',
+                  color: isActive ? '#ffffff' : '#ffffff',
+                  minWidth: '20px',
+                  textAlign: 'center'
+                }}>
+                  {signalCounts[item.badgeCategory]}
+                </span>
+              )}
             </Link>
           )
         })}

@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { showToast } from '../../components/Toast'
 
 const styles = `
   @media (max-width: 768px) {
@@ -14,6 +15,9 @@ const styles = `
     .marketing-modal { padding: 12px !important; }
     .marketing-modal-content { padding: 16px !important; max-width: 100% !important; }
     .marketing-account-card { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+    .marketing-calendar-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .marketing-calendar-day-cell { min-height: 80px !important; padding: 8px !important; }
+    .marketing-month-view-post { font-size: 9px !important; padding: 4px !important; }
   }
 `
 
@@ -101,42 +105,53 @@ export default function MarketingPage() {
 }
 
 function PostsView() {
-  const [posts, setPosts] = useState<any[]>([])
+  const [contentItems, setContentItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [showNewPostModal, setShowNewPostModal] = useState(false)
-  const [selectedPost, setSelectedPost] = useState<any>(null)
-  const [channels, setChannels] = useState<any[]>([])
+  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [channelAccounts, setChannelAccounts] = useState<any[]>([])
   const [error, setError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
+  const [generateItem, setGenerateItem] = useState<any>(null)
   const [postForm, setPostForm] = useState({
     title: '',
-    body_text: '',
+    base_caption: '',
     scheduled_for: '',
-    channel_ids: [] as string[],
-    status: 'Draft',
+    channel_account_ids: [] as string[],
+    status: 'Idea',
     owner: 'admin'
   })
 
   useEffect(() => {
-    loadPosts()
-    loadChannels()
+    loadContentItems()
+    loadChannelAccounts()
   }, [])
 
-  async function loadChannels() {
+  async function loadChannelAccounts() {
     try {
-      const response = await fetch('/api/marketing/channels?tenant_id=h2o', {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const response = await fetch('/api/marketing/channel-accounts?tenant_id=h2o', {
+        headers,
         credentials: 'include'
       })
       const data = await response.json()
-      setChannels(data)
+      setChannelAccounts(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Failed to load channels:', error)
+      console.error('Failed to load channel accounts:', error)
+      setChannelAccounts([])
     }
   }
 
-  async function loadPosts() {
+  async function loadContentItems() {
     try {
       const token = localStorage.getItem('token')
       const params = new URLSearchParams({ tenant_id: 'h2o' })
@@ -150,22 +165,22 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch(`/api/marketing/content-posts?${params}`, {
+      const response = await fetch(`/api/marketing/content-items?${params}`, {
         headers,
         credentials: 'include'
       })
       
       if (!response.ok) {
-        throw new Error(`Failed to load posts: ${response.statusText}`)
+        throw new Error(`Failed to load content items: ${response.statusText}`)
       }
       
       const data = await response.json()
       // Ensure data is always an array
-      setPosts(Array.isArray(data) ? data : [])
+      setContentItems(Array.isArray(data) ? data : [])
       setLoading(false)
     } catch (error) {
-      console.error('Failed to load posts:', error)
-      setPosts([]) // Set to empty array on error
+      console.error('Failed to load content items:', error)
+      setContentItems([]) // Set to empty array on error
       setLoading(false)
     }
   }
@@ -180,53 +195,74 @@ function PostsView() {
         throw new Error('Not authenticated. Please log in again.')
       }
 
-      // Prepare the request body
-      const requestBody: any = {
-        tenant_id: 'h2o',
-        title: postForm.title.trim(),
-        body_text: postForm.body_text.trim(),
-        status: postForm.status,
-        owner: postForm.owner,
-        channel_ids: postForm.channel_ids || [] // Channel IDs should be UUIDs (strings are fine, API will convert)
-      }
-
-      // Add scheduled_for if provided (convert to ISO string)
-      if (postForm.scheduled_for) {
-        // Convert datetime-local format to ISO string
-        const scheduledDate = new Date(postForm.scheduled_for)
-        if (!isNaN(scheduledDate.getTime())) {
-          requestBody.scheduled_for = scheduledDate.toISOString()
-        }
-      }
-
       // Validate required fields
-      if (!requestBody.title) {
+      if (!postForm.title.trim()) {
         throw new Error('Title is required')
       }
-      if (!requestBody.body_text) {
+      if (!postForm.base_caption.trim()) {
         throw new Error('Content is required')
       }
-      
-      console.log('Submitting post:', requestBody) // Debug log
+      if (!postForm.channel_account_ids || postForm.channel_account_ids.length === 0) {
+        throw new Error('Please select at least one account')
+      }
 
-      const response = await fetch('/api/marketing/content-posts', {
+      // Step 1: Create ContentItem
+      const contentItemBody: any = {
+        tenant_id: 'h2o',
+        title: postForm.title.trim(),
+        base_caption: postForm.base_caption.trim(),
+        status: postForm.status,
+        owner: postForm.owner
+      }
+      
+      const itemResponse = await fetch('/api/marketing/content-items', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         credentials: 'include',
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(contentItemBody)
       })
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to create post' }))
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
+      if (!itemResponse.ok) {
+        const errorData = await itemResponse.json().catch(() => ({ detail: 'Failed to create content item' }))
+        throw new Error(errorData.detail || `HTTP ${itemResponse.status}: ${itemResponse.statusText}`)
+      }
+      
+      const contentItem = await itemResponse.json()
+
+      // Step 2: Create PostInstances for selected accounts
+      let scheduledFor: string | undefined
+      if (postForm.scheduled_for) {
+        const scheduledDate = new Date(postForm.scheduled_for)
+        if (!isNaN(scheduledDate.getTime())) {
+          scheduledFor = scheduledDate.toISOString()
+        }
+      }
+
+      const instancesResponse = await fetch('/api/marketing/post-instances/bulk-create', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          content_item_id: contentItem.id,
+          channel_account_ids: postForm.channel_account_ids,
+          scheduled_for: scheduledFor
+        })
+      })
+      
+      if (!instancesResponse.ok) {
+        const errorData = await instancesResponse.json().catch(() => ({ detail: 'Failed to create post instances' }))
+        throw new Error(errorData.detail || `HTTP ${instancesResponse.status}: ${instancesResponse.statusText}`)
       }
       
       setShowNewPostModal(false)
-      setPostForm({ title: '', body_text: '', scheduled_for: '', channel_ids: [], status: 'Draft', owner: 'admin' })
-      await loadPosts()
+      setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
+      await loadContentItems()
     } catch (error: any) {
       console.error('Failed to create post:', error)
       setError(error.message || 'Failed to create post. Please try again.')
@@ -238,7 +274,7 @@ function PostsView() {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
-        Loading posts...
+        Loading content items...
       </div>
     )
   }
@@ -336,8 +372,8 @@ function PostsView() {
                   </label>
                   <textarea
                     required
-                    value={postForm.body_text}
-                    onChange={(e) => setPostForm({ ...postForm, body_text: e.target.value })}
+                    value={postForm.base_caption}
+                    onChange={(e) => setPostForm({ ...postForm, base_caption: e.target.value })}
                     placeholder="Post content..."
                     rows={5}
                     style={{
@@ -374,30 +410,33 @@ function PostsView() {
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
-                    Channels
+                    Accounts *
                   </label>
-                  <div style={{ display: 'grid', gap: '8px' }}>
-                    {Array.isArray(channels) && channels.length > 0 ? (
-                      channels.map(ch => (
-                        <label key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <div style={{ display: 'grid', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {Array.isArray(channelAccounts) && channelAccounts.length > 0 ? (
+                      channelAccounts.map(account => (
+                        <label key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                           <input
                             type="checkbox"
-                            checked={postForm.channel_ids.includes(ch.id)}
+                            checked={postForm.channel_account_ids.includes(account.id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setPostForm({ ...postForm, channel_ids: [...postForm.channel_ids, ch.id] })
+                                setPostForm({ ...postForm, channel_account_ids: [...postForm.channel_account_ids, account.id] })
                               } else {
-                                setPostForm({ ...postForm, channel_ids: postForm.channel_ids.filter(id => id !== ch.id) })
+                                setPostForm({ ...postForm, channel_account_ids: postForm.channel_account_ids.filter(id => id !== account.id) })
                               }
                             }}
                             style={{ cursor: 'pointer' }}
                           />
-                          <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{ch.name}</span>
+                          <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                            {account.name}
+                            {account.channel && ` (${account.channel.display_name || account.channel.key})`}
+                          </span>
                         </label>
                       ))
                     ) : (
                       <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '8px' }}>
-                        No channels available. Please add channels first.
+                        No accounts available. Please add channel accounts first.
                       </div>
                     )}
                   </div>
@@ -445,7 +484,7 @@ function PostsView() {
       {/* Quick Accountability Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button
-          onClick={() => { setStatusFilter(''); setSearch(''); loadPosts(); }}
+          onClick={() => { setStatusFilter(''); setSearch(''); loadContentItems(); }}
           style={{
             padding: '8px 16px',
             backgroundColor: !statusFilter && !search ? 'var(--color-primary)' : 'var(--color-hover)',
@@ -460,7 +499,7 @@ function PostsView() {
           All Posts
         </button>
         <button
-          onClick={() => { setStatusFilter('Needs_Approval'); loadPosts(); }}
+          onClick={() => { setStatusFilter('Needs Approval'); loadContentItems(); }}
           style={{
             padding: '8px 16px',
             backgroundColor: statusFilter === 'Needs_Approval' ? 'rgba(255, 152, 0, 0.2)' : 'var(--color-hover)',
@@ -480,7 +519,7 @@ function PostsView() {
             const future48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
             setStatusFilter('Scheduled');
             setSearch(`scheduled:${now.toISOString().split('T')[0]}-${future48h.toISOString().split('T')[0]}`);
-            loadPosts();
+            loadContentItems();
           }}
           style={{
             padding: '8px 16px',
@@ -496,7 +535,7 @@ function PostsView() {
           ⏰ Due in 48h
         </button>
         <button
-          onClick={() => { setStatusFilter('Draft'); setSearch('overdue'); loadPosts(); }}
+          onClick={() => { setStatusFilter('Draft'); setSearch('overdue'); loadContentItems(); }}
           style={{
             padding: '8px 16px',
             backgroundColor: 'rgba(244, 67, 54, 0.2)',
@@ -549,13 +588,12 @@ function PostsView() {
             <option value="">All Statuses</option>
             <option value="Idea">Idea</option>
             <option value="Draft">Draft</option>
-            <option value="Needs_Approval">Needs Approval</option>
-            <option value="Approved">Approved</option>
+            <option value="Needs Approval">Needs Approval</option>
             <option value="Scheduled">Scheduled</option>
             <option value="Posted">Posted</option>
           </select>
           <button
-            onClick={loadPosts}
+            onClick={loadContentItems}
             style={{
               padding: '10px 20px',
               backgroundColor: 'var(--color-primary)',
@@ -572,8 +610,8 @@ function PostsView() {
         </div>
       </div>
 
-      {/* Posts Table */}
-      {!Array.isArray(posts) || posts.length === 0 ? (
+      {/* Content Items Table */}
+      {!Array.isArray(contentItems) || contentItems.length === 0 ? (
         <div style={{
           backgroundColor: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -582,7 +620,7 @@ function PostsView() {
           textAlign: 'center',
           color: 'var(--color-text-secondary)'
         }}>
-          No posts found. Create your first marketing post to get started.
+          No content items found. Create your first marketing content item to get started.
         </div>
       ) : (
         <div className="marketing-table-wrapper" style={{
@@ -598,18 +636,19 @@ function PostsView() {
                 borderBottom: '1px solid var(--color-border)'
               }}>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Title</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Scheduled</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Status</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Owner</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Created</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {Array.isArray(posts) && posts.map((post, index) => (
+              {Array.isArray(contentItems) && contentItems.map((item, index) => (
                 <tr
-                  key={post.id}
-                  onClick={() => setSelectedPost(post)}
+                  key={item.id}
+                  onClick={() => setSelectedItem(item)}
                   style={{
-                    borderBottom: index < posts.length - 1 ? '1px solid var(--color-border)' : 'none',
+                    borderBottom: index < contentItems.length - 1 ? '1px solid var(--color-border)' : 'none',
                     cursor: 'pointer'
                   }}
                   onMouseEnter={(e) => {
@@ -619,22 +658,42 @@ function PostsView() {
                     e.currentTarget.style.backgroundColor = 'transparent'
                   }}
                 >
-                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>{post.title}</td>
-                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                    {post.scheduled_for ? new Date(post.scheduled_for).toLocaleDateString() : '-'}
-                  </td>
+                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>{item.title}</td>
                   <td style={{ padding: '16px' }}>
                     <span style={{
                       padding: '4px 12px',
                       borderRadius: '6px',
                       fontSize: '12px',
                       fontWeight: '500',
-                      ...getStatusColor(post.status)
+                      ...getStatusColor(item.status)
                     }}>
-                      {post.status}
+                      {item.status}
                     </span>
                   </td>
-                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>{post.owner}</td>
+                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>{item.owner}</td>
+                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
+                  </td>
+                  <td style={{ padding: '16px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setGenerateItem(item)
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: 'var(--color-primary)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Generate Posts
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -642,8 +701,21 @@ function PostsView() {
         </div>
       )}
 
-      {/* Post Detail Modal */}
-      {selectedPost && <PostDetailModal post={selectedPost} channels={channels} onClose={() => setSelectedPost(null)} onUpdate={() => { loadPosts(); setSelectedPost(null); }} />}
+      {/* Content Item Detail Modal */}
+      {selectedItem && <ContentItemDetailModal item={selectedItem} channelAccounts={channelAccounts} onClose={() => setSelectedItem(null)} onUpdate={() => { loadContentItems(); setSelectedItem(null); }} />}
+      
+      {/* Generate Posts Modal (from row action) */}
+      {generateItem && (
+        <GeneratePostsModal
+          contentItem={generateItem}
+          channelAccounts={channelAccounts}
+          onClose={() => setGenerateItem(null)}
+          onSuccess={() => {
+            setGenerateItem(null)
+            loadContentItems()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -652,6 +724,7 @@ function getStatusColor(status: string) {
   const colors: Record<string, any> = {
     'Idea': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
     'Draft': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
+    'Needs Approval': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
     'Needs_Approval': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
     'Approved': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
     'Scheduled': { backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#60A5FA' },
@@ -672,7 +745,7 @@ function CalendarView() {
   useEffect(() => {
     loadCalendar()
     loadChannels()
-  }, [currentDate])
+  }, [currentDate, viewMode])
 
   async function loadChannels() {
     try {
@@ -701,18 +774,43 @@ function CalendarView() {
 
   async function loadCalendar() {
     try {
-      const start = new Date(currentDate)
-      start.setDate(start.getDate() - 7)
-      const end = new Date(currentDate)
-      end.setDate(end.getDate() + 30)
+      setLoading(true)
+      const token = localStorage.getItem('token')
+      let start: Date
+      let end: Date
+
+      if (viewMode === 'month') {
+        // For month view, get the first and last day of the month
+        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+        end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+        // Include a few days before and after for proper week alignment
+        const startDay = start.getDay()
+        start.setDate(start.getDate() - startDay) // Start from Sunday of the week containing the 1st
+        const endDay = end.getDay()
+        end.setDate(end.getDate() + (6 - endDay)) // End on Saturday of the week containing the last day
+      } else {
+        // For week view, keep existing logic
+        start = new Date(currentDate)
+        start.setDate(start.getDate() - 7)
+        end = new Date(currentDate)
+        end.setDate(end.getDate() + 30)
+      }
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
 
       const params = new URLSearchParams({
         tenant_id: 'h2o',
-        start_date: start.toISOString().split('T')[0],
-        end_date: end.toISOString().split('T')[0]
+        date_from: start.toISOString(),
+        date_to: end.toISOString()
       })
       
       const response = await fetch(`/api/marketing/calendar?${params}`, {
+        headers,
         credentials: 'include'
       })
       if (!response.ok) {
@@ -741,10 +839,42 @@ function CalendarView() {
     return days
   }
 
-  const getPostsForDate = (date: Date) => {
+  const getMonthDays = () => {
+    const days = []
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    
+    // Get first day of month and its day of week
+    const firstDay = new Date(year, month, 1)
+    const firstDayOfWeek = firstDay.getDay()
+    
+    // Get last day of month
+    const lastDay = new Date(year, month + 1, 0)
+    const lastDate = lastDay.getDate()
+    
+    // Start from Sunday of the week containing the 1st
+    const startDate = new Date(firstDay)
+    startDate.setDate(startDate.getDate() - firstDayOfWeek)
+    
+    // End on Saturday of the week containing the last day
+    const endDayOfWeek = lastDay.getDay()
+    const endDate = new Date(lastDay)
+    endDate.setDate(endDate.getDate() + (6 - endDayOfWeek))
+    
+    // Generate all days in the month view (including padding days)
+    const current = new Date(startDate)
+    while (current <= endDate) {
+      days.push(new Date(current))
+      current.setDate(current.getDate() + 1)
+    }
+    
+    return days
+  }
+
+  const getInstancesForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0]
     const dayData = calendarData.find(d => d.date === dateStr)
-    return dayData?.posts || []
+    return dayData?.instances || []
   }
 
   if (loading) {
@@ -756,6 +886,10 @@ function CalendarView() {
   }
 
   const weekDays = getWeekDays()
+  const monthDays = getMonthDays()
+  const displayDays = viewMode === 'month' ? monthDays : weekDays
+  const currentMonth = currentDate.getMonth()
+  const currentYear = currentDate.getFullYear()
 
   return (
     <div>
@@ -776,7 +910,11 @@ function CalendarView() {
           <button
             onClick={() => {
               const newDate = new Date(currentDate)
-              newDate.setDate(newDate.getDate() - 7)
+              if (viewMode === 'month') {
+                newDate.setMonth(newDate.getMonth() - 1)
+              } else {
+                newDate.setDate(newDate.getDate() - 7)
+              }
               setCurrentDate(newDate)
             }}
             style={{
@@ -789,7 +927,7 @@ function CalendarView() {
               cursor: 'pointer'
             }}
           >
-            ← Previous
+            ← {viewMode === 'month' ? 'Previous Month' : 'Previous'}
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
@@ -808,7 +946,11 @@ function CalendarView() {
           <button
             onClick={() => {
               const newDate = new Date(currentDate)
-              newDate.setDate(newDate.getDate() + 7)
+              if (viewMode === 'month') {
+                newDate.setMonth(newDate.getMonth() + 1)
+              } else {
+                newDate.setDate(newDate.getDate() + 7)
+              }
               setCurrentDate(newDate)
             }}
             style={{
@@ -821,7 +963,7 @@ function CalendarView() {
               cursor: 'pointer'
             }}
           >
-            Next →
+            {viewMode === 'month' ? 'Next Month' : 'Next'} →
           </button>
         </div>
 
@@ -872,7 +1014,7 @@ function CalendarView() {
       </div>
 
       {/* Calendar Grid */}
-      <div style={{
+      <div className="marketing-calendar-grid" style={{
         backgroundColor: 'var(--color-card)',
         border: '1px solid var(--color-border)',
         borderRadius: '12px',
@@ -882,7 +1024,8 @@ function CalendarView() {
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
           gap: '1px',
-          backgroundColor: 'var(--color-border)'
+          backgroundColor: 'var(--color-border)',
+          minWidth: viewMode === 'month' ? '700px' : 'auto'
         }}>
           {/* Day Headers */}
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -903,49 +1046,54 @@ function CalendarView() {
           ))}
 
           {/* Day Cells */}
-          {weekDays.map(day => {
-            const posts = getPostsForDate(day)
+          {displayDays.map(day => {
+            const instances = getInstancesForDate(day)
             const isToday = day.toDateString() === new Date().toDateString()
+            const isCurrentMonth = day.getMonth() === currentMonth && day.getFullYear() === currentYear
+            const isOtherMonth = !isCurrentMonth
             
             return (
               <div
                 key={day.toISOString()}
+                className="marketing-calendar-day-cell"
                 style={{
                   backgroundColor: 'var(--color-card)',
-                  minHeight: '120px',
+                  minHeight: viewMode === 'month' ? '100px' : '120px',
                   padding: '12px',
-                  position: 'relative'
+                  position: 'relative',
+                  opacity: isOtherMonth ? 0.4 : 1
                 }}
               >
                 <div style={{
                   fontSize: '14px',
                   fontWeight: isToday ? '700' : '500',
-                  color: isToday ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                  color: isToday ? 'var(--color-primary)' : (isOtherMonth ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)'),
                   marginBottom: '8px'
                 }}>
                   {day.getDate()}
                 </div>
                 
-                {posts.length > 0 && (
+                {instances.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {posts.slice(0, 3).map((post: any) => {
-                      const postChannels = post.channel_ids?.map((cid: string) => 
-                        channels.find(ch => ch.id === cid)?.name
-                      ).filter(Boolean).join(', ') || 'No channel'
+                    {instances.slice(0, viewMode === 'month' ? 2 : 3).map((instance: any) => {
+                      const contentItem = instance.content_item
+                      const channelAccount = instance.channel_account
+                      const accountName = channelAccount?.name || 'Unknown Account'
                       
                       return (
                         <div
-                          key={post.id}
-                          onClick={() => setSelectedPost(post)}
+                          key={instance.id}
+                          className={viewMode === 'month' ? 'marketing-month-view-post' : ''}
+                          onClick={() => setSelectedPost(instance)}
                           style={{
-                            padding: '8px',
+                            padding: viewMode === 'month' ? '6px' : '8px',
                             borderRadius: '6px',
-                            fontSize: '11px',
+                            fontSize: viewMode === 'month' ? '10px' : '11px',
                             backgroundColor: 'var(--color-hover)',
                             border: '1px solid var(--color-border)',
                             cursor: 'pointer'
                           }}
-                          title={`${post.title} - ${post.owner}`}
+                          title={`${contentItem?.title || 'Untitled'} - ${accountName}`}
                         >
                           <div style={{
                             fontWeight: '600',
@@ -955,45 +1103,60 @@ function CalendarView() {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                           }}>
-                            {post.title}
+                            {contentItem?.title || 'Untitled'}
                           </div>
-                          <div style={{
-                            fontSize: '10px',
-                            color: 'var(--color-text-secondary)',
-                            marginBottom: '4px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            📍 {postChannels}
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                          {viewMode === 'week' && (
+                            <>
+                              <div style={{
+                                fontSize: '10px',
+                                color: 'var(--color-text-secondary)',
+                                marginBottom: '4px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                📍 {accountName}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                <span style={{
+                                  fontSize: '10px',
+                                  color: 'var(--color-text-secondary)'
+                                }}>
+                                  👤 {contentItem?.owner || 'Unknown'}
+                                </span>
+                                <span style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '9px',
+                                  fontWeight: '500',
+                                  ...getStatusColor(instance.status)
+                                }}>
+                                  {instance.status}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          {viewMode === 'month' && (
                             <span style={{
-                              fontSize: '10px',
-                              color: 'var(--color-text-secondary)'
-                            }}>
-                              👤 {post.owner}
-                            </span>
-                            <span style={{
-                              padding: '2px 6px',
+                              padding: '2px 4px',
                               borderRadius: '4px',
-                              fontSize: '9px',
+                              fontSize: '8px',
                               fontWeight: '500',
-                              ...getStatusColor(post.status)
+                              ...getStatusColor(instance.status)
                             }}>
-                              {post.status}
+                              {instance.status}
                             </span>
-                          </div>
+                          )}
                         </div>
                       )
                     })}
-                    {posts.length > 3 && (
+                    {instances.length > (viewMode === 'month' ? 2 : 3) && (
                       <div style={{
                         fontSize: '10px',
                         color: 'var(--color-text-secondary)',
                         paddingLeft: '8px'
                       }}>
-                        +{posts.length - 3} more
+                        +{instances.length - (viewMode === 'month' ? 2 : 3)} more
                       </div>
                     )}
                   </div>
@@ -1004,8 +1167,8 @@ function CalendarView() {
         </div>
       </div>
 
-      {/* Post Detail Modal */}
-      {selectedPost && <PostDetailModal post={selectedPost} channels={channels} onClose={() => setSelectedPost(null)} onUpdate={() => { loadCalendar(); setSelectedPost(null); }} />}
+      {/* Post Instance Detail Modal */}
+      {selectedPost && <PostInstanceDetailModal instance={selectedPost} onClose={() => setSelectedPost(null)} onUpdate={() => { loadCalendar(); setSelectedPost(null); }} />}
     </div>
   )
 }
@@ -1538,6 +1701,860 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
   )
 }
 
+// Content Item Detail Modal
+function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { item: any, channelAccounts: any[], onClose: () => void, onUpdate: () => void }) {
+  const [postInstances, setPostInstances] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+
+  useEffect(() => {
+    loadPostInstances()
+  }, [item.id])
+
+  async function loadPostInstances() {
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const response = await fetch(`/api/marketing/post-instances?tenant_id=h2o&content_item_id=${item.id}`, {
+        headers,
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPostInstances(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Failed to load post instances:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="marketing-modal" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px'
+    }}>
+      <div className="marketing-modal-content" style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '24px',
+        maxWidth: '800px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+              {item.title}
+            </h3>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              {item.owner} • {item.status}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: 'var(--color-primary)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              Generate Posts
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: 'transparent',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                fontSize: '18px'
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Content</h4>
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'var(--color-hover)',
+            borderRadius: '8px',
+            fontSize: '14px',
+            color: 'var(--color-text-primary)',
+            whiteSpace: 'pre-wrap'
+          }}>
+            {item.base_caption || 'No content'}
+          </div>
+        </div>
+
+        <div>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Post Instances</h4>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>Loading...</div>
+          ) : postInstances.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>No post instances yet</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {postInstances.map((instance: any) => {
+                const account = channelAccounts.find(acc => acc.id === instance.channel_account_id)
+                return (
+                  <div
+                    key={instance.id}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: 'var(--color-hover)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                        {account?.name || 'Unknown Account'}
+                      </div>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        ...getStatusColor(instance.status)
+                      }}>
+                        {instance.status}
+                      </span>
+                    </div>
+                    {instance.scheduled_for && (
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        Scheduled: {new Date(instance.scheduled_for).toLocaleString()}
+                      </div>
+                    )}
+                    {instance.post_url && (
+                      <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                        <a href={instance.post_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+                          View Post →
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Generate Posts Modal */}
+      {showGenerateModal && (
+        <GeneratePostsModal
+          contentItem={item}
+          channelAccounts={channelAccounts}
+          onClose={() => setShowGenerateModal(false)}
+          onSuccess={() => {
+            setShowGenerateModal(false)
+            loadPostInstances()
+            onUpdate()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Post Instance Detail Modal
+function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: any, onClose: () => void, onUpdate: () => void }) {
+  const contentItem = instance.content_item
+  const channelAccount = instance.channel_account
+  const [showMarkPostedModal, setShowMarkPostedModal] = useState(false)
+
+  return (
+    <div className="marketing-modal" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px'
+    }}>
+      <div className="marketing-modal-content" style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '24px',
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+              {contentItem?.title || 'Untitled'}
+            </h3>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              {channelAccount?.name || 'Unknown Account'} • {instance.status}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              fontSize: '18px'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Content</h4>
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'var(--color-hover)',
+            borderRadius: '8px',
+            fontSize: '14px',
+            color: 'var(--color-text-primary)',
+            whiteSpace: 'pre-wrap'
+          }}>
+            {instance.caption_override || contentItem?.base_caption || 'No content'}
+          </div>
+        </div>
+
+        {instance.scheduled_for && (
+          <div style={{ marginBottom: '20px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+            <strong>Scheduled:</strong> {new Date(instance.scheduled_for).toLocaleString()}
+          </div>
+        )}
+
+        {instance.post_url && (
+          <div style={{ marginBottom: '20px' }}>
+            <a href={instance.post_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+              View Post →
+            </a>
+          </div>
+        )}
+
+        {instance.status !== 'Posted' && (
+          <button
+            onClick={() => setShowMarkPostedModal(true)}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'var(--color-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Mark as Posted
+          </button>
+        )}
+      </div>
+      
+      {/* Mark Posted Modal */}
+      {showMarkPostedModal && (
+        <MarkPostedModal
+          instance={instance}
+          onClose={() => setShowMarkPostedModal(false)}
+          onSuccess={() => {
+            setShowMarkPostedModal(false)
+            onUpdate()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Mark Posted Modal - Requires proof
+function MarkPostedModal({ instance, onClose, onSuccess }: { instance: any, onClose: () => void, onSuccess: () => void }) {
+  const [postUrl, setPostUrl] = useState('')
+  const [screenshotUrl, setScreenshotUrl] = useState('')
+  const [postedManually, setPostedManually] = useState(false)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit() {
+    setError('')
+    
+    // Require proof: either post URL or manual toggle with screenshot
+    if (!postUrl && !postedManually) {
+      setError('Please provide either a post URL or mark as manually posted with screenshot')
+      return
+    }
+    
+    if (postedManually && !screenshotUrl) {
+      setError('Screenshot URL is required when marking as manually posted')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`/api/marketing/post-instances/${instance.id}/mark-posted`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          posted_at: new Date().toISOString(),
+          post_url: postUrl || undefined,
+          screenshot_url: screenshotUrl || undefined,
+          posted_manually: postedManually
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to mark as posted' }))
+        throw new Error(errorData.detail || 'Failed to mark as posted')
+      }
+
+      onSuccess()
+    } catch (error: any) {
+      console.error('Failed to mark as posted:', error)
+      setError(error.message || 'Failed to mark as posted. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="marketing-modal" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2000,
+      padding: '20px'
+    }}>
+      <div className="marketing-modal-content" style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '24px',
+        maxWidth: '500px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            Mark as Posted
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              fontSize: '18px'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {error && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'rgba(239, 83, 80, 0.1)',
+            border: '1px solid #EF5350',
+            borderRadius: '8px',
+            color: '#EF5350',
+            marginBottom: '20px',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            Post URL (if available)
+          </label>
+          <input
+            type="url"
+            value={postUrl}
+            onChange={(e) => setPostUrl(e.target.value)}
+            placeholder="https://..."
+            style={{
+              width: '100%',
+              padding: '10px',
+              backgroundColor: 'var(--color-hover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={postedManually}
+              onChange={(e) => setPostedManually(e.target.checked)}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+              Posted Manually (requires screenshot)
+            </span>
+          </label>
+          {postedManually && (
+            <input
+              type="url"
+              value={screenshotUrl}
+              onChange={(e) => setScreenshotUrl(e.target.value)}
+              placeholder="Screenshot URL (required)"
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: 'var(--color-hover)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                color: 'var(--color-text-primary)',
+                fontSize: '14px',
+                marginTop: '8px'
+              }}
+            />
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.5 : 1
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'var(--color-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.5 : 1
+            }}
+          >
+            {submitting ? 'Saving...' : 'Mark as Posted'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Generate Posts Modal
+function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }: { contentItem: any, channelAccounts: any[], onClose: () => void, onSuccess: () => void }) {
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+  const [scheduledFor, setScheduledFor] = useState('')
+  const [captionOverrides, setCaptionOverrides] = useState<Record<string, string>>({})
+  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  // Default scheduling: use channel-based defaults
+  useEffect(() => {
+    // If multiple accounts selected, use first account's channel default
+    // Otherwise, default to tomorrow 9 AM
+    let defaultTime = new Date()
+    defaultTime.setDate(defaultTime.getDate() + 1)
+    defaultTime.setHours(9, 0, 0, 0)
+    
+    if (selectedAccounts.length > 0) {
+      const firstAccount = channelAccounts.find(acc => acc.id === selectedAccounts[0])
+      if (firstAccount?.channel) {
+        // Channel-based defaults: GBP=9AM, Facebook=10AM, Instagram=11AM, Nextdoor=8AM
+        const channelDefaults: Record<string, number> = {
+          'google_business_profile': 9,
+          'facebook': 10,
+          'instagram': 11,
+          'nextdoor': 8
+        }
+        const channelKey = firstAccount.channel.key || ''
+        const defaultHour = channelDefaults[channelKey] || 9
+        defaultTime.setHours(defaultHour, 0, 0, 0)
+      }
+    }
+    
+    setScheduledFor(defaultTime.toISOString().slice(0, 16))
+  }, [selectedAccounts, channelAccounts])
+
+  async function handleGenerate() {
+    setError('')
+    if (selectedAccounts.length === 0) {
+      setError('Please select at least one account')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Prepare scheduled_for datetime
+      let scheduledForISO: string | undefined
+      if (scheduledFor) {
+        const scheduledDate = new Date(scheduledFor)
+        if (!isNaN(scheduledDate.getTime())) {
+          scheduledForISO = scheduledDate.toISOString()
+        }
+      }
+
+      // Create PostInstances via bulk-create
+      const response = await fetch('/api/marketing/post-instances/bulk-create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          content_item_id: contentItem.id,
+          channel_account_ids: selectedAccounts,
+          scheduled_for: scheduledForISO
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to generate posts' }))
+        throw new Error(errorData.detail || 'Failed to generate posts')
+      }
+
+      const instances = await response.json()
+
+      // Update caption overrides if any
+      if (Object.keys(captionOverrides).length > 0) {
+        for (const instance of instances) {
+          const accountId = instance.channel_account_id
+          if (captionOverrides[accountId]) {
+            await fetch(`/api/marketing/post-instances/${instance.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                caption_override: captionOverrides[accountId]
+              })
+            })
+          }
+        }
+      }
+
+      onSuccess()
+    } catch (error: any) {
+      console.error('Failed to generate posts:', error)
+      setError(error.message || 'Failed to generate posts. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function toggleAccount(accountId: string) {
+    if (selectedAccounts.includes(accountId)) {
+      setSelectedAccounts(selectedAccounts.filter(id => id !== accountId))
+    } else {
+      setSelectedAccounts([...selectedAccounts, accountId])
+    }
+  }
+
+  function toggleExpanded(accountId: string) {
+    setExpandedAccounts({
+      ...expandedAccounts,
+      [accountId]: !expandedAccounts[accountId]
+    })
+  }
+
+  return (
+    <div className="marketing-modal" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2000,
+      padding: '20px'
+    }}>
+      <div className="marketing-modal-content" style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '24px',
+        maxWidth: '700px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+              Generate Posts
+            </h3>
+            <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+              {contentItem.title}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              fontSize: '18px'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {error && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'rgba(239, 83, 80, 0.1)',
+            border: '1px solid #EF5350',
+            borderRadius: '8px',
+            color: '#EF5350',
+            marginBottom: '20px',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Account Selection */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{ display: 'block', marginBottom: '12px', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            Select Accounts *
+          </label>
+          <div style={{ display: 'grid', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+            {Array.isArray(channelAccounts) && channelAccounts.length > 0 ? (
+              channelAccounts.map(account => (
+                <div key={account.id} style={{
+                  padding: '12px',
+                  backgroundColor: 'var(--color-hover)',
+                  borderRadius: '8px',
+                  border: selectedAccounts.includes(account.id) ? '2px solid var(--color-primary)' : '1px solid var(--color-border)'
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAccounts.includes(account.id)}
+                      onChange={() => toggleAccount(account.id)}
+                      style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+                        {account.name}
+                      </div>
+                      {account.channel && (
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          {account.channel.display_name || account.channel.key}
+                        </div>
+                      )}
+                    </div>
+                    {selectedAccounts.includes(account.id) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleExpanded(account.id)
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'transparent',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '6px',
+                          color: 'var(--color-text-secondary)',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {expandedAccounts[account.id] ? 'Hide' : 'Customize'}
+                      </button>
+                    )}
+                  </label>
+                  
+                  {expandedAccounts[account.id] && selectedAccounts.includes(account.id) && (
+                    <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
+                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                        Caption Override (optional)
+                      </label>
+                      <textarea
+                        value={captionOverrides[account.id] || ''}
+                        onChange={(e) => setCaptionOverrides({
+                          ...captionOverrides,
+                          [account.id]: e.target.value
+                        })}
+                        placeholder={contentItem.base_caption || 'Enter custom caption...'}
+                        style={{
+                          width: '100%',
+                          minHeight: '80px',
+                          padding: '8px',
+                          backgroundColor: 'var(--color-card)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '6px',
+                          color: 'var(--color-text-primary)',
+                          fontSize: '13px',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                No accounts available. Please add channel accounts first.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Default Schedule */}
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            Default Schedule (optional)
+          </label>
+          <input
+            type="datetime-local"
+            value={scheduledFor}
+            onChange={(e) => setScheduledFor(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px',
+              backgroundColor: 'var(--color-hover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px'
+            }}
+          />
+          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+            Leave empty to create as Draft. Scheduled posts require caption and datetime.
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.5 : 1
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={submitting || selectedAccounts.length === 0}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'var(--color-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: (submitting || selectedAccounts.length === 0) ? 'not-allowed' : 'pointer',
+              opacity: (submitting || selectedAccounts.length === 0) ? 0.5 : 1
+            }}
+          >
+            {submitting ? 'Generating...' : `Generate ${selectedAccounts.length} Post${selectedAccounts.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ScoreboardView() {
   const [scoreboard, setScoreboard] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -1821,6 +2838,9 @@ function AccountsView() {
   const [channels, setChannels] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<any>(null)
+  const [formError, setFormError] = useState<string>('')
+  const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     channel_id: '',
     account_name: '',
@@ -1858,34 +2878,116 @@ function AccountsView() {
 
   async function handleAddAccount(e: React.FormEvent) {
     e.preventDefault()
+    setFormError('')
+    setSubmitting(true)
+    
+    // Validation
+    if (!formData.channel_id) {
+      setFormError('Please select a channel')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.account_name || !formData.account_name.trim()) {
+      setFormError('Account name is required')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.account_email || !formData.account_email.trim()) {
+      setFormError('Account email is required')
+      setSubmitting(false)
+      return
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.account_email)) {
+      setFormError('Please enter a valid email address')
+      setSubmitting(false)
+      return
+    }
+    
     try {
-      const response = await fetch('/api/marketing/channel-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const url = editingAccount 
+        ? `/api/marketing/channel-accounts/${editingAccount.id}`
+        : '/api/marketing/channel-accounts'
+      const method = editingAccount ? 'PATCH' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        headers,
         credentials: 'include',
         body: JSON.stringify({ ...formData, tenant_id: 'h2o' })
       })
-      if (response.ok) {
-        setShowAddForm(false)
-        setFormData({ channel_id: '', account_name: '', account_email: '', credential_vault_ref: '' })
-        loadData()
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to save account' }))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
       }
-    } catch (error) {
-      console.error('Failed to add account:', error)
+      
+      showToast(editingAccount ? 'Account updated successfully' : 'Account added successfully', 'success')
+      setShowAddForm(false)
+      setEditingAccount(null)
+      setFormData({ channel_id: '', account_name: '', account_email: '', credential_vault_ref: '' })
+      setFormError('')
+      loadData()
+    } catch (error: any) {
+      console.error('Failed to save account:', error)
+      setFormError(error.message || 'Failed to save account. Please try again.')
+      showToast(error.message || 'Failed to save account', 'error')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   async function handleDelete(accountId: string) {
-    if (!confirm('Delete this channel account?')) return
+    if (!confirm('Delete this channel account? This action cannot be undone.')) return
     try {
-      await fetch(`/api/marketing/channel-accounts/${accountId}`, {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const response = await fetch(`/api/marketing/channel-accounts/${accountId}`, {
         method: 'DELETE',
+        headers,
         credentials: 'include'
       })
-      loadData()
-    } catch (error) {
+      
+      if (response.ok) {
+        showToast('Account deleted successfully', 'success')
+        loadData()
+      } else {
+        throw new Error('Failed to delete account')
+      }
+    } catch (error: any) {
       console.error('Failed to delete account:', error)
+      showToast(error.message || 'Failed to delete account', 'error')
     }
+  }
+
+  function handleEdit(account: any) {
+    setEditingAccount(account)
+    setFormData({
+      channel_id: account.channel_id,
+      account_name: account.account_name || '',
+      account_email: account.login_email || account.account_email || '',
+      credential_vault_ref: account.credential_vault_ref || ''
+    })
+    setShowAddForm(true)
+    setFormError('')
+  }
+
+  function handleCancelForm() {
+    setShowAddForm(false)
+    setEditingAccount(null)
+    setFormData({ channel_id: '', account_name: '', account_email: '', credential_vault_ref: '' })
+    setFormError('')
   }
 
   if (loading) {
@@ -1920,7 +3022,7 @@ function AccountsView() {
         </button>
       </div>
 
-      {/* Add Account Form */}
+      {/* Add/Edit Account Form */}
       {showAddForm && (
         <div style={{
           backgroundColor: 'var(--color-card)',
@@ -1930,8 +3032,21 @@ function AccountsView() {
           marginBottom: '24px'
         }}>
           <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-            Add Channel Account
+            {editingAccount ? 'Edit Channel Account' : 'Add Channel Account'}
           </h3>
+          {formError && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: 'rgba(239, 83, 80, 0.1)',
+              border: '1px solid #EF5350',
+              borderRadius: '8px',
+              color: '#EF5350',
+              fontSize: '14px',
+              marginBottom: '16px'
+            }}>
+              {formError}
+            </div>
+          )}
           <form onSubmit={handleAddAccount}>
             <div style={{ display: 'grid', gap: '16px' }}>
               <div>
@@ -2025,22 +3140,25 @@ function AccountsView() {
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
               <button
                 type="submit"
+                disabled={submitting}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: 'var(--color-primary)',
+                  backgroundColor: submitting ? 'var(--color-hover)' : 'var(--color-primary)',
                   border: 'none',
                   borderRadius: '8px',
                   color: '#ffffff',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: 'pointer'
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1
                 }}
               >
-                Save Account
+                {submitting ? 'Saving...' : (editingAccount ? 'Update Account' : 'Save Account')}
               </button>
               <button
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={handleCancelForm}
+                disabled={submitting}
                 style={{
                   padding: '10px 20px',
                   backgroundColor: 'var(--color-hover)',
@@ -2048,7 +3166,8 @@ function AccountsView() {
                   borderRadius: '8px',
                   color: 'var(--color-text-primary)',
                   fontSize: '14px',
-                  cursor: 'pointer'
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1
                 }}
               >
                 Cancel
@@ -2088,19 +3207,11 @@ function AccountsView() {
                   alignItems: 'center'
                 }}
               >
-                <div>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                    {account.account_name}
-                  </h4>
-                  <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                    {channel?.name} • {account.account_email}
-                  </div>
-                  {account.credential_vault_ref && (
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                      Vault: {account.credential_vault_ref}
-                    </div>
-                  )}
-                  <div style={{ marginTop: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                      {account.account_name}
+                    </h4>
                     <span style={{
                       padding: '4px 8px',
                       borderRadius: '6px',
@@ -2109,24 +3220,65 @@ function AccountsView() {
                       backgroundColor: account.oauth_connected ? 'rgba(76, 175, 80, 0.2)' : 'rgba(158, 158, 158, 0.2)',
                       color: account.oauth_connected ? '#66BB6A' : '#BDBDBD'
                     }}>
-                      {account.oauth_connected ? '✓ Auto-post ready' : 'Manual post only'}
+                      {account.oauth_connected ? '✓ Connected' : 'Manual'}
                     </span>
+                    {account.status && (
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        backgroundColor: account.status === 'active' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(158, 158, 158, 0.2)',
+                        color: account.status === 'active' ? '#66BB6A' : '#BDBDBD'
+                      }}>
+                        {account.status}
+                      </span>
+                    )}
                   </div>
+                  <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                    <strong>{channel?.display_name || channel?.name || 'Unknown Channel'}</strong> • {account.login_email || account.account_email}
+                  </div>
+                  {account.credential_vault_ref && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                      🔐 Vault: {account.credential_vault_ref}
+                    </div>
+                  )}
+                  {!account.oauth_connected && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
+                      Manual posting required - OAuth not connected
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => handleDelete(account.id)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    color: 'var(--color-text-secondary)',
-                    fontSize: '14px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => handleEdit(account)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(account.id)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #EF5350',
+                      borderRadius: '8px',
+                      color: '#EF5350',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             )
           })}

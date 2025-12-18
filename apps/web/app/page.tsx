@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { useMobile } from '../lib/useMobile'
+import { Dataflow } from '../components/Dataflow'
 
 export default function Dashboard() {
   const isMobile = useMobile()
@@ -165,6 +166,27 @@ export default function Dashboard() {
           value={stats.completedThisWeek}
           color="#2196F3"
         />
+      </div>
+
+      {/* Dataflow - Actionable Signals */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            color: 'var(--color-text-primary)',
+            marginBottom: '8px'
+          }}>
+            Dataflow
+          </h2>
+          <p style={{
+            fontSize: '14px',
+            color: 'var(--color-text-secondary)'
+          }}>
+            Actionable items requiring attention
+          </p>
+        </div>
+        <Dataflow />
       </div>
 
       {/* Overdue Alerts Section */}
