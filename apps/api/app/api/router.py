@@ -27,17 +27,17 @@ from ..schemas import UserCreate, UserUpdate, UserOut
 from uuid import UUID
 
 # Import marketing routes (async-based)
+import logging
+logger = logging.getLogger(__name__)
+marketing_router = None
 try:
     from ..routes_marketing import router as marketing_router
+    logger.info("Marketing routes imported successfully")
 except ImportError as e:
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(f"Marketing routes not available: {e}")
+    logger.error(f"Marketing routes import failed (ImportError): {e}", exc_info=True)
     marketing_router = None
 except Exception as e:
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.error(f"Error importing marketing routes: {e}", exc_info=True)
+    logger.error(f"Marketing routes import failed (Exception): {e}", exc_info=True)
     marketing_router = None
 
 # Import review system routes
@@ -87,13 +87,9 @@ router = APIRouter()
 # Include marketing routes if available
 if marketing_router:
     router.include_router(marketing_router)
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info("Marketing routes included successfully")
+    logger.info("Marketing routes included successfully in main router")
 else:
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning("Marketing routes not available - endpoints will return 404")
+    logger.error("Marketing routes NOT included - marketing_router is None. Endpoints will return 404!")
 
 # Include review system routes if available
 if reviews_router:
