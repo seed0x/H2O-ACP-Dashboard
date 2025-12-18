@@ -66,6 +66,12 @@ try:
 except ImportError:
     signals_router = None
 
+# Import portals directory routes
+try:
+    from .portals import router as portals_router
+except ImportError:
+    portals_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -97,6 +103,10 @@ if notifications_router:
 # Include signals routes if available
 if signals_router:
     router.include_router(signals_router)
+
+# Include portals directory routes if available
+if portals_router:
+    router.include_router(portals_router)
 
 class LoginRequest(BaseModel):
     username: str

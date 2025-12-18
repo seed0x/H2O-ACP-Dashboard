@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime, date
 from uuid import UUID
+from enum import Enum
 
 class Token(BaseModel):
     access_token: str
@@ -347,4 +348,149 @@ class NotificationOut(BaseModel):
 
 class NotificationCount(BaseModel):
     count: int
+
+# Portals Directory Schemas
+
+class PortalCategory(str, Enum):
+    permit = "permit"
+    inspection = "inspection"
+    utility = "utility"
+    vendor = "vendor"
+    builder = "builder"
+    warranty = "warranty"
+    finance = "finance"
+    other = "other"
+
+class TenantEnum(str, Enum):
+    h2o = "h2o"
+    all_county = "all_county"
+
+class PortalRuleAppliesTo(str, Enum):
+    job = "job"
+    service_call = "service_call"
+
+class JobPhase(str, Enum):
+    rough = "rough"
+    trim = "trim"
+    final = "final"
+
+class PortalDefinitionBase(BaseModel):
+    name: str
+    category: PortalCategory
+    jurisdiction: Optional[str] = None
+    base_url: str
+    support_phone: Optional[str] = None
+    description: Optional[str] = None
+    is_active: bool = True
+
+class PortalDefinitionCreate(PortalDefinitionBase):
+    pass
+
+class PortalDefinitionUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[PortalCategory] = None
+    jurisdiction: Optional[str] = None
+    base_url: Optional[str] = None
+    support_phone: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class PortalDefinitionOut(PortalDefinitionBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PortalAccountBase(BaseModel):
+    portal_definition_id: UUID
+    tenant_id: TenantEnum
+    login_identifier: str
+    account_number: Optional[str] = None
+    credential_vault_ref: Optional[str] = None
+    notes: Optional[str] = None
+    owner: Optional[str] = None
+    last_verified_at: Optional[datetime] = None
+    is_active: bool = True
+
+class PortalAccountCreate(PortalAccountBase):
+    pass
+
+class PortalAccountUpdate(BaseModel):
+    portal_definition_id: Optional[UUID] = None
+    tenant_id: Optional[TenantEnum] = None
+    login_identifier: Optional[str] = None
+    account_number: Optional[str] = None
+    credential_vault_ref: Optional[str] = None
+    notes: Optional[str] = None
+    owner: Optional[str] = None
+    last_verified_at: Optional[datetime] = None
+    is_active: Optional[bool] = None
+
+class PortalAccountOut(PortalAccountBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    portal_definition: Optional[PortalDefinitionOut] = None
+
+    class Config:
+        from_attributes = True
+
+class BuilderPortalAccountCreate(BaseModel):
+    builder_id: UUID
+    portal_account_id: UUID
+
+class BuilderPortalAccountOut(BaseModel):
+    builder_id: UUID
+    portal_account_id: UUID
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PortalRuleBase(BaseModel):
+    applies_to: PortalRuleAppliesTo
+    tenant_id: Optional[TenantEnum] = None
+    builder_id: Optional[UUID] = None
+    city: Optional[str] = None
+    county: Optional[str] = None
+    permit_required: Optional[bool] = None
+    phase: Optional[JobPhase] = None
+    portal_account_id: UUID
+    priority: int = 100
+    is_active: bool = True
+
+class PortalRuleCreate(PortalRuleBase):
+    pass
+
+class PortalRuleUpdate(BaseModel):
+    applies_to: Optional[PortalRuleAppliesTo] = None
+    tenant_id: Optional[TenantEnum] = None
+    builder_id: Optional[UUID] = None
+    city: Optional[str] = None
+    county: Optional[str] = None
+    permit_required: Optional[bool] = None
+    phase: Optional[JobPhase] = None
+    portal_account_id: Optional[UUID] = None
+    priority: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class PortalRuleOut(PortalRuleBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    portal_account: Optional[PortalAccountOut] = None
+
+    class Config:
+        from_attributes = True
+
+class SuggestedPortalsRequest(BaseModel):
+    applies_to: PortalRuleAppliesTo
+    tenant_id: TenantEnum
+    city: Optional[str] = None
+    county: Optional[str] = None
+    builder_id: Optional[UUID] = None
+    permit_required: Optional[bool] = None
+    phase: Optional[JobPhase] = None
 

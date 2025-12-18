@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, or_
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from . import models, schemas
 from typing import Optional, List
@@ -451,6 +452,231 @@ async def find_or_create_builder(db: AsyncSession, builder_name: str, changed_by
         raise ValueError('Builder name must be unique')
     await db.refresh(builder)
     return builder
+
+# Portals Directory CRUD
+
+async def create_portal_definition(db: AsyncSession, definition_in: schemas.PortalDefinitionCreate, changed_by: str) -> models.PortalDefinition:
+    definition = models.PortalDefinition(**definition_in.dict())
+    db.add(definition)
+    await db.flush()
+    await write_audit(db, None, 'portal_definition', definition.id, 'create', changed_by)
+    await db.commit()
+    await db.refresh(definition)
+    return definition
+
+async def get_portal_definition(db: AsyncSession, definition_id: UUID) -> Optional[models.PortalDefinition]:
+    q = select(models.PortalDefinition).where(models.PortalDefinition.id == definition_id)
+    res = await db.execute(q)
+    return res.scalar_one_or_none()
+
+async def list_portal_definitions(db: AsyncSession, is_active: Optional[bool] = None, category: Optional[str] = None) -> List[models.PortalDefinition]:
+    q = select(models.PortalDefinition)
+    if is_active is not None:
+        q = q.where(models.PortalDefinition.is_active == is_active)
+    if category:
+        q = q.where(models.PortalDefinition.category == category)
+    q = q.order_by(models.PortalDefinition.name)
+    res = await db.execute(q)
+    return res.scalars().all()
+
+async def update_portal_definition(db: AsyncSession, definition: models.PortalDefinition, definition_in: schemas.PortalDefinitionUpdate, changed_by: str) -> models.PortalDefinition:
+    for field, value in definition_in.dict(exclude_unset=True).items():
+        old = getattr(definition, field)
+        setattr(definition, field, value)
+        await write_audit(db, None, 'portal_definition', definition.id, 'update', changed_by, field, str(old) if old is not None else None, str(value) if value is not None else None)
+    db.add(definition)
+    await db.commit()
+    await db.refresh(definition)
+    return definition
+
+async def delete_portal_definition(db: AsyncSession, definition: models.PortalDefinition, changed_by: str):
+    await write_audit(db, None, 'portal_definition', definition.id, 'delete', changed_by)
+    await db.delete(definition)
+    await db.commit()
+
+async def create_portal_account(db: AsyncSession, account_in: schemas.PortalAccountCreate, changed_by: str) -> models.PortalAccount:
+    account = models.PortalAccount(**account_in.dict())
+    db.add(account)
+    await db.flush()
+    await write_audit(db, account.tenant_id, 'portal_account', account.id, 'create', changed_by)
+    await db.commit()
+    await db.refresh(account)
+    return account
+
+async def get_portal_account(db: AsyncSession, account_id: UUID) -> Optional[models.PortalAccount]:
+    q = select(models.PortalAccount).where(models.PortalAccount.id == account_id)
+    res = await db.execute(q)
+    return res.scalar_one_or_none()
+
+async def list_portal_accounts(db: AsyncSession, tenant_id: Optional[str] = None, is_active: Optional[bool] = None, search: Optional[str] = None) -> List[models.PortalAccount]:
+    q = select(models.PortalAccount).options(selectinload(models.PortalAccount.portal_definition))
+    if tenant_id:
+        q = q.where(models.PortalAccount.tenant_id == tenant_id)
+    if is_active is not None:
+        q = q.where(models.PortalAccount.is_active == is_active)
+    if search:
+        q = q.join(models.PortalDefinition).where(
+            or_(
+                models.PortalDefinition.name.ilike(f"%{search}%"),
+                models.PortalAccount.login_identifier.ilike(f"%{search}%"),
+                models.PortalAccount.account_number.ilike(f"%{search}%") if models.PortalAccount.account_number else False
+            )
+        )
+    q = q.order_by(models.PortalAccount.created_at.desc())
+    res = await db.execute(q)
+    return res.scalars().all()
+
+async def update_portal_account(db: AsyncSession, account: models.PortalAccount, account_in: schemas.PortalAccountUpdate, changed_by: str) -> models.PortalAccount:
+    for field, value in account_in.dict(exclude_unset=True).items():
+        old = getattr(account, field)
+        setattr(account, field, value)
+        await write_audit(db, account.tenant_id, 'portal_account', account.id, 'update', changed_by, field, str(old) if old is not None else None, str(value) if value is not None else None)
+    db.add(account)
+    await db.commit()
+    await db.refresh(account)
+    return account
+
+async def delete_portal_account(db: AsyncSession, account: models.PortalAccount, changed_by: str):
+    await write_audit(db, account.tenant_id, 'portal_account', account.id, 'delete', changed_by)
+    await db.delete(account)
+    await db.commit()
+
+async def link_builder_portal_account(db: AsyncSession, builder_id: UUID, portal_account_id: UUID, changed_by: str) -> models.BuilderPortalAccount:
+    link = models.BuilderPortalAccount(builder_id=builder_id, portal_account_id=portal_account_id)
+    db.add(link)
+    await db.flush()
+    await write_audit(db, None, 'builder_portal_account', f"{builder_id}:{portal_account_id}", 'create', changed_by)
+    await db.commit()
+    await db.refresh(link)
+    return link
+
+async def unlink_builder_portal_account(db: AsyncSession, builder_id: UUID, portal_account_id: UUID, changed_by: str):
+    q = select(models.BuilderPortalAccount).where(
+        models.BuilderPortalAccount.builder_id == builder_id,
+        models.BuilderPortalAccount.portal_account_id == portal_account_id
+    )
+    res = await db.execute(q)
+    link = res.scalar_one_or_none()
+    if link:
+        await write_audit(db, None, 'builder_portal_account', f"{builder_id}:{portal_account_id}", 'delete', changed_by)
+        await db.delete(link)
+        await db.commit()
+
+async def get_builder_portal_accounts(db: AsyncSession, builder_id: UUID) -> List[models.PortalAccount]:
+    q = select(models.PortalAccount).join(models.BuilderPortalAccount).where(
+        models.BuilderPortalAccount.builder_id == builder_id
+    ).options(selectinload(models.PortalAccount.portal_definition))
+    res = await db.execute(q)
+    return res.scalars().all()
+
+async def create_portal_rule(db: AsyncSession, rule_in: schemas.PortalRuleCreate, changed_by: str) -> models.PortalRule:
+    rule = models.PortalRule(**rule_in.dict())
+    db.add(rule)
+    await db.flush()
+    await write_audit(db, rule.tenant_id, 'portal_rule', rule.id, 'create', changed_by)
+    await db.commit()
+    await db.refresh(rule)
+    return rule
+
+async def get_portal_rule(db: AsyncSession, rule_id: UUID) -> Optional[models.PortalRule]:
+    q = select(models.PortalRule).where(models.PortalRule.id == rule_id)
+    res = await db.execute(q)
+    return res.scalar_one_or_none()
+
+async def list_portal_rules(db: AsyncSession, applies_to: Optional[str] = None, tenant_id: Optional[str] = None, is_active: Optional[bool] = None) -> List[models.PortalRule]:
+    q = select(models.PortalRule).options(selectinload(models.PortalRule.portal_account).selectinload(models.PortalAccount.portal_definition))
+    if applies_to:
+        q = q.where(models.PortalRule.applies_to == applies_to)
+    if tenant_id:
+        q = q.where(or_(models.PortalRule.tenant_id == tenant_id, models.PortalRule.tenant_id.is_(None)))
+    if is_active is not None:
+        q = q.where(models.PortalRule.is_active == is_active)
+    q = q.order_by(models.PortalRule.priority.asc(), models.PortalRule.created_at.desc())
+    res = await db.execute(q)
+    return res.scalars().all()
+
+async def update_portal_rule(db: AsyncSession, rule: models.PortalRule, rule_in: schemas.PortalRuleUpdate, changed_by: str) -> models.PortalRule:
+    for field, value in rule_in.dict(exclude_unset=True).items():
+        old = getattr(rule, field)
+        setattr(rule, field, value)
+        await write_audit(db, rule.tenant_id, 'portal_rule', rule.id, 'update', changed_by, field, str(old) if old is not None else None, str(value) if value is not None else None)
+    db.add(rule)
+    await db.commit()
+    await db.refresh(rule)
+    return rule
+
+async def delete_portal_rule(db: AsyncSession, rule: models.PortalRule, changed_by: str):
+    await write_audit(db, rule.tenant_id, 'portal_rule', rule.id, 'delete', changed_by)
+    await db.delete(rule)
+    await db.commit()
+
+async def suggest_portals(
+    db: AsyncSession,
+    applies_to: str,
+    tenant_id: str,
+    city: Optional[str] = None,
+    county: Optional[str] = None,
+    builder_id: Optional[UUID] = None,
+    permit_required: Optional[bool] = None,
+    phase: Optional[str] = None
+) -> List[models.PortalAccount]:
+    """
+    Suggest portal accounts based on rules.
+    Returns ordered list (priority ascending, then by creation date).
+    """
+    # First, get builder-linked portals (highest priority)
+    builder_portals = []
+    if builder_id:
+        builder_portals = await get_builder_portal_accounts(db, builder_id)
+        builder_portals = [p for p in builder_portals if p.tenant_id == tenant_id and p.is_active]
+    
+    # Get matching rules
+    q = select(models.PortalRule).where(
+        models.PortalRule.applies_to == applies_to,
+        models.PortalRule.is_active == True
+    ).options(selectinload(models.PortalRule.portal_account).selectinload(models.PortalAccount.portal_definition))
+    
+    # Tenant filter: rule applies if tenant_id matches OR rule.tenant_id is None (both tenants)
+    q = q.where(or_(models.PortalRule.tenant_id == tenant_id, models.PortalRule.tenant_id.is_(None)))
+    
+    # Additional filters
+    if builder_id:
+        q = q.where(or_(models.PortalRule.builder_id == builder_id, models.PortalRule.builder_id.is_(None)))
+    if city:
+        q = q.where(or_(models.PortalRule.city == city, models.PortalRule.city.is_(None)))
+    if county:
+        q = q.where(or_(models.PortalRule.county == county, models.PortalRule.county.is_(None)))
+    if permit_required is not None:
+        q = q.where(or_(models.PortalRule.permit_required == permit_required, models.PortalRule.permit_required.is_(None)))
+    if phase:
+        q = q.where(or_(models.PortalRule.phase == phase, models.PortalRule.phase.is_(None)))
+    
+    q = q.order_by(models.PortalRule.priority.asc())
+    res = await db.execute(q)
+    rules = res.scalars().all()
+    
+    # Collect portal accounts from rules
+    rule_portals = []
+    seen_account_ids = set()
+    
+    for rule in rules:
+        if rule.portal_account and rule.portal_account.is_active and rule.portal_account.tenant_id == tenant_id:
+            if rule.portal_account.id not in seen_account_ids:
+                rule_portals.append(rule.portal_account)
+                seen_account_ids.add(rule.portal_account.id)
+    
+    # Combine: builder portals first, then rule portals
+    result = []
+    builder_account_ids = {p.id for p in builder_portals}
+    
+    for portal in builder_portals:
+        result.append(portal)
+    
+    for portal in rule_portals:
+        if portal.id not in builder_account_ids:
+            result.append(portal)
+    
+    return result
 
 async def find_duplicate_job(db: AsyncSession, tenant_id: str, builder_id: UUID, community: str, lot_number: str, phase: str) -> Optional[models.Job]:
     """Find duplicate job based on uniqueness constraint"""

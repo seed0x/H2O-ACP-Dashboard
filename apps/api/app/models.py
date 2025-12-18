@@ -360,3 +360,67 @@ class Notification(Base):
     entity_id = Column(UUID(as_uuid=True), nullable=True)
     read = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# Portals Directory Models
+
+class PortalDefinition(Base):
+    __tablename__ = "portal_definitions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(Text, nullable=False)
+    category = Column(Enum('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category'), nullable=False)
+    jurisdiction = Column(Text, nullable=True)  # e.g., "City of Vancouver", "Clark County"
+    base_url = Column(Text, nullable=False)
+    support_phone = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    accounts = relationship("PortalAccount", back_populates="portal_definition")
+
+class PortalAccount(Base):
+    __tablename__ = "portal_accounts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    portal_definition_id = Column(UUID(as_uuid=True), ForeignKey("portal_definitions.id"), nullable=False)
+    tenant_id = Column(Enum('h2o', 'all_county', name='tenant_enum'), nullable=False)
+    login_identifier = Column(Text, nullable=False)  # email/username
+    account_number = Column(Text, nullable=True)  # customer_id
+    credential_vault_ref = Column(Text, nullable=True)  # e.g., "1Password → H2O → Vancouver Permits"
+    notes = Column(Text, nullable=True)
+    owner = Column(Text, nullable=True)  # user/email
+    last_verified_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    portal_definition = relationship("PortalDefinition", back_populates="accounts")
+    builder_links = relationship("BuilderPortalAccount", back_populates="portal_account", cascade="all, delete-orphan")
+
+class BuilderPortalAccount(Base):
+    __tablename__ = "builder_portal_accounts"
+
+    builder_id = Column(UUID(as_uuid=True), ForeignKey("builders.id", ondelete="CASCADE"), primary_key=True)
+    portal_account_id = Column(UUID(as_uuid=True), ForeignKey("portal_accounts.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    builder = relationship("Builder")
+    portal_account = relationship("PortalAccount", back_populates="builder_links")
+
+class PortalRule(Base):
+    __tablename__ = "portal_rules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    applies_to = Column(Enum('job', 'service_call', name='portal_rule_applies_to'), nullable=False)
+    tenant_id = Column(Enum('h2o', 'all_county', name='tenant_enum'), nullable=True)  # null = both tenants
+    builder_id = Column(UUID(as_uuid=True), ForeignKey("builders.id"), nullable=True)
+    city = Column(Text, nullable=True)
+    county = Column(Text, nullable=True)
+    permit_required = Column(Boolean, nullable=True)
+    phase = Column(Enum('rough', 'trim', 'final', name='job_phase'), nullable=True)
+    portal_account_id = Column(UUID(as_uuid=True), ForeignKey("portal_accounts.id"), nullable=False)
+    priority = Column(Integer, nullable=False, default=100)  # Lower = higher priority
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
