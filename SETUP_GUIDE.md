@@ -7,12 +7,12 @@ Step-by-step guide to get your application running with all environment variable
 ## 🎯 Overview
 
 You have **two deployment options**:
-1. **Vercel** (Recommended) - Frontend + API as serverless functions
+1. **Production** - Frontend on Vercel, API on Render
 2. **Local Development** - Docker Compose setup
 
 ---
 
-## Option 1: Vercel Deployment (Production)
+## Option 1: Production Deployment (Vercel + Render)
 
 ### Step 1: Set Up Database
 

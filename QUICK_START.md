@@ -4,7 +4,7 @@ Get your application running in 5 minutes!
 
 ---
 
-## For Vercel Deployment (Production)
+## For Production Deployment (Vercel Frontend + Render API)
 
 ### 1️⃣ Set Up Database
 

@@ -6,10 +6,6 @@ Clean, organized structure for H2O-ACP Dashboard.
 
 ```
 H2O-ACP-Dashboard/
-├── api/                          # Vercel serverless function
-│   ├── index.py                  # FastAPI handler for Vercel
-│   └── requirements.txt          # Python dependencies for serverless
-│
 ├── apps/
 │   ├── api/                      # FastAPI backend
 │   │   ├── app/
@@ -66,17 +62,18 @@ H2O-ACP-Dashboard/
 ## 🎯 Key Files
 
 ### Configuration
-- `vercel.json` - Vercel serverless function routing
-- `render.yaml` - Render.com deployment config
-- `railway.json` - Railway deployment config
+- `vercel.json` - Vercel frontend deployment config
+- `render.yaml` - Render.com API deployment config
+- `railway.json` - Railway deployment config (alternative)
 - `Makefile` - Development commands
 
 ### Documentation
 - `README.md` - Project overview and quickstart
+- `docs/ARCHITECTURE.md` - System architecture and deployment
+- `DEPLOYMENT_NOTES.md` - Production deployment configuration
 - `SENIOR_ENGINEER_AUDIT.md` - Architecture review
 - `CRITICAL_FIXES_APPLIED.md` - P0 fixes applied
 - `P1_IMPROVEMENTS_APPLIED.md` - P1 improvements
-- `VERCEL_SERVERLESS_COMPLETE.md` - Vercel deployment guide
 - `TESTING_GUIDE.md` - Testing instructions
 
 ### Backend
@@ -91,13 +88,11 @@ H2O-ACP-Dashboard/
 - `apps/web/components/` - React components
 - `apps/web/lib/config.ts` - API configuration
 
-### Serverless
-- `api/index.py` - Vercel serverless function handler
-- `api/requirements.txt` - Serverless function dependencies
-
 ## 📝 Notes
 
 - **Root `requirements.txt`** - Legacy file, use `apps/api/requirements.txt` instead
+- **API Deployment**: API is deployed on Render, not Vercel (see [DEPLOYMENT_NOTES.md](../DEPLOYMENT_NOTES.md))
+- **Frontend Deployment**: Frontend is deployed on Vercel only (no serverless functions)
 - **`packages/db/`** - Placeholder directory, currently unused
 - All essential documentation is in root directory for easy access
 

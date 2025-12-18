@@ -636,7 +636,7 @@ All create, update, and delete operations are logged to `AuditLog` table.
 - **Icons**: @iconscout/react-unicons
 
 ### 11.3 Deployment
-- **API**: Can be deployed to Vercel (serverless), Railway, or Docker
+- **API**: Deployed on Render (production) or Docker (local development)
 - **Web**: Next.js static/SSR to Vercel or similar
 - **Database**: PostgreSQL (Supabase, Railway, or self-hosted)
 

@@ -1,8 +1,9 @@
 # Comprehensive API Test Script
 # Tests all endpoints and features
 
-# Test against Vercel serverless API
-$baseUrl = "https://dataflow-eta.vercel.app/api/v1"
+# Test against Render API (production)
+# For local testing, change to: http://localhost:8000/api/v1
+$baseUrl = "https://h2o-acp-dashboard.onrender.com/api/v1"
 $token = $null
 $adminToken = $null
 

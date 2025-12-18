@@ -24,30 +24,21 @@ Updated all test files to use shared fixtures:
 - ✅ `test_job_constraints.py` - Removed duplicate setup_db, uses conftest
 - ✅ `test_login.py` - Added better error messages
 
-### 3. Web App Configuration for Vercel
-**Problem**: Frontend was trying to connect to `localhost:8000` which doesn't exist in serverless setup.
+### 3. Web App Configuration
+**Problem**: Frontend was trying to connect to `localhost:8000` which doesn't exist in production.
 
 **Solution**: Updated configuration files:
-- ✅ `apps/web/lib/config.ts` - Defaults to same-domain (serverless functions)
-- ✅ `apps/web/next.config.js` - Only proxies if `NEXT_PUBLIC_API_URL` is explicitly set
-- ✅ `apps/web/package.json` - Added `dev:vercel` script for local serverless development
+- ✅ `apps/web/lib/config.ts` - Uses Render API URL in production
+- ✅ `apps/web/next.config.js` - Only proxies in development if `NEXT_PUBLIC_API_URL` is set
 
 ## Architecture
 
-### Production (Vercel)
+### Production
 ```
-Frontend (Next.js) → Vercel Serverless Function (/api/index.py) → Supabase Database
+Frontend (Next.js on Vercel) → API (FastAPI on Render) → PostgreSQL (Supabase)
 ```
 
 ### Local Development
-**Option 1: Serverless (Recommended)**
-```bash
-vercel dev
-# or
-cd apps/web && npm run dev:vercel
-```
-
-**Option 2: Separate API Server**
 ```bash
 # Set in .env:
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -55,6 +46,11 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 # Then run:
 cd apps/api && uvicorn app.main:app --reload
 cd apps/web && npm run dev
+```
+
+Or use Docker Compose:
+```bash
+make dev
 ```
 
 ## Test Configuration
