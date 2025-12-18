@@ -16,8 +16,14 @@ depends_on = None
 
 
 def upgrade():
-    # Create portal_category enum
-    op.execute("CREATE TYPE portal_category AS ENUM ('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other')")
+    # Create portal_category enum (reuse if exists, otherwise create)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE portal_category AS ENUM ('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
     
     # Create tenant_enum (reuse if exists, otherwise create)
     op.execute("""
@@ -28,8 +34,14 @@ def upgrade():
         END $$;
     """)
     
-    # Create portal_rule_applies_to enum
-    op.execute("CREATE TYPE portal_rule_applies_to AS ENUM ('job', 'service_call')")
+    # Create portal_rule_applies_to enum (reuse if exists, otherwise create)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE portal_rule_applies_to AS ENUM ('job', 'service_call');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
     
     # Create job_phase enum
     op.execute("""
