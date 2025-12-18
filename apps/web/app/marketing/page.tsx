@@ -2288,8 +2288,8 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
         }
       }
 
-      // Create PostInstances via bulk-create
-      const response = await fetch('/api/marketing/post-instances/bulk-create', {
+      // Create PostInstances via bulk endpoint
+      const response = await fetch('/api/marketing/post-instances/bulk', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
