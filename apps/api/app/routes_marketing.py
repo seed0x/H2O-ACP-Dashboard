@@ -6,9 +6,9 @@ from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 
-from ..db.session import get_session
-from ..core.auth import get_current_user
-from .. import models
+from .db.session import get_session
+from .core.auth import get_current_user
+from . import models
 from .schemas_marketing import (
     MarketingChannel as MarketingChannelSchema,
     ChannelAccount as ChannelAccountSchema,
