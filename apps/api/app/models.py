@@ -310,3 +310,19 @@ class RecoveryTicket(Base):
     resolution_notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+# Notification System
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)  # None = all users in tenant
+    tenant_id = Column(Text, nullable=False)
+    type = Column(String, nullable=False)  # 'overdue', 'reminder', 'status_change', 'review_received', 'escalation'
+    title = Column(Text, nullable=False)
+    message = Column(Text, nullable=False)
+    entity_type = Column(String, nullable=True)  # 'job', 'service_call', 'review_request', 'recovery_ticket'
+    entity_id = Column(UUID(as_uuid=True), nullable=True)
+    read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

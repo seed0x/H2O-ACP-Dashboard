@@ -12,6 +12,7 @@ import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
 import { showToast } from '../../components/Toast'
 import { handleApiError, logError } from '../../lib/error-handler'
+import { QuickAction } from '../../components/QuickActions'
 
 export default function ReviewsPage() {
   const router = useRouter()
@@ -220,99 +221,113 @@ export default function ReviewsPage() {
             columns={[
               { header: 'Customer', accessor: 'customer_name' },
               { header: 'Email', accessor: 'customer_email' },
-              { header: 'Status', accessor: 'status' },
-              { header: 'Days Since', accessor: 'days_since' },
-              { header: 'Sent', accessor: 'sent_at' },
-              { header: 'Actions', accessor: 'actions' },
+              { header: 'Status', accessor: (row: ReviewRequest) => <StatusBadge status={row.status} /> },
+              { header: 'Days Since', accessor: (row: ReviewRequest) => {
+                const daysSince = Math.floor((new Date().getTime() - new Date(row.created_at).getTime()) / (1000 * 60 * 60 * 24))
+                return `${daysSince} day${daysSince !== 1 ? 's' : ''}`
+              }},
+              { header: 'Sent', accessor: (row: ReviewRequest) => row.sent_at ? new Date(row.sent_at).toLocaleDateString() : '-' },
             ]}
-            data={filteredRequests.map(r => {
-              const daysSince = Math.floor((new Date().getTime() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24))
-              return {
-                ...r,
-                status: <StatusBadge status={r.status} />,
-                days_since: `${daysSince} day${daysSince !== 1 ? 's' : ''}`,
-                sent_at: r.sent_at ? new Date(r.sent_at).toLocaleDateString() : '-',
-                actions: r.status === 'pending' && r.customer_email ? (
-                  <Button 
-                    size="sm" 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSendRequest(r.id)
-                    }}
-                  >
-                    Send
-                  </Button>
-                ) : '-',
-              }
-            })}
+            data={filteredRequests}
             onRowClick={(row) => router.push(`/review-requests/${row.id}`)}
+            actions={(row: ReviewRequest) => {
+              const actions: QuickAction[] = []
+              if (row.status === 'pending' && row.customer_email) {
+                actions.push({
+                  label: 'Send Now',
+                  onClick: (e) => {
+                    e.stopPropagation()
+                    handleSendRequest(row.id)
+                  },
+                  variant: 'primary',
+                  show: true
+                })
+              }
+              actions.push({
+                label: 'View Details',
+                onClick: (e) => {
+                  e.stopPropagation()
+                  router.push(`/review-requests/${row.id}`)
+                },
+                variant: 'secondary',
+                show: true
+              })
+              return actions
+            }}
           />
         </div>
       ) : activeTab === 'reviews' ? (
         <Table
           columns={[
             { header: 'Customer', accessor: 'customer_name' },
-            { header: 'Rating', accessor: 'rating' },
-            { header: 'Comment', accessor: 'comment' },
-            { header: 'Public', accessor: 'is_public' },
-            { header: 'Created', accessor: 'created_at' },
-            { header: 'Actions', accessor: 'actions' },
+            { header: 'Rating', accessor: (row: Review) => '⭐'.repeat(row.rating) },
+            { header: 'Comment', accessor: (row: Review) => row.comment ? (row.comment.length > 50 ? row.comment.substring(0, 50) + '...' : row.comment) : '-' },
+            { header: 'Public', accessor: (row: Review) => row.is_public ? 'Yes' : 'No' },
+            { header: 'Created', accessor: (row: Review) => new Date(row.created_at).toLocaleDateString() },
           ]}
-          data={filteredReviews.map(r => ({
-            ...r,
-            rating: '⭐'.repeat(r.rating),
-            comment: r.comment ? (r.comment.length > 50 ? r.comment.substring(0, 50) + '...' : r.comment) : '-',
-            is_public: r.is_public ? 'Yes' : 'No',
-            created_at: new Date(r.created_at).toLocaleDateString(),
-            actions: !r.is_public ? (
-              <Button 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleMakePublic(r.id)
-                }} 
-                size="sm"
-              >
-                Make Public
-              </Button>
-            ) : '-',
-          }))}
+          data={filteredReviews}
           onRowClick={(row) => router.push(`/reviews/${row.id}`)}
+          actions={(row: Review) => {
+            const actions: QuickAction[] = []
+            if (!row.is_public) {
+              actions.push({
+                label: 'Make Public',
+                onClick: (e) => {
+                  e.stopPropagation()
+                  handleMakePublic(row.id)
+                },
+                variant: 'primary',
+                show: true
+              })
+            }
+            actions.push({
+              label: 'View Details',
+              onClick: (e) => {
+                e.stopPropagation()
+                router.push(`/reviews/${row.id}`)
+              },
+              variant: 'secondary',
+              show: true
+            })
+            return actions
+          }}
         />
       ) : (
         <Table
           columns={[
             { header: 'Customer', accessor: 'customer_name' },
-            { header: 'Issue', accessor: 'issue_description' },
-            { header: 'Status', accessor: 'status' },
-            { header: 'Assigned To', accessor: 'assigned_to' },
-            { header: 'Created', accessor: 'created_at' },
-            { header: 'Actions', accessor: 'actions' },
+            { header: 'Issue', accessor: (row: RecoveryTicket) => row.issue_description.length > 50 ? row.issue_description.substring(0, 50) + '...' : row.issue_description },
+            { header: 'Status', accessor: (row: RecoveryTicket) => <StatusBadge status={row.status} /> },
+            { header: 'Assigned To', accessor: (row: RecoveryTicket) => row.assigned_to || '-' },
+            { header: 'Created', accessor: (row: RecoveryTicket) => new Date(row.created_at).toLocaleDateString() },
           ]}
-          data={filteredTickets.map(t => ({
-            ...t,
-            issue_description: t.issue_description.length > 50 ? t.issue_description.substring(0, 50) + '...' : t.issue_description,
-            status: <StatusBadge status={t.status} />,
-            assigned_to: t.assigned_to || '-',
-            created_at: new Date(t.created_at).toLocaleDateString(),
-            actions: (
-              <Select
-                value={t.status}
-                onChange={(e) => {
-                  e.stopPropagation()
-                  handleUpdateTicketStatus(t.id, e.target.value)
-                }}
-                onClick={(e) => e.stopPropagation()}
-                style={{ width: '150px' }}
-                options={[
-                  { value: 'open', label: 'Open' },
-                  { value: 'in_progress', label: 'In Progress' },
-                  { value: 'resolved', label: 'Resolved' },
-                  { value: 'closed', label: 'Closed' },
-                ]}
-              />
-            ),
-          }))}
+          data={filteredTickets}
           onRowClick={(row) => router.push(`/recovery-tickets/${row.id}`)}
+          actions={(row: RecoveryTicket) => {
+            const actions: QuickAction[] = []
+            actions.push({
+              label: 'Update Status',
+              onClick: (e) => {
+                e.stopPropagation()
+                const newStatus = prompt('Enter new status (open, in_progress, resolved, closed):', row.status)
+                if (newStatus && ['open', 'in_progress', 'resolved', 'closed'].includes(newStatus)) {
+                  handleUpdateTicketStatus(row.id, newStatus)
+                }
+              },
+              variant: 'secondary',
+              show: true
+            })
+            actions.push({
+              label: 'View Details',
+              onClick: (e) => {
+                e.stopPropagation()
+                router.push(`/recovery-tickets/${row.id}`)
+              },
+              variant: 'secondary',
+              show: true
+            })
+            return actions
+          }}
         />
       )}
     </div>

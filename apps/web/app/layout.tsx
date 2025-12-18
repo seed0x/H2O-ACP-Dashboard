@@ -5,6 +5,7 @@ import { Sidebar } from '../components/Sidebar'
 import { AuthGuard } from '../components/AuthGuard'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ToastContainer } from '../components/Toast'
+import { NotificationCenter } from '../components/NotificationCenter'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
@@ -62,9 +63,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 )}
               </>
             )}
+            {!isLoginPage && (
+              <header style={{
+                position: 'fixed',
+                top: 0,
+                left: isMobile ? '0' : '256px',
+                right: 0,
+                height: '64px',
+                backgroundColor: 'var(--color-card)',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                padding: '0 24px',
+                zIndex: 99
+              }}>
+                <NotificationCenter />
+              </header>
+            )}
             <main style={{ 
               marginLeft: isLoginPage || (isMobile && !sidebarOpen) ? '0' : (isMobile ? '0' : '256px'), 
-              minHeight: '100vh', 
+              marginTop: isLoginPage ? '0' : '64px',
+              minHeight: isLoginPage ? '100vh' : 'calc(100vh - 64px)', 
               width: isLoginPage ? '100%' : (isMobile ? '100%' : 'calc(100% - 256px)'),
               padding: isMobile ? '16px' : '0',
               transition: 'margin-left 0.3s ease'

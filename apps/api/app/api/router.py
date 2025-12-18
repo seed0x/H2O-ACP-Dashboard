@@ -54,6 +54,12 @@ try:
 except ImportError:
     analytics_router = None
 
+# Import notifications routes
+try:
+    from .notifications import router as notifications_router
+except ImportError:
+    notifications_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -77,6 +83,10 @@ if overdue_router:
 # Include analytics routes if available
 if analytics_router:
     router.include_router(analytics_router)
+
+# Include notifications routes if available
+if notifications_router:
+    router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 
 class LoginRequest(BaseModel):
     username: str

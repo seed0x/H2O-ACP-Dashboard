@@ -32,3 +32,4 @@ def downgrade():
     op.drop_column('service_calls', 'assigned_to')
     op.drop_column('jobs', 'assigned_to')
 
+

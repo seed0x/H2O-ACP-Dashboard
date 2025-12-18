@@ -79,6 +79,50 @@ async def lifespan(app: FastAPI):
                 
                 # Create admin user
                 await ensure_admin_user()
+                
+                # Start background scheduler
+                try:
+                    from .core.scheduler import start_scheduler, get_scheduler
+                    from .core.tasks import check_overdue_items, automate_review_requests, escalate_stale_items, daily_summary
+                    from apscheduler.triggers.cron import CronTrigger
+                    from apscheduler.triggers.interval import IntervalTrigger
+                    
+                    scheduler = get_scheduler()
+                    
+                    # Schedule tasks
+                    scheduler.add_job(
+                        check_overdue_items,
+                        trigger=IntervalTrigger(hours=1),
+                        id='check_overdue_items',
+                        replace_existing=True
+                    )
+                    
+                    scheduler.add_job(
+                        automate_review_requests,
+                        trigger=IntervalTrigger(minutes=15),
+                        id='automate_review_requests',
+                        replace_existing=True
+                    )
+                    
+                    scheduler.add_job(
+                        escalate_stale_items,
+                        trigger=IntervalTrigger(hours=6),
+                        id='escalate_stale_items',
+                        replace_existing=True
+                    )
+                    
+                    scheduler.add_job(
+                        daily_summary,
+                        trigger=CronTrigger(hour=8, minute=0),
+                        id='daily_summary',
+                        replace_existing=True
+                    )
+                    
+                    start_scheduler()
+                    logger.info("✓ Background scheduler configured and started")
+                except Exception as e:
+                    logger.warning(f"⚠ Could not start scheduler: {e}", exc_info=True)
+                    
             except Exception as e:
                 logger.error(f"✗ Database connection failed: {e}", exc_info=True)
         
@@ -92,6 +136,11 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down...")
+    try:
+        from .core.scheduler import shutdown_scheduler
+        shutdown_scheduler()
+    except Exception as e:
+        logger.warning(f"Error shutting down scheduler: {e}")
 
 app = FastAPI(title="Plumbing Ops Platform API", version="1.0.0", lifespan=lifespan)
 

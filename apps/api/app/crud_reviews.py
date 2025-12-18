@@ -190,6 +190,13 @@ async def create_review(
         try:
             from ..core.review_utils import auto_create_recovery_ticket_for_negative_review
             await auto_create_recovery_ticket_for_negative_review(db, review)
+            
+            # Trigger automation notification
+            try:
+                from ..core.automation import on_review_received
+                await on_review_received(db, review, changed_by)
+            except Exception as e:
+                logger.error(f"Error triggering review automation: {e}", exc_info=True)
         except Exception as e:
             # Log error but don't fail the review creation
             import logging

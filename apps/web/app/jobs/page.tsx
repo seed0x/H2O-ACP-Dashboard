@@ -11,7 +11,7 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 
 interface Job {
-  id: number
+  id: string | number
   tenant_id: string
   builder_id: number
   community: string
@@ -21,6 +21,7 @@ interface Job {
   city: string
   status: string
   scheduled_start: string | null
+  assigned_to?: string
 }
 
 export default function JobsPage() {
@@ -61,6 +62,50 @@ export default function JobsPage() {
     
     return matchesSearch && matchesStatus
   })
+
+  async function handleQuickComplete(jobId: string | number) {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      await axios.patch(`${API_BASE_URL}/jobs/${jobId}`, 
+        { status: 'Completed' },
+        { headers, withCredentials: true }
+      )
+      showToast('Job marked as completed', 'success')
+      await loadJobs()
+    } catch (error: any) {
+      logError(error, 'quickCompleteJob')
+      showToast(handleApiError(error), 'error')
+    }
+  }
+
+  function getQuickActions(job: Job): QuickAction[] {
+    const actions: QuickAction[] = []
+    
+    if (job.status === 'In Progress') {
+      actions.push({
+        label: 'Mark Complete',
+        onClick: (e) => {
+          e.stopPropagation()
+          handleQuickComplete(job.id)
+        },
+        variant: 'primary',
+        show: true
+      })
+    }
+    
+    actions.push({
+      label: 'View Details',
+      onClick: (e) => {
+        e.stopPropagation()
+        router.push(`/jobs/${job.id}`)
+      },
+      variant: 'secondary',
+      show: true
+    })
+    
+    return actions
+  }
 
   const columns = [
     {
@@ -158,6 +203,7 @@ export default function JobsPage() {
         columns={columns}
         onRowClick={(job) => router.push(`/jobs/${job.id}`)}
         emptyMessage="No jobs found. Create your first job to get started."
+        actions={getQuickActions}
       />
     </div>
   )

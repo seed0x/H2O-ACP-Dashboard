@@ -9,19 +9,24 @@ import { Table } from '../../components/ui/Table'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
+import { QuickAction } from '../../components/QuickActions'
+import { showToast } from '../../components/Toast'
+import { handleApiError, logError } from '../../lib/error-handler'
 
 interface ServiceCall {
-  id: number
+  id: string | number
   tenant_id: string
   builder_id: number
   customer_name: string
   address_line1: string
   city: string
   phone: string
+  email?: string
   issue_description: string
   status: string
   priority: string
   created_at: string
+  assigned_to?: string
 }
 
 export default function ServiceCallsPage() {
@@ -62,6 +67,86 @@ export default function ServiceCallsPage() {
     
     return matchesSearch && matchesStatus
   })
+
+  async function handleQuickComplete(callId: string | number) {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      await axios.patch(`${API_BASE_URL}/service-calls/${callId}`, 
+        { status: 'Completed' },
+        { headers, withCredentials: true }
+      )
+      showToast('Service call marked as completed', 'success')
+      await loadServiceCalls()
+    } catch (error: any) {
+      logError(error, 'quickCompleteServiceCall')
+      showToast(handleApiError(error), 'error')
+    }
+  }
+
+  async function handleCreateReview(callId: string | number) {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      const call = serviceCalls.find(c => c.id === callId)
+      if (!call || !call.email) {
+        showToast('Service call must have customer email to create review request', 'error')
+        return
+      }
+      await axios.post(`${API_BASE_URL}/reviews/requests`, {
+        tenant_id: call.tenant_id,
+        service_call_id: callId,
+        customer_name: call.customer_name,
+        customer_email: call.email,
+        customer_phone: call.phone
+      }, { headers, withCredentials: true })
+      showToast('Review request created successfully', 'success')
+      await loadServiceCalls()
+    } catch (error: any) {
+      logError(error, 'createReviewRequest')
+      showToast(handleApiError(error), 'error')
+    }
+  }
+
+  function getQuickActions(call: ServiceCall): QuickAction[] {
+    const actions: QuickAction[] = []
+    
+    if (call.status !== 'Completed') {
+      actions.push({
+        label: 'Mark Complete',
+        onClick: (e) => {
+          e.stopPropagation()
+          handleQuickComplete(call.id)
+        },
+        variant: 'primary',
+        show: true
+      })
+    }
+    
+    if (call.status === 'Completed' && call.email) {
+      actions.push({
+        label: 'Create Review',
+        onClick: (e) => {
+          e.stopPropagation()
+          handleCreateReview(call.id)
+        },
+        variant: 'secondary',
+        show: true
+      })
+    }
+    
+    actions.push({
+      label: 'View Details',
+      onClick: (e) => {
+        e.stopPropagation()
+        router.push(`/service-calls/${call.id}`)
+      },
+      variant: 'secondary',
+      show: true
+    })
+    
+    return actions
+  }
 
   const columns = [
     {
@@ -161,6 +246,7 @@ export default function ServiceCallsPage() {
         columns={columns}
         onRowClick={(call) => router.push(`/service-calls/${call.id}`)}
         emptyMessage="No service calls found. Create your first service call to get started."
+        actions={getQuickActions}
       />
     </div>
   )

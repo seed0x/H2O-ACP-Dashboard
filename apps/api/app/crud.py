@@ -286,6 +286,7 @@ async def list_jobs(db: AsyncSession, tenant_id: str | None, status: str | None,
     return res.scalars().all()
 
 async def update_job(db: AsyncSession, job: models.Job, job_in: schemas.JobUpdate, changed_by: str) -> models.Job:
+    old_status = job.status
     for field, value in job_in.dict(exclude_unset=True).items():
         old = getattr(job, field)
         setattr(job, field, value)
@@ -293,6 +294,16 @@ async def update_job(db: AsyncSession, job: models.Job, job_in: schemas.JobUpdat
     db.add(job)
     await db.commit()
     await db.refresh(job)
+    
+    # Trigger automation if status changed
+    if job_in.status is not None and old_status != job.status:
+        try:
+            from ..core.automation import on_job_status_changed
+            await on_job_status_changed(db, job, old_status, job.status, changed_by)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error triggering job automation: {e}", exc_info=True)
+    
     return job
 
 async def delete_job(db: AsyncSession, job: models.Job, changed_by: str):
@@ -364,7 +375,16 @@ async def update_service_call(db: AsyncSession, sc: models.ServiceCall, sc_in: s
     await db.commit()
     await db.refresh(sc)
     
-    # Automation: If service call was just completed, create review request
+    # Trigger automation if status changed
+    if sc_in.status is not None and old_status != sc.status:
+        try:
+            from ..core.automation import on_service_call_status_changed
+            await on_service_call_status_changed(db, sc, old_status, sc.status, changed_by)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error triggering service call automation: {e}", exc_info=True)
+    
+    # Legacy automation: If service call was just completed, create review request
     if old_status != 'completed' and sc.status == 'completed':
         try:
             from ..core.service_call_automation import on_service_call_completed

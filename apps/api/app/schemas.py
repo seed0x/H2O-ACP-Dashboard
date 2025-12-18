@@ -328,3 +328,23 @@ class RecoveryTicketUpdate(BaseModel):
     assigned_to: Optional[str] = None
     resolution_notes: Optional[str] = None
 
+# Notification Schemas
+
+class NotificationOut(BaseModel):
+    id: UUID
+    user_id: Optional[UUID] = None
+    tenant_id: str
+    type: str
+    title: str
+    message: str
+    entity_type: Optional[str] = None
+    entity_id: Optional[UUID] = None
+    read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class NotificationCount(BaseModel):
+    count: int
+

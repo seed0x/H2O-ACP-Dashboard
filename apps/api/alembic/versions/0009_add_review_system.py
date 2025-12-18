@@ -100,3 +100,4 @@ def downgrade():
     op.drop_constraint('uq_review_requests_token', 'review_requests', type_='unique')
     op.drop_table('review_requests')
 
+

@@ -1,4 +1,6 @@
 import React from 'react'
+import { QuickActions, QuickAction } from '../QuickActions'
+import { useMobile } from '../../lib/useMobile'
 
 interface Column<T> {
   header: string
@@ -11,14 +13,17 @@ interface TableProps<T> {
   columns: Column<T>[]
   onRowClick?: (row: T) => void
   emptyMessage?: string
+  actions?: (row: T) => QuickAction[]
 }
 
 export function Table<T extends { id: string | number }>({ 
   data, 
   columns, 
   onRowClick,
-  emptyMessage = 'No data available'
+  emptyMessage = 'No data available',
+  actions
 }: TableProps<T>) {
+  const isMobile = useMobile()
   if (data.length === 0) {
     return (
       <div style={{
@@ -72,6 +77,20 @@ export function Table<T extends { id: string | number }>({
                 {col.header}
               </th>
             ))}
+            {actions && (
+              <th style={{
+                padding: '16px',
+                textAlign: 'right',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: 'var(--color-text-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                width: '150px'
+              }}>
+                Actions
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -107,6 +126,20 @@ export function Table<T extends { id: string | number }>({
                     : String(row[col.accessor])}
                 </td>
               ))}
+              {actions && (
+                <td
+                  style={{
+                    padding: '16px',
+                    fontSize: '14px',
+                    textAlign: 'right'
+                  }}
+                >
+                  <QuickActions 
+                    actions={actions(row)} 
+                    isMobile={isMobile}
+                  />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

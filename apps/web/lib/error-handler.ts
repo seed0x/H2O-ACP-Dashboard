@@ -90,3 +90,4 @@ export function logError(error: unknown, context?: string) {
   // Example: Sentry.captureException(error, { tags: { context } })
 }
 
+
