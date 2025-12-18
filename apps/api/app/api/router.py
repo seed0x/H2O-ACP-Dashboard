@@ -60,6 +60,12 @@ try:
 except ImportError:
     notifications_router = None
 
+# Import signals routes
+try:
+    from .signals import router as signals_router
+except ImportError:
+    signals_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -87,6 +93,10 @@ if analytics_router:
 # Include notifications routes if available
 if notifications_router:
     router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
+
+# Include signals routes if available
+if signals_router:
+    router.include_router(signals_router)
 
 class LoginRequest(BaseModel):
     username: str

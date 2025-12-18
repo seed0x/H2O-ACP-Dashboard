@@ -211,41 +211,75 @@ class ChannelAccount(Base):
 
     channel = relationship("MarketingChannel", back_populates="accounts")
 
-class ContentPost(Base):
-    __tablename__ = "content_posts"
+class ContentItem(Base):
+    __tablename__ = "content_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(Text, nullable=False)
     title = Column(String, nullable=False)
-    channel_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=False)
-    status = Column(String, nullable=False)
-    scheduled_for = Column(DateTime(timezone=True), nullable=True)
-    draft_due_date = Column(DateTime(timezone=True), nullable=True)
-    posted_at = Column(DateTime(timezone=True), nullable=True)
-    owner = Column(String, nullable=False)
-    reviewer = Column(String, nullable=True)
-    body_text = Column(Text, nullable=True)
+    base_caption = Column(Text, nullable=True)  # Base caption that can be overridden per instance
+    media_urls = Column(ARRAY(String), nullable=True)
     cta_type = Column(String, nullable=True)
     cta_url = Column(String, nullable=True)
-    target_city = Column(String, nullable=True)
     tags = Column(ARRAY(String), nullable=True)
+    target_city = Column(String, nullable=True)
+    template_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to template (future)
+    status = Column(String, nullable=False, default='Idea')  # Idea → Draft → Needs Approval → Scheduled → Posted
+    owner = Column(String, nullable=False)
+    reviewer = Column(String, nullable=True)
+    draft_due_date = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(Text, nullable=True)
     source_type = Column(String, nullable=True)
     source_ref = Column(String, nullable=True)
-    media_type = Column(String, nullable=True)
-    media_urls = Column(ARRAY(String), nullable=True)
-    notes = Column(Text, nullable=True)
-    last_error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    publish_jobs = relationship("PublishJob", back_populates="content_post")
+    post_instances = relationship("PostInstance", back_populates="content_item", cascade="all, delete-orphan")
+
+class PostInstance(Base):
+    __tablename__ = "post_instances"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    content_item_id = Column(UUID(as_uuid=True), ForeignKey("content_items.id"), nullable=False)
+    channel_account_id = Column(UUID(as_uuid=True), ForeignKey("channel_accounts.id"), nullable=False)
+    
+    # Per-account customization
+    caption_override = Column(Text, nullable=True)  # Override base_caption for this account
+    scheduled_for = Column(DateTime(timezone=True), nullable=True)
+    
+    # Posting status
+    status = Column(String, nullable=False, default='Draft')  # Draft → Scheduled → Posted → Failed
+    
+    # Posting metadata
+    posted_at = Column(DateTime(timezone=True), nullable=True)
+    post_url = Column(String, nullable=True)  # URL of the actual post on the platform
+    posted_manually = Column(Boolean, nullable=False, default=False)
+    screenshot_url = Column(String, nullable=True)  # Link to screenshot if posted manually
+    
+    # Autopost
+    autopost_enabled = Column(Boolean, nullable=False, default=False)
+    publish_job_id = Column(UUID(as_uuid=True), ForeignKey("publish_jobs.id"), nullable=True)  # Reference to PublishJob if autoposted
+    
+    # Error tracking
+    last_error = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    content_item = relationship("ContentItem", back_populates="post_instances")
+    channel_account = relationship("ChannelAccount")
+
+# ContentPost model removed - using ContentItem and PostInstance instead
+# The content_posts table still exists in the database from previous migrations
+# but is no longer used in the application
 
 class PublishJob(Base):
     __tablename__ = "publish_jobs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(Text, nullable=False)
-    content_post_id = Column(UUID(as_uuid=True), ForeignKey("content_posts.id"), nullable=False)
+    post_instance_id = Column(UUID(as_uuid=True), ForeignKey("post_instances.id"), nullable=False)
     attempt_no = Column(Integer, nullable=False, default=1)
     method = Column(String, nullable=False)
     provider = Column(String, nullable=False)
@@ -254,7 +288,7 @@ class PublishJob(Base):
     error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    content_post = relationship("ContentPost", back_populates="publish_jobs")
+    post_instance = relationship("PostInstance")
 
 # Review System Models
 
