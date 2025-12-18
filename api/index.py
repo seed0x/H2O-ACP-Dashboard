@@ -6,11 +6,19 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# Vercel natively supports ASGI applications - export FastAPI app directly
-# No need for Mangum adapter - Vercel handles ASGI directly
-from apps.api.app.main import app
+# Lazy import to avoid Vercel introspection issues
+# Import app and Mangum inside handler function
+_mangum_adapter = None
 
-# Vercel's Python runtime automatically detects and serves the 'app' object
-# This is the standard way to deploy FastAPI on Vercel
-__all__ = ['app']
+def handler(event, context):
+    """Vercel serverless function handler"""
+    global _mangum_adapter
+    if _mangum_adapter is None:
+        from apps.api.app.main import app
+        from mangum import Mangum
+        _mangum_adapter = Mangum(app, lifespan="off")
+    return _mangum_adapter(event, context)
+
+# Export handler for Vercel
+__all__ = ['handler']
 
