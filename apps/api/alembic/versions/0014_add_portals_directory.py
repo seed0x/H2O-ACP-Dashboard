@@ -6,7 +6,7 @@ Create Date: 2025-01-21
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ENUM
 import json
 import os
 
@@ -81,10 +81,30 @@ def upgrade():
             f.write(json.dumps({"location": "0014_add_portals_directory.py:56", "message": "Before creating portal_definitions table", "data": {"enum_name": "portal_category"}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
     except: pass
     # #endregion
+    
+    # Create ENUM type objects with create_type=False
+    # We manually create the types above, so we tell SQLAlchemy not to create them
+    # However, SQLAlchemy's _on_table_create event still fires and tries to create them
+    # So we override the create method to always use checkfirst=True
+    portal_category_enum = ENUM('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category', create_type=False)
+    portal_rule_applies_to_enum = ENUM('job', 'service_call', name='portal_rule_applies_to', create_type=False)
+    job_phase_enum = ENUM('rough', 'trim', 'final', name='job_phase', create_type=False)
+    tenant_enum_type = ENUM('h2o', 'all_county', name='tenant_enum', create_type=False)
+    
+    # Override the create method to always check first (prevent duplicate errors)
+    original_create = portal_category_enum.create
+    def safe_create(bind=None, checkfirst=True, **kw):
+        return original_create(bind=bind, checkfirst=True, **kw)
+    
+    portal_category_enum.create = safe_create
+    portal_rule_applies_to_enum.create = safe_create
+    job_phase_enum.create = safe_create
+    tenant_enum_type.create = safe_create
+    
     op.create_table('portal_definitions',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('name', sa.Text, nullable=False),
-        sa.Column('category', sa.Enum('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category', create_type=False), nullable=False),
+        sa.Column('category', portal_category_enum, nullable=False),
         sa.Column('jurisdiction', sa.Text, nullable=True),
         sa.Column('base_url', sa.Text, nullable=False),
         sa.Column('support_phone', sa.Text, nullable=True),
@@ -98,7 +118,7 @@ def upgrade():
     op.create_table('portal_accounts',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('portal_definition_id', UUID(as_uuid=True), nullable=False),
-        sa.Column('tenant_id', sa.Enum('h2o', 'all_county', name='tenant_enum', create_type=False), nullable=False),
+        sa.Column('tenant_id', tenant_enum_type, nullable=False),
         sa.Column('login_identifier', sa.Text, nullable=False),
         sa.Column('account_number', sa.Text, nullable=True),
         sa.Column('credential_vault_ref', sa.Text, nullable=True),
@@ -126,13 +146,13 @@ def upgrade():
     # Create portal_rules table
     op.create_table('portal_rules',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('applies_to', sa.Enum('job', 'service_call', name='portal_rule_applies_to', create_type=False), nullable=False),
-        sa.Column('tenant_id', sa.Enum('h2o', 'all_county', name='tenant_enum', create_type=False), nullable=True),
+        sa.Column('applies_to', portal_rule_applies_to_enum, nullable=False),
+        sa.Column('tenant_id', tenant_enum_type, nullable=True),
         sa.Column('builder_id', UUID(as_uuid=True), nullable=True),
         sa.Column('city', sa.Text, nullable=True),
         sa.Column('county', sa.Text, nullable=True),
         sa.Column('permit_required', sa.Boolean, nullable=True),
-        sa.Column('phase', sa.Enum('rough', 'trim', 'final', name='job_phase', create_type=False), nullable=True),
+        sa.Column('phase', job_phase_enum, nullable=True),
         sa.Column('portal_account_id', UUID(as_uuid=True), nullable=False),
         sa.Column('priority', sa.Integer, nullable=False, server_default='100'),
         sa.Column('is_active', sa.Boolean, nullable=False, server_default='true'),

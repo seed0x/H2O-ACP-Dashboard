@@ -55,7 +55,23 @@ def run_migrations_online() -> None:
         await connectable.dispose()
 
     def do_run_migrations_sync(connection: Connection):
-        context.configure(connection=connection, target_metadata=target_metadata)
+        # Configure context to skip ENUM type creation from metadata
+        # This prevents SQLAlchemy from trying to create ENUMs that already exist
+        def include_object(object, name, type_, reflected, compare_to):
+            # Skip ENUM type creation - we handle them manually in migrations
+            if type_ == "type" and hasattr(object, "name"):
+                # Check if this is one of our manually-created ENUMs
+                enum_names = ['portal_category', 'portal_rule_applies_to', 'job_phase', 'tenant_enum']
+                if object.name in enum_names:
+                    return False  # Skip processing this ENUM type
+            return True
+        
+        context.configure(
+            connection=connection, 
+            target_metadata=target_metadata,
+            include_object=include_object,
+            compare_type=False  # Don't compare types to avoid ENUM creation issues
+        )
         with context.begin_transaction():
             context.run_migrations()
 
