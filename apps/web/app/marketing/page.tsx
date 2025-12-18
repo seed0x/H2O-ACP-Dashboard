@@ -139,7 +139,7 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch('/api/marketing/channel-accounts?tenant_id=h2o', {
+      const response = await fetch(\${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o', {
         headers,
         credentials: 'include'
       })
@@ -215,7 +215,7 @@ function PostsView() {
         owner: postForm.owner
       }
       
-      const itemResponse = await fetch('/api/marketing/content-items', {
+      const itemResponse = await fetch(\${API_BASE_URL}/marketing/content-items', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -241,7 +241,7 @@ function PostsView() {
         }
       }
 
-      const instancesResponse = await fetch('/api/marketing/post-instances/bulk', {
+      const instancesResponse = await fetch(\${API_BASE_URL}/marketing/post-instances/bulk', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -757,7 +757,7 @@ function CalendarView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch('/api/marketing/channels?tenant_id=h2o', {
+      const response = await fetch(\${API_BASE_URL}/marketing/channels?tenant_id=h2o', {
         headers,
         credentials: 'include'
       })
@@ -2289,7 +2289,7 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
       }
 
       // Create PostInstances via bulk endpoint
-      const response = await fetch('/api/marketing/post-instances/bulk', {
+      const response = await fetch(\${API_BASE_URL}/marketing/post-instances/bulk', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2874,8 +2874,8 @@ function AccountsView() {
   async function loadData() {
     try {
       const [accountsRes, channelsRes] = await Promise.all([
-        fetch('/api/marketing/channel-accounts?tenant_id=h2o', { credentials: 'include' }),
-        fetch('/api/marketing/channels?tenant_id=h2o', { credentials: 'include' })
+        fetch(\${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o', { credentials: 'include' }),
+        fetch(\${API_BASE_URL}/marketing/channels?tenant_id=h2o', { credentials: 'include' })
       ])
       
       if (!accountsRes.ok || !channelsRes.ok) {
