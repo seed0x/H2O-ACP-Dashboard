@@ -32,12 +32,16 @@ logger = logging.getLogger(__name__)
 marketing_router = None
 try:
     from ..routes_marketing import router as marketing_router
-    logger.info("Marketing routes imported successfully")
+    logger.info("✓ Marketing routes imported successfully")
 except ImportError as e:
-    logger.error(f"Marketing routes import failed (ImportError): {e}", exc_info=True)
+    logger.error(f"✗ Marketing routes import failed (ImportError): {e}", exc_info=True)
+    import traceback
+    logger.error(f"Traceback: {traceback.format_exc()}")
     marketing_router = None
 except Exception as e:
-    logger.error(f"Marketing routes import failed (Exception): {e}", exc_info=True)
+    logger.error(f"✗ Marketing routes import failed (Exception): {e}", exc_info=True)
+    import traceback
+    logger.error(f"Traceback: {traceback.format_exc()}")
     marketing_router = None
 
 # Import review system routes
