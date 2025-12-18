@@ -2,6 +2,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { API_BASE_URL } from '../lib/config'
 import UilDashboard from '@iconscout/react-unicons/icons/uil-dashboard'
 import UilBuilding from '@iconscout/react-unicons/icons/uil-building'
 import UilWrench from '@iconscout/react-unicons/icons/uil-wrench'
@@ -60,7 +61,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch('/api/signals/all?tenant_id=h2o', {
+      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=h2o`, {
         headers,
         credentials: 'include'
       })

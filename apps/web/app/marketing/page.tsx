@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { showToast } from '../../components/Toast'
+import { API_BASE_URL } from '../../lib/config'
 
 const styles = `
   @media (max-width: 768px) {
@@ -139,7 +140,7 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch('/api/marketing/channel-accounts?tenant_id=h2o', {
+      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, {
         headers,
         credentials: 'include'
       })
@@ -165,7 +166,7 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch(`/api/marketing/content-items?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/content-items?${params}`, {
         headers,
         credentials: 'include'
       })
@@ -215,7 +216,7 @@ function PostsView() {
         owner: postForm.owner
       }
       
-      const itemResponse = await fetch('/api/marketing/content-items', {
+      const itemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -241,7 +242,7 @@ function PostsView() {
         }
       }
 
-      const instancesResponse = await fetch('/api/marketing/post-instances/bulk', {
+      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -757,7 +758,7 @@ function CalendarView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch('/api/marketing/channels?tenant_id=h2o', {
+      const response = await fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, {
         headers,
         credentials: 'include'
       })
@@ -809,7 +810,7 @@ function CalendarView() {
         date_to: end.toISOString()
       })
       
-      const response = await fetch(`/api/marketing/calendar?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/calendar?${params}`, {
         headers,
         credentials: 'include'
       })
@@ -1211,7 +1212,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
         cta_url: editForm.cta_url || null
       }
       
-      const response = await fetch(`/api/marketing/content-items/${post.id}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/content-items/${post.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1232,42 +1233,13 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
     }
   }
 
-  async function handleMarkPosted() {
-    try {
-      // Note: mark-posted is for post-instances, not content-items
-      // This should be handled at the post-instance level
-      console.warn('mark-posted should be called on post-instance, not content-item')
-      const response = await fetch(`/api/marketing/content-posts/${post.id}/mark-posted`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tenant_id: 'h2o' })
-      })
-      if (response.ok) {
-        onUpdate()
-      }
-    } catch (error) {
-      console.error('Failed to mark as posted:', error)
-    }
-  }
-
-  async function handleMarkFailed() {
-    const reason = prompt('Why did this post fail?')
-    if (!reason) return
-    try {
-      const response = await fetch(`/api/marketing/content-posts/${post.id}/mark-failed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tenant_id: 'h2o', error_message: reason })
-      })
-      if (response.ok) {
-        onUpdate()
-      }
-    } catch (error) {
-      console.error('Failed to mark as failed:', error)
-    }
-  }
+  // NOTE: Mark-posted and mark-failed operations are for PostInstances, not ContentItems.
+  // These operations should be performed using PostInstanceDetailModal, not PostDetailModal.
+  // The legacy content-posts endpoints no longer exist in the new data model.
+  // If you need to mark posts as posted/failed, use the PostInstanceDetailModal component.
+  
+  // Removed handleMarkPosted() - Use PostInstanceDetailModal.mark-posted endpoint instead
+  // Removed handleMarkFailed() - Use PostInstanceDetailModal.mark-failed endpoint instead
 
   const postChannels = Array.isArray(post.channel_ids) && Array.isArray(channels)
     ? post.channel_ids.map((cid: string) => 
@@ -1595,40 +1567,9 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
           >
             {updating ? 'Saving...' : 'Save Changes'}
           </button>
-          {post.status === 'Scheduled' && (
-            <>
-              <button
-                onClick={handleMarkPosted}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                  border: '1px solid #66BB6A',
-                  borderRadius: '8px',
-                  color: '#66BB6A',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer'
-                }}
-              >
-                ✓ Mark Posted
-              </button>
-              <button
-                onClick={handleMarkFailed}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: 'rgba(244, 67, 54, 0.2)',
-                  border: '1px solid #EF5350',
-                  borderRadius: '8px',
-                  color: '#EF5350',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer'
-                }}
-              >
-                × Mark Failed
-              </button>
-            </>
-          )}
+          {/* NOTE: Mark-posted and mark-failed operations removed.
+              These operations should be performed at the PostInstance level using PostInstanceDetailModal.
+              ContentItems cannot be marked as posted/failed - only PostInstances can. */}
           <button
             onClick={onClose}
             style={{
@@ -1736,7 +1677,7 @@ function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { 
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch(`/api/marketing/post-instances?tenant_id=h2o&content_item_id=${item.id}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/post-instances?tenant_id=h2o&content_item_id=${item.id}`, {
         headers,
         credentials: 'include'
       })
@@ -2048,7 +1989,7 @@ function MarkPostedModal({ instance, onClose, onSuccess }: { instance: any, onCl
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`/api/marketing/post-instances/${instance.id}/mark-posted`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}/mark-posted`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2289,7 +2230,7 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
       }
 
       // Create PostInstances via bulk endpoint
-      const response = await fetch('/api/marketing/post-instances/bulk', {
+      const response = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2315,7 +2256,7 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
         for (const instance of instances) {
           const accountId = instance.channel_account_id
           if (captionOverrides[accountId]) {
-            await fetch(`/api/marketing/post-instances/${instance.id}`, {
+            await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json',
@@ -2605,7 +2546,7 @@ function ScoreboardView() {
       
       // Scoreboard endpoint not yet implemented in API
       // TODO: Implement scoreboard endpoint or remove this feature
-      const response = await fetch(`/api/marketing/scoreboard?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/scoreboard?${params}`, {
         credentials: 'include'
       })
       
@@ -2874,8 +2815,8 @@ function AccountsView() {
   async function loadData() {
     try {
       const [accountsRes, channelsRes] = await Promise.all([
-        fetch('/api/marketing/channel-accounts?tenant_id=h2o', { credentials: 'include' }),
-        fetch('/api/marketing/channels?tenant_id=h2o', { credentials: 'include' })
+        fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, { credentials: 'include' })
       ])
       
       if (!accountsRes.ok || !channelsRes.ok) {
@@ -2932,8 +2873,8 @@ function AccountsView() {
       }
       
       const url = editingAccount 
-        ? `/api/marketing/channel-accounts/${editingAccount.id}`
-        : '/api/marketing/channel-accounts'
+        ? `${API_BASE_URL}/marketing/channel-accounts/${editingAccount.id}`
+        : `${API_BASE_URL}/marketing/channel-accounts`
       const method = editingAccount ? 'PATCH' : 'POST'
       
       // Map form data to API schema
@@ -2981,7 +2922,7 @@ function AccountsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch(`/api/marketing/channel-accounts/${accountId}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts/${accountId}`, {
         method: 'DELETE',
         headers,
         credentials: 'include'

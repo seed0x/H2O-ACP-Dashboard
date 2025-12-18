@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { SignalCard, SignalAction } from './SignalCard'
 import { useRouter } from 'next/navigation'
+import { API_BASE_URL } from '../lib/config'
 
 interface Signal {
   id: string
@@ -40,7 +41,7 @@ export function Dataflow() {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch('/api/signals/all?tenant_id=h2o', {
+      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=h2o`, {
         headers,
         credentials: 'include'
       })
@@ -205,4 +206,5 @@ export function Dataflow() {
     </div>
   )
 }
+
 
