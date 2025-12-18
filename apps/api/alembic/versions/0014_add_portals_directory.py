@@ -7,6 +7,8 @@ Create Date: 2025-01-21
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
+import json
+import os
 
 # revision identifiers, used by Alembic.
 revision = '0014'
@@ -16,7 +18,21 @@ depends_on = None
 
 
 def upgrade():
+    # #region agent log
+    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.cursor', 'debug.log')
+    try:
+        with open(log_path, 'a') as f:
+            f.write(json.dumps({"location": "0014_add_portals_directory.py:18", "message": "upgrade() entry", "data": {"revision": "0014"}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
+    
     # Create portal_category enum (reuse if exists, otherwise create)
+    # #region agent log
+    try:
+        with open(log_path, 'a') as f:
+            f.write(json.dumps({"location": "0014_add_portals_directory.py:20", "message": "Before creating portal_category enum", "data": {}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
     op.execute("""
         DO $$ BEGIN
             CREATE TYPE portal_category AS ENUM ('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other');
@@ -24,6 +40,12 @@ def upgrade():
             WHEN duplicate_object THEN null;
         END $$;
     """)
+    # #region agent log
+    try:
+        with open(log_path, 'a') as f:
+            f.write(json.dumps({"location": "0014_add_portals_directory.py:26", "message": "After creating portal_category enum", "data": {}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
     
     # Create tenant_enum (reuse if exists, otherwise create)
     op.execute("""
@@ -53,10 +75,16 @@ def upgrade():
     """)
     
     # Create portal_definitions table
+    # #region agent log
+    try:
+        with open(log_path, 'a') as f:
+            f.write(json.dumps({"location": "0014_add_portals_directory.py:56", "message": "Before creating portal_definitions table", "data": {"enum_name": "portal_category"}, "timestamp": __import__('time').time() * 1000, "sessionId": "debug-session", "runId": "run1", "hypothesisId": "A"}) + "\n")
+    except: pass
+    # #endregion
     op.create_table('portal_definitions',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('name', sa.Text, nullable=False),
-        sa.Column('category', sa.Enum('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category'), nullable=False),
+        sa.Column('category', sa.Enum('permit', 'inspection', 'utility', 'vendor', 'builder', 'warranty', 'finance', 'other', name='portal_category', create_type=False), nullable=False),
         sa.Column('jurisdiction', sa.Text, nullable=True),
         sa.Column('base_url', sa.Text, nullable=False),
         sa.Column('support_phone', sa.Text, nullable=True),
@@ -70,7 +98,7 @@ def upgrade():
     op.create_table('portal_accounts',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('portal_definition_id', UUID(as_uuid=True), nullable=False),
-        sa.Column('tenant_id', sa.Enum('h2o', 'all_county', name='tenant_enum'), nullable=False),
+        sa.Column('tenant_id', sa.Enum('h2o', 'all_county', name='tenant_enum', create_type=False), nullable=False),
         sa.Column('login_identifier', sa.Text, nullable=False),
         sa.Column('account_number', sa.Text, nullable=True),
         sa.Column('credential_vault_ref', sa.Text, nullable=True),
@@ -98,13 +126,13 @@ def upgrade():
     # Create portal_rules table
     op.create_table('portal_rules',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('applies_to', sa.Enum('job', 'service_call', name='portal_rule_applies_to'), nullable=False),
-        sa.Column('tenant_id', sa.Enum('h2o', 'all_county', name='tenant_enum'), nullable=True),
+        sa.Column('applies_to', sa.Enum('job', 'service_call', name='portal_rule_applies_to', create_type=False), nullable=False),
+        sa.Column('tenant_id', sa.Enum('h2o', 'all_county', name='tenant_enum', create_type=False), nullable=True),
         sa.Column('builder_id', UUID(as_uuid=True), nullable=True),
         sa.Column('city', sa.Text, nullable=True),
         sa.Column('county', sa.Text, nullable=True),
         sa.Column('permit_required', sa.Boolean, nullable=True),
-        sa.Column('phase', sa.Enum('rough', 'trim', 'final', name='job_phase'), nullable=True),
+        sa.Column('phase', sa.Enum('rough', 'trim', 'final', name='job_phase', create_type=False), nullable=True),
         sa.Column('portal_account_id', UUID(as_uuid=True), nullable=False),
         sa.Column('priority', sa.Integer, nullable=False, server_default='100'),
         sa.Column('is_active', sa.Boolean, nullable=False, server_default='true'),
