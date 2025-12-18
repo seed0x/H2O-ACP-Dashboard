@@ -24,15 +24,33 @@ async def list_notifications(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """List notifications for current user"""
-    query = select(models.Notification).where(
-        or_(
-            models.Notification.user_id == current_user.id,
+    # Build query based on user_id and tenant_id
+    conditions = []
+    
+    if current_user.user_id:
+        from uuid import UUID
+        try:
+            user_uuid = UUID(current_user.user_id)
+            conditions.append(models.Notification.user_id == user_uuid)
+        except ValueError:
+            pass  # Invalid UUID, skip
+    
+    # If user has tenant_id, also show tenant-wide notifications
+    if current_user.tenant_id:
+        conditions.append(
             and_(
                 models.Notification.user_id.is_(None),
                 models.Notification.tenant_id == current_user.tenant_id
             )
         )
-    )
+    # If no tenant_id but has user_id, show notifications for this user only
+    # (don't show tenant-wide notifications if tenant_id is None)
+    
+    if not conditions:
+        # No conditions met, return empty
+        return []
+    
+    query = select(models.Notification).where(or_(*conditions))
     
     if read is not None:
         query = query.where(models.Notification.read == read)
@@ -52,15 +70,30 @@ async def get_unread_count(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Get count of unread notifications for current user"""
+    conditions = []
+    
+    if current_user.user_id:
+        from uuid import UUID
+        try:
+            user_uuid = UUID(current_user.user_id)
+            conditions.append(models.Notification.user_id == user_uuid)
+        except ValueError:
+            pass
+    
+    if current_user.tenant_id:
+        conditions.append(
+            and_(
+                models.Notification.user_id.is_(None),
+                models.Notification.tenant_id == current_user.tenant_id
+            )
+        )
+    
+    if not conditions:
+        return {"count": 0}
+    
     query = select(models.Notification).where(
         and_(
-            or_(
-                models.Notification.user_id == current_user.id,
-                and_(
-                    models.Notification.user_id.is_(None),
-                    models.Notification.tenant_id == current_user.tenant_id
-                )
-            ),
+            or_(*conditions),
             models.Notification.read == False
         )
     )
@@ -78,17 +111,32 @@ async def mark_notification_read(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Mark a notification as read"""
+    conditions = []
+    if current_user.user_id:
+        from uuid import UUID
+        try:
+            user_uuid = UUID(current_user.user_id)
+            conditions.append(models.Notification.user_id == user_uuid)
+        except ValueError:
+            pass
+    if current_user.tenant_id:
+        conditions.append(
+            and_(
+                models.Notification.user_id.is_(None),
+                models.Notification.tenant_id == current_user.tenant_id
+            )
+        )
+    
+    if not conditions:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    from uuid import UUID as UUIDType
+    notif_uuid = UUIDType(str(notification_id))
     result = await db.execute(
         select(models.Notification).where(
             and_(
-                models.Notification.id == notification_id,
-                or_(
-                    models.Notification.user_id == current_user.id,
-                    and_(
-                        models.Notification.user_id.is_(None),
-                        models.Notification.tenant_id == current_user.tenant_id
-                    )
-                )
+                models.Notification.id == notif_uuid,
+                or_(*conditions) if len(conditions) > 1 else conditions[0]
             )
         )
     )
@@ -110,15 +158,28 @@ async def mark_all_read(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Mark all notifications as read for current user"""
+    conditions = []
+    if current_user.user_id:
+        from uuid import UUID
+        try:
+            user_uuid = UUID(current_user.user_id)
+            conditions.append(models.Notification.user_id == user_uuid)
+        except ValueError:
+            pass
+    if current_user.tenant_id:
+        conditions.append(
+            and_(
+                models.Notification.user_id.is_(None),
+                models.Notification.tenant_id == current_user.tenant_id
+            )
+        )
+    
+    if not conditions:
+        return {"marked_read": 0}
+    
     query = select(models.Notification).where(
         and_(
-            or_(
-                models.Notification.user_id == current_user.id,
-                and_(
-                    models.Notification.user_id.is_(None),
-                    models.Notification.tenant_id == current_user.tenant_id
-                )
-            ),
+            or_(*conditions) if len(conditions) > 1 else conditions[0],
             models.Notification.read == False
         )
     )

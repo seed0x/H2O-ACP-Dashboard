@@ -142,7 +142,8 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
             token = create_access_token({
                 "username": user.username,
                 "role": user.role,
-                "user_id": str(user.id)
+                "user_id": str(user.id),
+                "tenant_id": user.tenant_id
             })
             
             username = user.username

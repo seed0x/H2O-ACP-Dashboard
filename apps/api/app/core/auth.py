@@ -69,7 +69,9 @@ async def get_current_user(
         
         # Fallback to token data (for backward compatibility with old tokens)
         role: str = payload.get("role", "user")
-        return CurrentUser(username=username, role=role, user_id=user_id)
+        # Try to get tenant_id from token if available
+        tenant_id: Optional[str] = payload.get("tenant_id")
+        return CurrentUser(username=username, role=role, user_id=user_id, tenant_id=tenant_id)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
