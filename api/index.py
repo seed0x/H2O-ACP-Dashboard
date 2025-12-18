@@ -14,7 +14,14 @@ try:
     from mangum import Mangum
     
     # Create handler with lifespan support disabled (Vercel handles cold starts differently)
-    handler = Mangum(app, lifespan="off")
+    # Wrap in a callable function to ensure Vercel recognizes it properly
+    _mangum_handler = Mangum(app, lifespan="off")
+    
+    def handler(event, context):
+        """Vercel serverless function handler"""
+        return _mangum_handler(event, context)
 except ImportError:
     # Fallback if mangum not available (shouldn't happen in production)
-    handler = app
+    def handler(event, context):
+        """Fallback handler - should not be used in production"""
+        return {"statusCode": 500, "body": "Mangum not available"}
