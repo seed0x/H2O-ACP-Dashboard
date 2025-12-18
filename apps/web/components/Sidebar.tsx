@@ -11,6 +11,7 @@ import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
 import UilChart from '@iconscout/react-unicons/icons/uil-chart'
 import UilStar from '@iconscout/react-unicons/icons/uil-star'
+import UilFolder from '@iconscout/react-unicons/icons/uil-folder'
 
 interface NavItem {
   name: string
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { name: 'Marketing', href: '/marketing', icon: UilCalendarAlt, badgeCategory: 'marketing' },
   { name: 'Builders', href: '/builders', icon: UilUserCircle },
   { name: 'Bids', href: '/bids', icon: UilFileAlt },
+  { name: 'Directory', href: '/directory', icon: UilFolder },
 ]
 
 interface SidebarProps {

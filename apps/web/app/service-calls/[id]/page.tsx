@@ -65,6 +65,8 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
   const [scheduledStart, setScheduledStart] = useState('')
   const [scheduledEnd, setScheduledEnd] = useState('')
   const [notes, setNotes] = useState('')
+  const [suggestedPortals, setSuggestedPortals] = useState<any[]>([])
+  const [loadingPortals, setLoadingPortals] = useState(false)
 
   useEffect(() => {
     async function getParams() {
@@ -114,11 +116,42 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       
       // Load audit
       await loadAudit()
+      
+      // Load suggested portals
+      await loadSuggestedPortals()
     } catch (err: any) {
       logError(err, 'loadServiceCall')
       showToast(handleApiError(err), 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadSuggestedPortals() {
+    if (!id) return
+    const currentSc = sc
+    if (!currentSc) return
+    try {
+      setLoadingPortals(true)
+      const headers = getAuthHeaders()
+      const params: any = {
+        applies_to: 'service_call',
+        tenant_id: currentSc.tenant_id,
+      }
+      if (currentSc.city) params.city = currentSc.city
+      if (currentSc.builder_id) params.builder_id = currentSc.builder_id
+      
+      const response = await axios.get(`${API_BASE_URL}/directory/suggested-portals`, {
+        headers,
+        params,
+        withCredentials: true
+      })
+      setSuggestedPortals(Array.isArray(response.data) ? response.data : [])
+    } catch (err) {
+      logError(err, 'loadSuggestedPortals')
+      setSuggestedPortals([])
+    } finally {
+      setLoadingPortals(false)
     }
   }
 
@@ -456,6 +489,84 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
           placeholder="Service call notes and updates..."
           rows={6}
         />
+      </div>
+
+      {/* Suggested Portals */}
+      <div style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            Suggested Portals
+          </h2>
+          <Button
+            variant="secondary"
+            onClick={() => router.push('/directory')}
+            style={{ fontSize: '13px', padding: '6px 12px' }}
+          >
+            View All
+          </Button>
+        </div>
+        {loadingPortals ? (
+          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
+            Loading portals...
+          </div>
+        ) : suggestedPortals.length === 0 ? (
+          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
+            No portals suggested for this service call
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {suggestedPortals.slice(0, 3).map(portal => (
+              <div key={portal.id} style={{
+                padding: '16px',
+                backgroundColor: 'var(--color-background)',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '500', marginBottom: '4px', color: 'var(--color-text-primary)' }}>
+                    {portal.portal_definition.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                    {portal.portal_definition.jurisdiction && `${portal.portal_definition.jurisdiction} • `}
+                    <StatusBadge status={portal.portal_definition.category} variant="category" />
+                    {' • '}
+                    {portal.login_identifier}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Button
+                    variant="primary"
+                    onClick={() => window.open(portal.portal_definition.base_url, '_blank', 'noopener,noreferrer')}
+                    style={{ fontSize: '12px', padding: '6px 12px' }}
+                  >
+                    Open
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {suggestedPortals.length > 3 && (
+              <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => router.push('/directory')}
+                  style={{ fontSize: '13px' }}
+                >
+                  View all {suggestedPortals.length} matching portals
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Timeline / Audit */}
