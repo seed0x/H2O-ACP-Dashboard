@@ -29,7 +29,15 @@ from uuid import UUID
 # Import marketing routes (async-based)
 try:
     from ..routes_marketing import router as marketing_router
-except ImportError:
+except ImportError as e:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Marketing routes not available: {e}")
+    marketing_router = None
+except Exception as e:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.error(f"Error importing marketing routes: {e}", exc_info=True)
     marketing_router = None
 
 # Import review system routes
@@ -79,6 +87,13 @@ router = APIRouter()
 # Include marketing routes if available
 if marketing_router:
     router.include_router(marketing_router)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Marketing routes included successfully")
+else:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("Marketing routes not available - endpoints will return 404")
 
 # Include review system routes if available
 if reviews_router:
@@ -228,6 +243,17 @@ async def create_builder(builder_in: BuilderCreate, db: AsyncSession = Depends(g
         builder = await crud.create_builder(db, builder_in, current_user.username)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        error_details = traceback.format_exc()
+        logger.error(f"Error creating builder: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}" if settings.environment == "development" else "Internal server error"
+        )
     return builder
 
 @router.get('/builders')

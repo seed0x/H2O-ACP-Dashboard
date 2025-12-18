@@ -57,8 +57,11 @@ async def write_audit_marketing(
 # Marketing Channels
 
 @router.get("/channels", response_model=List[MarketingChannelSchema])
-async def get_channels(db: AsyncSession = Depends(get_session)):
-    """Get all marketing channels"""
+async def get_channels(
+    tenant_id: Optional[str] = Query(None),  # Frontend sends this but we don't need it
+    db: AsyncSession = Depends(get_session)
+):
+    """Get all marketing channels (reference list for creating accounts)"""
     result = await db.execute(select(models.MarketingChannel))
     return result.scalars().all()
 
@@ -491,6 +494,138 @@ async def delete_content_item(
     await db.commit()
     
     return {"message": "Content item deleted"}
+
+
+# Content Posts (aliases for content-items to match frontend)
+# The frontend uses "content-posts" but the API uses "content-items"
+# These endpoints provide compatibility
+
+@router.get("/content-posts/{item_id}", response_model=ContentItemSchema)
+async def get_content_post(item_id: UUID, db: AsyncSession = Depends(get_session)):
+    """Get a content post (alias for content-item)"""
+    result = await db.execute(
+        select(models.ContentItem).where(models.ContentItem.id == item_id)
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Content post not found")
+    return item
+
+@router.patch("/content-posts/{item_id}", response_model=ContentItemSchema)
+async def update_content_post(
+    item_id: UUID,
+    item_update: ContentItemUpdate,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    """Update a content post (alias for content-item)"""
+    result = await db.execute(
+        select(models.ContentItem).where(models.ContentItem.id == item_id)
+    )
+    db_item = result.scalar_one_or_none()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Content post not found")
+    
+    update_data = item_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(db_item, field)
+        setattr(db_item, field, value)
+        await write_audit_marketing(
+            db,
+            db_item.tenant_id,
+            "content_item",
+            db_item.id,
+            "update",
+            current_user.username,
+            field,
+            str(old_value) if old_value is not None else None,
+            str(value) if value is not None else None,
+        )
+    
+    await db.commit()
+    await db.refresh(db_item)
+    
+    return db_item
+
+@router.post("/content-posts/{item_id}/mark-posted")
+async def mark_content_post_posted(
+    item_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    """Mark all post instances for a content item as posted"""
+    # Get the content item
+    item_result = await db.execute(
+        select(models.ContentItem).where(models.ContentItem.id == item_id)
+    )
+    db_item = item_result.scalar_one_or_none()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Content post not found")
+    
+    # Get all post instances for this content item
+    instances_result = await db.execute(
+        select(models.PostInstance).where(models.PostInstance.content_item_id == item_id)
+    )
+    instances = instances_result.scalars().all()
+    
+    # Mark all instances as posted
+    for instance in instances:
+        if instance.status != 'Posted':
+            instance.status = 'Posted'
+            instance.posted_at = datetime.utcnow()
+            instance.posted_manually = True
+            await write_audit_marketing(
+                db, instance.tenant_id, "post_instance", instance.id, "mark_posted", current_user.username
+            )
+    
+    # Update content item status if all instances are posted
+    if instances and all(inst.status == 'Posted' for inst in instances):
+        db_item.status = 'Posted'
+        await write_audit_marketing(
+            db, db_item.tenant_id, "content_item", db_item.id, "mark_posted", current_user.username
+        )
+    
+    await db.commit()
+    return {"message": "Content post marked as posted", "instances_updated": len(instances)}
+
+@router.post("/content-posts/{item_id}/mark-failed")
+async def mark_content_post_failed(
+    item_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    """Mark all post instances for a content item as failed"""
+    # Get the content item
+    item_result = await db.execute(
+        select(models.ContentItem).where(models.ContentItem.id == item_id)
+    )
+    db_item = item_result.scalar_one_or_none()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Content post not found")
+    
+    # Get all post instances for this content item
+    instances_result = await db.execute(
+        select(models.PostInstance).where(models.PostInstance.content_item_id == item_id)
+    )
+    instances = instances_result.scalars().all()
+    
+    # Mark all instances as failed
+    for instance in instances:
+        if instance.status != 'Failed':
+            instance.status = 'Failed'
+            instance.last_error = "Manually marked as failed"
+            await write_audit_marketing(
+                db, instance.tenant_id, "post_instance", instance.id, "mark_failed", current_user.username
+            )
+    
+    # Update content item status
+    db_item.status = 'Failed'
+    await write_audit_marketing(
+        db, db_item.tenant_id, "content_item", db_item.id, "mark_failed", current_user.username
+    )
+    
+    await db.commit()
+    return {"message": "Content post marked as failed", "instances_updated": len(instances)}
 
 
 # Post Instances

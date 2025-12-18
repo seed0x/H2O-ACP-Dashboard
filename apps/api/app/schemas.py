@@ -149,16 +149,16 @@ class JobBase(BaseModel):
     builder_id: UUID
     community: str
     lot_number: str
-    plan: Optional[str]
+    plan: Optional[str] = None
     phase: str
     status: str
     address_line1: str
     city: str
     state: Optional[str] = "WA"
     zip: str
-    scheduled_start: Optional[datetime]
-    scheduled_end: Optional[datetime]
-    notes: Optional[str]
+    scheduled_start: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
+    notes: Optional[str] = None
     tech_name: Optional[str] = None
     assigned_to: Optional[str] = None
     warranty_start_date: Optional[date] = None

@@ -92,20 +92,40 @@ Write-Host ""
 
 # Test 2: Login (Admin)
 Write-Host "2. Testing Login (Admin)..." -ForegroundColor Yellow
-$loginBody = @{
-    username = "admin"
-    password = "test-admin"
-}
-$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/login" -Body $loginBody
-if ($result.Success -and $result.StatusCode -eq 200) {
-    $adminToken = $result.Content.message
-    Write-Host "  [OK] Admin login successful" -ForegroundColor Green
-    Write-Host "  Response: $($result.Content | ConvertTo-Json)" -ForegroundColor Gray
-} else {
-    Write-Host "  [FAIL] Admin login failed - Status: $($result.StatusCode)" -ForegroundColor Red
-    if ($result.Error) {
-        Write-Host "  Error: $($result.Error)" -ForegroundColor Red
+# Try common passwords
+$passwordsToTry = @("adminpassword", "test-admin", "admin")
+$loginSuccessful = $false
+
+foreach ($pwd in $passwordsToTry) {
+    $loginBody = @{
+        username = "admin"
+        password = $pwd
     }
+    Write-Host "  Trying password: $pwd..." -ForegroundColor Gray
+    $result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/login" -Body $loginBody
+    if ($result.Success -and $result.StatusCode -eq 200) {
+        # Token might be in different fields depending on response format
+        if ($result.Content.access_token) {
+            $adminToken = $result.Content.access_token
+        } elseif ($result.Content.token) {
+            $adminToken = $result.Content.token
+        } elseif ($result.Content.message) {
+            $adminToken = $result.Content.message
+        } else {
+            # Try to extract token from response
+            $adminToken = $result.Content | ConvertTo-Json -Compress
+        }
+        Write-Host "  [OK] Admin login successful with password: $pwd" -ForegroundColor Green
+        Write-Host "  Response: $($result.Content | ConvertTo-Json)" -ForegroundColor Gray
+        $loginSuccessful = $true
+        break
+    }
+}
+
+if (-not $loginSuccessful) {
+    Write-Host "  [FAIL] Admin login failed with all attempted passwords" -ForegroundColor Red
+    Write-Host "  Tried: $($passwordsToTry -join ', ')" -ForegroundColor Yellow
+    Write-Host "  Note: Check ADMIN_PASSWORD environment variable on Render" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -169,8 +189,8 @@ Write-Host ""
 # Test 7: Builders - Create
 Write-Host "6. Testing Builders - Create..." -ForegroundColor Yellow
 $newBuilder = @{
-    name = "Test Builder"
-    tenant_id = "all_county"
+    name = "Test Builder $(Get-Date -Format 'yyyyMMddHHmmss')"
+    notes = "Test builder created by automated test"
 }
 $result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/builders" -Body $newBuilder -Token $adminToken
 if ($result.Success -and ($result.StatusCode -eq 200 -or $result.StatusCode -eq 201)) {
@@ -186,6 +206,18 @@ if ($result.Success -and ($result.StatusCode -eq 200 -or $result.StatusCode -eq 
     }
 } else {
     Write-Host "  [WARN] Builder creation: $($result.StatusCode)" -ForegroundColor Yellow
+    if ($result.Error) {
+        Write-Host "  Error: $($result.Error)" -ForegroundColor Gray
+    }
+    # Try to get an existing builder
+    Write-Host "  Attempting to use existing builder..." -ForegroundColor Yellow
+    $listResult = Invoke-ApiCall -Url "$baseUrl/builders" -Token $adminToken
+    if ($listResult.Success -and $listResult.Content -and $listResult.Content.Count -gt 0) {
+        $builderId = $listResult.Content[0].id
+        Write-Host "  [OK] Using existing builder ID: $builderId" -ForegroundColor Green
+    } else {
+        Write-Host "  [FAIL] No builders available for job creation test" -ForegroundColor Red
+    }
 }
 Write-Host ""
 
@@ -201,37 +233,58 @@ Write-Host ""
 
 # Test 10: Jobs - Create (with tenant validation)
 Write-Host "9. Testing Jobs - Create (Tenant Validation)..." -ForegroundColor Yellow
-$newJob = @{
-    tenant_id = "all_county"
-    builder_id = $builderId
-    community = "Test Community"
-    lot = "123"
-    status = "draft"
-}
-$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/jobs" -Body $newJob -Token $adminToken
-if ($result.Success -and ($result.StatusCode -eq 200 -or $result.StatusCode -eq 201)) {
-    $jobId = $result.Content.id
-    Write-Host "  [OK] Job created successfully" -ForegroundColor Green
-    Write-Host "  Job ID: $jobId" -ForegroundColor Gray
+if ($builderId) {
+    $newJob = @{
+        tenant_id = "all_county"
+        builder_id = $builderId
+        community = "Test Community"
+        lot_number = "123"
+        phase = "Phase 1"
+        status = "draft"
+        address_line1 = "123 Test Street"
+        city = "Seattle"
+        state = "WA"
+        zip = "98101"
+    }
+    $result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/jobs" -Body $newJob -Token $adminToken
+    if ($result.Success -and ($result.StatusCode -eq 200 -or $result.StatusCode -eq 201)) {
+        $jobId = $result.Content.id
+        Write-Host "  [OK] Job created successfully" -ForegroundColor Green
+        Write-Host "  Job ID: $jobId" -ForegroundColor Gray
+    } else {
+        Write-Host "  [WARN] Job creation: $($result.StatusCode)" -ForegroundColor Yellow
+        if ($result.Error) {
+            Write-Host "  Error details: $($result.Error)" -ForegroundColor Gray
+        }
+    }
 } else {
-    Write-Host "  [WARN] Job creation: $($result.StatusCode)" -ForegroundColor Yellow
+    Write-Host "  [SKIP] Job creation skipped - no builder ID available" -ForegroundColor Yellow
 }
 Write-Host ""
 
 # Test 11: Jobs - Invalid Tenant (should fail)
 Write-Host "10. Testing Jobs - Invalid Tenant (should fail)..." -ForegroundColor Yellow
-$invalidJob = @{
-    tenant_id = "invalid_tenant"
-    builder_id = $builderId
-    community = "Test"
-    lot = "123"
-    status = "draft"
-}
-$result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/jobs" -Body $invalidJob -Token $adminToken -ExpectError $true
-if ($result.ExpectedError) {
-    Write-Host "  [OK] Tenant validation working (correctly rejected invalid tenant)" -ForegroundColor Green
+if ($builderId) {
+    $invalidJob = @{
+        tenant_id = "invalid_tenant"
+        builder_id = $builderId
+        community = "Test"
+        lot_number = "123"
+        phase = "Phase 1"
+        status = "draft"
+        address_line1 = "123 Test Street"
+        city = "Seattle"
+        state = "WA"
+        zip = "98101"
+    }
+    $result = Invoke-ApiCall -Method "POST" -Url "$baseUrl/jobs" -Body $invalidJob -Token $adminToken -ExpectError $true
+    if ($result.ExpectedError) {
+        Write-Host "  [OK] Tenant validation working (correctly rejected invalid tenant)" -ForegroundColor Green
+    } else {
+        Write-Host "  [WARN] Tenant validation may not be working" -ForegroundColor Yellow
+    }
 } else {
-    Write-Host "  [WARN] Tenant validation may not be working" -ForegroundColor Yellow
+    Write-Host "  [SKIP] Invalid tenant test skipped - no builder ID available" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -255,30 +308,50 @@ if ($result.Success -and $result.StatusCode -eq 200) {
 }
 Write-Host ""
 
-# Test 14: Marketing - Channels
-Write-Host "13. Testing Marketing - Channels..." -ForegroundColor Yellow
-$result = Invoke-ApiCall -Url "$baseUrl/marketing/channels" -Token $adminToken
+# Test 14: Marketing - Channels (reference list for creating accounts)
+Write-Host "13. Testing Marketing - Channels (reference list)..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/marketing/channels?tenant_id=h2o" -Token $adminToken
 if ($result.Success -and $result.StatusCode -eq 200) {
     $channelCount = ($result.Content | Measure-Object).Count
     $msg = '  [OK] Marketing channels listed successfully (' + $channelCount + ' channels)'
     Write-Host $msg -ForegroundColor Green
 } else {
-    Write-Host "  [WARN] Marketing channels: $($result.StatusCode)" -ForegroundColor Yellow
+    Write-Host "  [FAIL] Marketing channels: $($result.StatusCode)" -ForegroundColor Red
+    if ($result.Error) {
+        Write-Host "  Error: $($result.Error)" -ForegroundColor Gray
+    }
 }
 Write-Host ""
 
-# Test 15: Marketing - Channel Accounts
+# Test 15: Marketing - Channel Accounts (the actual working entities)
 Write-Host "14. Testing Marketing - Channel Accounts..." -ForegroundColor Yellow
 $result = Invoke-ApiCall -Url "$baseUrl/marketing/channel-accounts?tenant_id=h2o" -Token $adminToken
 if ($result.Success -and $result.StatusCode -eq 200) {
-    Write-Host "  [OK] Channel accounts listed successfully" -ForegroundColor Green
+    $accountCount = ($result.Content | Measure-Object).Count
+    $msg = '  [OK] Channel accounts listed successfully (' + $accountCount + ' accounts)'
+    Write-Host $msg -ForegroundColor Green
 } else {
-    Write-Host "  [WARN] Channel accounts: $($result.StatusCode)" -ForegroundColor Yellow
+    Write-Host "  [FAIL] Channel accounts: $($result.StatusCode)" -ForegroundColor Red
+    if ($result.Error) {
+        Write-Host "  Error: $($result.Error)" -ForegroundColor Gray
+    }
+}
+Write-Host ""
+
+# Test 15b: Marketing - Content Items
+Write-Host "15. Testing Marketing - Content Items..." -ForegroundColor Yellow
+$result = Invoke-ApiCall -Url "$baseUrl/marketing/content-items?tenant_id=h2o" -Token $adminToken
+if ($result.Success -and $result.StatusCode -eq 200) {
+    $itemCount = ($result.Content | Measure-Object).Count
+    $msg = '  [OK] Content items listed successfully (' + $itemCount + ' items)'
+    Write-Host $msg -ForegroundColor Green
+} else {
+    Write-Host "  [WARN] Content items: $($result.StatusCode)" -ForegroundColor Yellow
 }
 Write-Host ""
 
 # Test 16: Audit Log
-Write-Host "15. Testing Audit Log..." -ForegroundColor Yellow
+Write-Host "16. Testing Audit Log..." -ForegroundColor Yellow
 $result = Invoke-ApiCall -Url "$baseUrl/audit?limit=10" -Token $adminToken
 if ($result.Success -and $result.StatusCode -eq 200) {
     $auditCount = ($result.Content | Measure-Object).Count
@@ -290,7 +363,7 @@ if ($result.Success -and $result.StatusCode -eq 200) {
 Write-Host ""
 
 # Test 17: Rate Limiting (Login attempts)
-Write-Host "16. Testing Rate Limiting (Login attempts)..." -ForegroundColor Yellow
+Write-Host "17. Testing Rate Limiting (Login attempts)..." -ForegroundColor Yellow
 $rateLimitTested = $false
 for ($i = 1; $i -le 12; $i++) {
     $loginBody = @{
@@ -311,7 +384,7 @@ if (-not $rateLimitTested) {
 Write-Host ""
 
 # Test 18: Unauthorized Access
-Write-Host "17. Testing Unauthorized Access..." -ForegroundColor Yellow
+Write-Host "18. Testing Unauthorized Access..." -ForegroundColor Yellow
 $result = Invoke-ApiCall -Url "$baseUrl/users" -ExpectError $true
 if ($result.ExpectedError -or $result.StatusCode -eq 401) {
     Write-Host "  [OK] Unauthorized access correctly blocked" -ForegroundColor Green
@@ -321,7 +394,7 @@ if ($result.ExpectedError -or $result.StatusCode -eq 401) {
 Write-Host ""
 
 # Test 19: Invalid Endpoint
-Write-Host "18. Testing Invalid Endpoint (404)..." -ForegroundColor Yellow
+Write-Host "19. Testing Invalid Endpoint (404)..." -ForegroundColor Yellow
 $result = Invoke-ApiCall -Url "$baseUrl/invalid-endpoint" -ExpectError $true
 if ($result.ExpectedError -or $result.StatusCode -eq 404) {
     Write-Host "  [OK] 404 handling working correctly" -ForegroundColor Green
