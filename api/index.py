@@ -10,18 +10,8 @@ from apps.api.app.main import app
 
 # Vercel serverless handler - Use Mangum to properly handle ASGI app
 # Mangum converts ASGI to AWS Lambda/Vercel format
-try:
-    from mangum import Mangum
-    
-    # Create handler with lifespan support disabled (Vercel handles cold starts differently)
-    # Wrap in a callable function to ensure Vercel recognizes it properly
-    _mangum_handler = Mangum(app, lifespan="off")
-    
-    def handler(event, context):
-        """Vercel serverless function handler"""
-        return _mangum_handler(event, context)
-except ImportError:
-    # Fallback if mangum not available (shouldn't happen in production)
-    def handler(event, context):
-        """Fallback handler - should not be used in production"""
-        return {"statusCode": 500, "body": "Mangum not available"}
+from mangum import Mangum
+
+# Create handler with lifespan support disabled (Vercel handles cold starts differently)
+# Export handler directly - Vercel Python runtime expects this
+handler = Mangum(app, lifespan="off")
