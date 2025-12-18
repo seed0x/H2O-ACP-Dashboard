@@ -16,13 +16,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Insert seed channels
+    # Insert seed channels - use ON CONFLICT to make idempotent
+    # This allows the migration to run multiple times without errors
     op.execute("""
         INSERT INTO marketing_channels (key, display_name, supports_autopost) VALUES
         ('google_business_profile', 'Google Business Profile', true),
         ('facebook_page', 'Facebook Page', true),
         ('instagram_business', 'Instagram Business', true),
         ('nextdoor', 'Nextdoor', false)
+        ON CONFLICT (key) DO NOTHING
     """)
 
 
