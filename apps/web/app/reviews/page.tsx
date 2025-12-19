@@ -81,7 +81,7 @@ function ReviewsContent() {
       await loadData()
       showToast('Review request sent successfully', 'success')
     } catch (error) {
-      showToast(handleApiError(error, 'Sending review request'), 'error')
+      handleApiError(error, 'Sending review request')
     }
   }
 
@@ -91,7 +91,7 @@ function ReviewsContent() {
       await loadData()
       showToast('Request marked as lost', 'success')
     } catch (error) {
-      showToast(handleApiError(error, 'Marking as lost'), 'error')
+      handleApiError(error, 'Marking as lost')
     }
   }
 
@@ -103,7 +103,7 @@ function ReviewsContent() {
       setSelectedRequests([])
       showToast(`Sent ${selectedRequests.length} review request(s)`, 'success')
     } catch (error) {
-      showToast(handleApiError(error, 'Bulk sending'), 'error')
+      handleApiError(error, 'Bulk sending')
     }
   }
 
@@ -113,7 +113,7 @@ function ReviewsContent() {
       await loadData()
       showToast(`Review ${isPublic ? 'made public' : 'made private'}`, 'success')
     } catch (error) {
-      showToast(handleApiError(error, 'Updating review'), 'error')
+      handleApiError(error, 'Updating review')
     }
   }
 
@@ -123,7 +123,7 @@ function ReviewsContent() {
       await loadData()
       showToast('Ticket status updated', 'success')
     } catch (error) {
-      showToast(handleApiError(error, 'Updating ticket'), 'error')
+      handleApiError(error, 'Updating ticket')
     }
   }
 
@@ -133,7 +133,7 @@ function ReviewsContent() {
       await loadData()
       showToast('Ticket assigned successfully', 'success')
     } catch (error) {
-      showToast(handleApiError(error, 'Assigning ticket'), 'error')
+      handleApiError(error, 'Assigning ticket')
     }
   }
 
