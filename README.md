@@ -1,26 +1,39 @@
 # H2O-ACP Dashboard
 
-Multi-tenant plumbing operations platform. Backend: FastAPI + PostgreSQL. Frontend: Next.js + TypeScript.
+Multi-tenant plumbing operations platform for **H2O Plumbing** (service/warranty) and **All County Construction** (new construction).
 
-## Quickstart
+**Tech Stack**: FastAPI + PostgreSQL + Next.js + TypeScript
+
+## 🚀 Quick Start
 
 ```bash
+# Clone and setup
 cp .env.example .env
 make dev
+
+# Run migrations
+make migrate
+
+# Seed data
+make seed
 ```
 
-Then:
-- Run migrations: `make migrate`
-- Seed: `make seed`
+For detailed setup instructions, see **[QUICK_START.md](QUICK_START.md)**
 
-## Documentation
+## 📚 Documentation
 
-- **[Architecture](docs/ARCHITECTURE.md)** - System architecture and deployment overview
-- **[Deployment Notes](DEPLOYMENT_NOTES.md)** - Production deployment configuration
-- **[Architecture Audit](SENIOR_ENGINEER_AUDIT.md)** - Comprehensive architecture review and recommendations
-- **[Critical Fixes](CRITICAL_FIXES_APPLIED.md)** - P0 fixes applied (marketing routes, async patterns, connection pooling)
-- **[P1 Improvements](P1_IMPROVEMENTS_APPLIED.md)** - High-priority improvements (API versioning, tenant config, rate limiting, user management)
-- **[Testing Guide](TESTING_GUIDE.md)** - Comprehensive testing instructions
+### Core Guides
+- **[Quick Start Guide](QUICK_START.md)** - Get up and running locally
+- **[Testing Guide](TESTING_GUIDE.md)** - Run tests and verify functionality
+- **[Deployment Options](DEPLOYMENT_OPTIONS.md)** - Deploy to production
+
+### Architecture & Design
+- **[Application Overview](APPLICATION_OVERVIEW.md)** - System architecture and design
+- **[Project Structure](PROJECT_STRUCTURE.md)** - Codebase organization
+
+### Maintenance
+- **[Known Issues](FAILURE_MAP.md)** - Active bugs and workarounds
+- **[Implementation Summary](IMPLEMENTATION_SUMMARY.md)** - Latest UX/UI improvements
 
 ## Project Structure
 

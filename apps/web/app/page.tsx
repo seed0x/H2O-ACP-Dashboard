@@ -4,9 +4,14 @@ import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { useMobile } from '../lib/useMobile'
 import { Dataflow } from '../components/Dataflow'
+import { handleApiError } from '../lib/error-handler'
+import { StatSkeleton } from '../components/ui/Skeleton'
+import { useTenant } from '../contexts/TenantContext'
+import { TodaysSchedule } from '../components/TodaysSchedule'
 
 export default function Dashboard() {
   const isMobile = useMobile()
+  const { currentTenant, isTenantSelected } = useTenant()
   const [stats, setStats] = useState({
     activeJobs: 0,
     pendingServiceCalls: 0,
@@ -31,21 +36,83 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard()
-  }, [])
+  }, [currentTenant]) // Reload when tenant changes
 
   async function loadDashboard() {
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-      const [jobs, serviceCalls, builders, overdueJobsRes, overdueCallsRes, overdueRequestsRes, overdueTicketsRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { headers, withCredentials: true }),
-        axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { headers, withCredentials: true }),
-        axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true }),
-        axios.get(`${API_BASE_URL}/jobs/overdue?tenant_id=all_county`, { headers, withCredentials: true }).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE_URL}/service-calls/overdue?tenant_id=h2o`, { headers, withCredentials: true }).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE_URL}/reviews/requests/overdue?tenant_id=h2o`, { headers, withCredentials: true }).catch(() => ({ data: [] })),
-        axios.get(`${API_BASE_URL}/recovery-tickets/overdue?tenant_id=h2o`, { headers, withCredentials: true }).catch(() => ({ data: [] }))
-      ])
+      
+      // Load core data with error handling
+      let jobs = { data: [] }
+      let serviceCalls = { data: [] }
+      let builders = { data: [] }
+      
+      // Load jobs (All County specific or filter by current tenant)
+      if (isTenantSelected('all_county')) {
+        try {
+          const jobsParams = currentTenant === 'both' ? '' : `?tenant_id=all_county`
+          jobs = await axios.get(`${API_BASE_URL}/jobs${jobsParams}`, { headers, withCredentials: true })
+        } catch (error) {
+          handleApiError(error, 'Loading jobs', loadDashboard)
+        }
+      }
+      
+      // Load service calls (H2O specific or filter by current tenant)
+      if (isTenantSelected('h2o')) {
+        try {
+          const callsParams = currentTenant === 'both' ? '' : `?tenant_id=h2o`
+          serviceCalls = await axios.get(`${API_BASE_URL}/service-calls${callsParams}`, { headers, withCredentials: true })
+        } catch (error) {
+          handleApiError(error, 'Loading service calls', loadDashboard)
+        }
+      }
+      
+      try {
+        builders = await axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true })
+      } catch (error) {
+        handleApiError(error, 'Loading builders', loadDashboard)
+      }
+      
+      // Load overdue data with individual error handling
+      let overdueJobsRes = { data: [] }
+      let overdueCallsRes = { data: [] }
+      let overdueRequestsRes = { data: [] }
+      let overdueTicketsRes = { data: [] }
+      
+      // Load overdue jobs (All County)
+      if (isTenantSelected('all_county')) {
+        try {
+          const jobsParams = currentTenant === 'both' ? '' : '?tenant_id=all_county'
+          overdueJobsRes = await axios.get(`${API_BASE_URL}/jobs/overdue${jobsParams}`, { headers, withCredentials: true })
+        } catch (error) {
+          handleApiError(error, 'Loading overdue jobs', loadDashboard)
+        }
+      }
+      
+      // Load overdue service calls (H2O)
+      if (isTenantSelected('h2o')) {
+        try {
+          const callsParams = currentTenant === 'both' ? '' : '?tenant_id=h2o'
+          overdueCallsRes = await axios.get(`${API_BASE_URL}/service-calls/overdue${callsParams}`, { headers, withCredentials: true })
+        } catch (error) {
+          handleApiError(error, 'Loading overdue service calls', loadDashboard)
+        }
+        
+        try {
+          const requestsParams = currentTenant === 'both' ? '' : '?tenant_id=h2o'
+          overdueRequestsRes = await axios.get(`${API_BASE_URL}/reviews/requests/overdue${requestsParams}`, { headers, withCredentials: true })
+        } catch (error) {
+          handleApiError(error, 'Loading overdue review requests', loadDashboard)
+        }
+        
+        try {
+          const ticketsParams = currentTenant === 'both' ? '' : '?tenant_id=h2o'
+          overdueTicketsRes = await axios.get(`${API_BASE_URL}/recovery-tickets/overdue${ticketsParams}`, { headers, withCredentials: true })
+        } catch (error) {
+          handleApiError(error, 'Loading overdue recovery tickets', loadDashboard)
+        }
+      }
 
       const activeJobs = jobs.data.filter((j: any) => j.status !== 'Completed').length
       const pendingCalls = serviceCalls.data.filter((c: any) => c.status === 'New' || c.status === 'Scheduled').length
@@ -115,8 +182,12 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <div style={{ color: 'var(--color-text-secondary)' }}>Loading...</div>
+      <div style={{ padding: isMobile ? '16px' : '32px' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ width: '300px', height: '40px', backgroundColor: 'var(--color-hover)', borderRadius: '8px', marginBottom: '12px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ width: '200px', height: '20px', backgroundColor: 'var(--color-hover)', borderRadius: '4px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+        </div>
+        <StatSkeleton count={4} />
       </div>
     )
   }
@@ -166,6 +237,11 @@ export default function Dashboard() {
           value={stats.completedThisWeek}
           color="#2196F3"
         />
+      </div>
+
+      {/* Today's Schedule */}
+      <div style={{ marginBottom: '32px' }}>
+        <TodaysSchedule />
       </div>
 
       {/* Dataflow - Actionable Signals */}

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { handleApiError } from '../../lib/error-handler'
+import { StatSkeleton, CardSkeleton } from '../../components/ui/Skeleton'
 
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<any>(null)
@@ -19,15 +21,32 @@ export default function AnalyticsPage() {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       
-      const [overviewRes, reviewsRes, performanceRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/analytics/overview`, { headers, withCredentials: true }).catch(() => ({ data: null })),
-        axios.get(`${API_BASE_URL}/analytics/reviews?days=30`, { headers, withCredentials: true }).catch(() => ({ data: null })),
-        axios.get(`${API_BASE_URL}/analytics/performance?days=30`, { headers, withCredentials: true }).catch(() => ({ data: null }))
-      ])
+      // Load overview data
+      try {
+        const overviewRes = await axios.get(`${API_BASE_URL}/analytics/overview`, { headers, withCredentials: true })
+        setOverview(overviewRes.data)
+      } catch (error) {
+        handleApiError(error, 'Loading analytics overview', loadAnalytics)
+        setOverview(null)
+      }
       
-      setOverview(overviewRes.data)
-      setReviewAnalytics(reviewsRes.data)
-      setPerformance(performanceRes.data)
+      // Load review analytics
+      try {
+        const reviewsRes = await axios.get(`${API_BASE_URL}/analytics/reviews?days=30`, { headers, withCredentials: true })
+        setReviewAnalytics(reviewsRes.data)
+      } catch (error) {
+        handleApiError(error, 'Loading review analytics', loadAnalytics)
+        setReviewAnalytics(null)
+      }
+      
+      // Load performance data
+      try {
+        const performanceRes = await axios.get(`${API_BASE_URL}/analytics/performance?days=30`, { headers, withCredentials: true })
+        setPerformance(performanceRes.data)
+      } catch (error) {
+        handleApiError(error, 'Loading performance analytics', loadAnalytics)
+        setPerformance(null)
+      }
     } catch (err) {
       console.error('Failed to load analytics', err)
     } finally {
@@ -37,8 +56,18 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <div style={{ color: 'var(--color-text-secondary)' }}>Loading analytics...</div>
+      <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+        <PageHeader
+          title="Analytics Dashboard"
+          description="Business intelligence and performance metrics"
+        />
+        <div style={{ marginBottom: '32px' }}>
+          <StatSkeleton count={6} />
+        </div>
+        <div style={{ marginBottom: '32px' }}>
+          <CardSkeleton count={2} />
+        </div>
+        <CardSkeleton count={2} />
       </div>
     )
   }

@@ -736,10 +736,27 @@ function getStatusColor(status: string) {
 function CalendarView() {
   const [calendarData, setCalendarData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
+  
+  // Initialize view mode from localStorage or default to week on mobile
+  const [viewMode, setViewMode] = useState<'week' | 'month'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('calendarViewMode')
+      if (saved === 'week' || saved === 'month') return saved
+      // Default to week view on mobile
+      return window.innerWidth < 768 ? 'week' : 'month'
+    }
+    return 'month'
+  })
+  
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedPost, setSelectedPost] = useState<any>(null)
   const [channels, setChannels] = useState<any[]>([])
+  
+  // Save view mode preference
+  const handleViewModeChange = (mode: 'week' | 'month') => {
+    setViewMode(mode)
+    localStorage.setItem('calendarViewMode', mode)
+  }
 
   useEffect(() => {
     loadCalendar()
@@ -997,7 +1014,7 @@ function CalendarView() {
           padding: '4px'
         }}>
           <button
-            onClick={() => setViewMode('week')}
+            onClick={() => handleViewModeChange('week')}
             style={{
               padding: '6px 16px',
               backgroundColor: viewMode === 'week' ? 'var(--color-primary)' : 'transparent',
@@ -1005,13 +1022,15 @@ function CalendarView() {
               borderRadius: '6px',
               color: viewMode === 'week' ? '#ffffff' : 'var(--color-text-primary)',
               fontSize: '14px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}
           >
             Week
           </button>
           <button
-            onClick={() => setViewMode('month')}
+            onClick={() => handleViewModeChange('month')}
             style={{
               padding: '6px 16px',
               backgroundColor: viewMode === 'month' ? 'var(--color-primary)' : 'transparent',
@@ -1019,7 +1038,9 @@ function CalendarView() {
               borderRadius: '6px',
               color: viewMode === 'month' ? '#ffffff' : 'var(--color-text-primary)',
               fontSize: '14px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}
           >
             Month
