@@ -10,8 +10,9 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { showToast } from '../../components/Toast'
-import { handleApiError, logError } from '../../lib/error-handler'
+import { handleApiError } from '../../lib/error-handler'
 import { QuickAction } from '../../components/QuickActions'
+import { getPageTenant } from '../../contexts/TenantContext'
 
 interface Job {
   id: string | number
@@ -42,7 +43,9 @@ export default function JobsPage() {
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-      const response = await axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { 
+      // Jobs are All County specific
+      const tenantId = getPageTenant('jobs')
+      const response = await axios.get(`${API_BASE_URL}/jobs?tenant_id=${tenantId}`, { 
         headers,
         withCredentials: true 
       })
@@ -50,6 +53,7 @@ export default function JobsPage() {
       setLoading(false)
     } catch (error) {
       console.error('Failed to load jobs:', error)
+      handleApiError(error, 'Loading jobs', loadJobs)
       setJobs([])
       setLoading(false)
     }

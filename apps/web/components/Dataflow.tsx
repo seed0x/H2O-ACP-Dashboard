@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { SignalCard, SignalAction } from './SignalCard'
 import { useRouter } from 'next/navigation'
 import { API_BASE_URL } from '../lib/config'
+import { useTenant } from '../contexts/TenantContext'
 
 interface Signal {
   id: string
@@ -23,6 +24,7 @@ interface Signal {
 
 export function Dataflow() {
   const router = useRouter()
+  const { currentTenant } = useTenant()
   const [signals, setSignals] = useState<Signal[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -31,7 +33,7 @@ export function Dataflow() {
     // Refresh every 30 seconds
     const interval = setInterval(loadSignals, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [currentTenant])
 
   async function loadSignals() {
     try {
@@ -41,7 +43,9 @@ export function Dataflow() {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=h2o`, {
+      // Signals are h2o specific, but respect tenant selection
+      const tenantParam = currentTenant === 'both' ? 'h2o' : currentTenant
+      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=${tenantParam}`, {
         headers,
         credentials: 'include'
       })
