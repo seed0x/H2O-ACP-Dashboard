@@ -470,10 +470,26 @@ async def get_service_call(id: UUID, db: AsyncSession = Depends(get_session)):
 
 @router.patch('/service-calls/{id}', response_model=ServiceCallOut)
 async def patch_service_call(id: UUID, sc_in: ServiceCallUpdate, db: AsyncSession = Depends(get_session), current_user=Depends(get_current_user)):
+    from ..core.service_call_automation import on_service_call_completed
+    
     sc = await crud.get_service_call(db, id)
     if not sc:
         raise HTTPException(status_code=404, detail='Service call not found')
+    
+    # Track old status to detect completion
+    old_status = sc.status
+    
+    # Update service call
     sc = await crud.update_service_call(db, sc, sc_in, current_user.username)
+    
+    # Auto-create review request when service call is completed
+    if old_status != 'completed' and sc.status == 'completed':
+        try:
+            await on_service_call_completed(db, sc, changed_by=current_user.username)
+        except Exception as e:
+            # Don't fail the service call update if review request creation fails
+            print(f"Warning: Failed to create review request for service call {sc.id}: {e}")
+    
     return sc
 
 @router.delete('/service-calls/{id}')

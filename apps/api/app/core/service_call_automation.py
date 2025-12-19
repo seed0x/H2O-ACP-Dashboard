@@ -1,6 +1,7 @@
 """Automation triggers for service calls"""
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
+from typing import Optional
 
 from .. import models, crud_reviews, schemas
 from .review_utils import send_review_request

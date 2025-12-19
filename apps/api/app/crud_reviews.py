@@ -357,3 +357,121 @@ async def update_recovery_ticket(
     await db.refresh(ticket)
     return ticket
 
+async def mark_review_request_as_lost(
+    db: AsyncSession,
+    review_request: models.ReviewRequest,
+    changed_by: str = "system"
+) -> models.ReviewRequest:
+    """Mark a review request as lost (customer didn't respond)"""
+    old_status = review_request.status
+    review_request.status = 'lost'
+    
+    # Write audit log
+    await db.execute(models.AuditLog.__table__.insert().values(
+        tenant_id=review_request.tenant_id,
+        entity_type='review_request',
+        entity_id=review_request.id,
+        action='update',
+        field='status',
+        old_value=old_status,
+        new_value='lost',
+        changed_by=changed_by,
+    ))
+    
+    await db.commit()
+    await db.refresh(review_request)
+    return review_request
+
+async def auto_expire_review_requests(
+    db: AsyncSession,
+    changed_by: str = "system"
+) -> int:
+    """Automatically mark expired review requests as lost
+    
+    Returns:
+        Number of review requests expired
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Find review requests that are sent but past expiration
+    q = select(models.ReviewRequest).where(
+        models.ReviewRequest.status == 'sent',
+        models.ReviewRequest.expires_at < now
+    )
+    res = await db.execute(q)
+    expired_requests = res.scalars().all()
+    
+    count = 0
+    for request in expired_requests:
+        await mark_review_request_as_lost(db, request, changed_by)
+        count += 1
+    
+    return count
+
+async def get_review_stats(
+    db: AsyncSession,
+    tenant_id: str
+) -> dict:
+    """Get review statistics for a tenant
+    
+    Returns:
+        Dictionary with: total_requests, sent, completed (got), lost, pending, conversion_rate
+    """
+    # Total requests
+    total_q = select(func.count(models.ReviewRequest.id)).where(
+        models.ReviewRequest.tenant_id == tenant_id
+    )
+    total_res = await db.execute(total_q)
+    total_requests = total_res.scalar() or 0
+    
+    # Count by status
+    pending_q = select(func.count(models.ReviewRequest.id)).where(
+        models.ReviewRequest.tenant_id == tenant_id,
+        models.ReviewRequest.status == 'pending'
+    )
+    pending_res = await db.execute(pending_q)
+    pending = pending_res.scalar() or 0
+    
+    sent_q = select(func.count(models.ReviewRequest.id)).where(
+        models.ReviewRequest.tenant_id == tenant_id,
+        models.ReviewRequest.status == 'sent'
+    )
+    sent_res = await db.execute(sent_q)
+    sent = sent_res.scalar() or 0
+    
+    completed_q = select(func.count(models.ReviewRequest.id)).where(
+        models.ReviewRequest.tenant_id == tenant_id,
+        models.ReviewRequest.status == 'completed'
+    )
+    completed_res = await db.execute(completed_q)
+    completed = completed_res.scalar() or 0
+    
+    lost_q = select(func.count(models.ReviewRequest.id)).where(
+        models.ReviewRequest.tenant_id == tenant_id,
+        models.ReviewRequest.status == 'lost'
+    )
+    lost_res = await db.execute(lost_q)
+    lost = lost_res.scalar() or 0
+    
+    # Get average rating from completed reviews
+    avg_rating_q = select(func.avg(models.Review.rating)).join(
+        models.ReviewRequest
+    ).where(
+        models.ReviewRequest.tenant_id == tenant_id
+    )
+    avg_rating_res = await db.execute(avg_rating_q)
+    avg_rating = avg_rating_res.scalar() or 0.0
+    
+    # Calculate conversion rate (completed / sent)
+    conversion_rate = (completed / sent * 100) if sent > 0 else 0.0
+    
+    return {
+        'total_requests': total_requests,
+        'pending': pending,
+        'sent': sent,
+        'completed': completed,  # "got"
+        'lost': lost,
+        'conversion_rate': round(conversion_rate, 1),
+        'average_rating': round(float(avg_rating), 1) if avg_rating else 0.0
+    }
+

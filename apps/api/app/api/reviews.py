@@ -11,6 +11,18 @@ from ..core.review_utils import send_review_request
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
+@router.get("/stats")
+async def get_review_statistics(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Get review statistics for a tenant"""
+    validate_tenant_feature(tenant_id, TenantFeature.SERVICE_CALLS)
+    
+    stats = await crud_reviews.get_review_stats(db, tenant_id)
+    return stats
+
 @router.post("/requests", response_model=schemas.ReviewRequestOut, status_code=status.HTTP_201_CREATED)
 async def create_review_request(
     review_request_in: schemas.ReviewRequestCreate,
@@ -110,6 +122,25 @@ async def send_review_request_endpoint(
     # Refresh to get updated status
     await db.refresh(review_request)
     return review_request
+
+@router.post("/requests/{request_id}/mark-lost", response_model=schemas.ReviewRequestOut)
+async def mark_request_as_lost(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Manually mark a review request as lost"""
+    review_request = await crud_reviews.get_review_request(db, request_id)
+    if not review_request:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review request not found")
+    
+    validate_tenant_feature(review_request.tenant_id, TenantFeature.SERVICE_CALLS)
+    
+    if review_request.status == 'completed':
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot mark completed request as lost")
+    
+    updated = await crud_reviews.mark_review_request_as_lost(db, review_request, changed_by=current_user.username)
+    return updated
 
 @router.get("", response_model=List[schemas.ReviewOut])
 async def list_reviews(
