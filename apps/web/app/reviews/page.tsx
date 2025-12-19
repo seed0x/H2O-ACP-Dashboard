@@ -161,7 +161,7 @@ function ReviewsContent() {
             title="Conversion Rate" 
             value={`${stats.conversion_rate}%`} 
             color="#8B5CF6"
-            subtitle={`Avg Rating: ${stats.average_rating}★`}
+            subtitle={`Avg Rating: ${String(stats.average_rating)}★`}
           />
         </div>
       )}
