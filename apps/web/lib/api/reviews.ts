@@ -10,13 +10,23 @@ export interface ReviewRequest {
   customer_email?: string
   customer_phone?: string
   token: string
-  status: 'pending' | 'sent' | 'completed' | 'expired'
+  status: 'pending' | 'sent' | 'completed' | 'expired' | 'lost'
   sent_at?: string
   completed_at?: string
   expires_at?: string
   reminder_sent: boolean
   created_at: string
   updated_at: string
+}
+
+export interface ReviewStats {
+  total_requests: number
+  pending: number
+  sent: number
+  completed: number  // "got"
+  lost: number
+  conversion_rate: number
+  average_rating: number
 }
 
 export interface Review {
@@ -92,6 +102,17 @@ export const reviewApi = {
 
   sendRequest: async (requestId: string): Promise<ReviewRequest> => {
     const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/send`)
+    return res.data
+  },
+
+  markRequestAsLost: async (requestId: string): Promise<ReviewRequest> => {
+    const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/mark-lost`)
+    return res.data
+  },
+
+  getStats: async (tenantId: string): Promise<ReviewStats> => {
+    const params = new URLSearchParams({ tenant_id: tenantId })
+    const res = await axios.get(`${API_BASE_URL}/reviews/stats?${params}`)
     return res.data
   },
 
