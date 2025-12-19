@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { API_BASE_URL } from '../lib/config'
+import { useTenant } from '../contexts/TenantContext'
 import UilDashboard from '@iconscout/react-unicons/icons/uil-dashboard'
 import UilBuilding from '@iconscout/react-unicons/icons/uil-building'
 import UilWrench from '@iconscout/react-unicons/icons/uil-wrench'
@@ -41,6 +42,7 @@ interface SidebarProps {
 
 export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const { currentTenant } = useTenant()
   const [signalCounts, setSignalCounts] = useState<{ reviews: number; marketing: number; dispatch: number }>({
     reviews: 0,
     marketing: 0,
@@ -51,7 +53,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
     loadSignalCounts()
     const interval = setInterval(loadSignalCounts, 30000) // Refresh every 30 seconds
     return () => clearInterval(interval)
-  }, [])
+  }, [currentTenant])
 
   async function loadSignalCounts() {
     try {
@@ -61,7 +63,9 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=h2o`, {
+      // Signals are h2o specific, but respect tenant selection
+      const tenantParam = currentTenant === 'both' ? 'h2o' : currentTenant
+      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=${tenantParam}`, {
         headers,
         credentials: 'include'
       })

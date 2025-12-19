@@ -10,7 +10,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { showToast } from '../../components/Toast'
-import { handleApiError } from '../../lib/error-handler'
+import { handleApiError, logError } from '../../lib/error-handler'
 import { QuickAction } from '../../components/QuickActions'
 import { getPageTenant } from '../../contexts/TenantContext'
 
