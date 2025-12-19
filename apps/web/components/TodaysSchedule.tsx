@@ -61,8 +61,8 @@ export function TodaysSchedule() {
                 title: `${job.builder?.name || 'Unknown Builder'} - Lot ${job.lot_number || 'N/A'}`,
                 location: job.address_line1 || 'No address',
                 status: job.status || 'Unknown',
-                assignedTo: job.tech_name || job.assigned_to || 'Unassigned',
-                tenant: 'all_county',
+                assignedTo: String(job.tech_name || job.assigned_to || 'Unassigned'),
+                tenant: 'all_county' as const,
                 priority: job.priority
               })
             }
@@ -87,11 +87,11 @@ export function TodaysSchedule() {
                 id: call.id,
                 type: 'service_call',
                 time: formatTime(call.scheduled_start),
-                title: call.customer_name || 'Unknown Customer',
+                title: String(call.customer_name || 'Unknown Customer'),
                 location: `${call.address_line1 || 'No address'}${call.city ? ', ' + call.city : ''}`,
                 status: call.status || 'Unknown',
-                assignedTo: call.assigned_to || 'Unassigned',
-                tenant: 'h2o',
+                assignedTo: String(call.assigned_to || 'Unassigned'),
+                tenant: 'h2o' as const,
                 priority: call.priority
               })
             }

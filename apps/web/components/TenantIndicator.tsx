@@ -17,6 +17,12 @@ export function TenantIndicator({
   const displayTenant = tenant || currentTenant
   const config = TENANT_CONFIG[displayTenant]
   
+  // Guard against undefined config
+  if (!config) {
+    console.warn(`TenantIndicator: Invalid tenant "${displayTenant}"`, { tenant, currentTenant })
+    return null
+  }
+  
   const sizeStyles = {
     sm: { padding: '2px 6px', fontSize: '11px', gap: '4px' },
     md: { padding: '4px 10px', fontSize: '12px', gap: '6px' },
@@ -28,7 +34,7 @@ export function TenantIndicator({
   if (variant === 'icon') {
     return (
       <span
-        title={config.name}
+        title={config.name || ''}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -42,7 +48,7 @@ export function TenantIndicator({
           cursor: 'default'
         }}
       >
-        {config.icon}
+        {config.icon || ''}
       </span>
     )
   }
@@ -63,8 +69,8 @@ export function TenantIndicator({
         whiteSpace: 'nowrap'
       }}
     >
-      <span>{config.icon}</span>
-      <span>{variant === 'full' ? config.name : config.shortName}</span>
+      <span>{config.icon || ''}</span>
+      <span>{variant === 'full' ? (config.name || '') : (config.shortName || '')}</span>
     </span>
   )
 }
