@@ -170,21 +170,9 @@ async def topoff_scheduler_logic(
         if not target_datetimes:
             continue
         
-        # Get existing PostInstances for this account in the date range
-        existing_result = await db.execute(
-            select(models.PostInstance.scheduled_for)
-            .where(
-                and_(
-                    models.PostInstance.tenant_id == tenant_id,
-                    models.PostInstance.channel_account_id == account.id,
-                    models.PostInstance.scheduled_for >= start_date,
-                    models.PostInstance.scheduled_for <= end_date
-                )
-            )
-        )
-        existing_datetimes = {row[0] for row in existing_result.all() if row[0]}
-        
         # Get full existing instances to check for content
+        # We need to match by datetime, but account for timezone differences
+        # Compare datetimes by truncating to minute precision to avoid microsecond mismatches
         existing_instances_result = await db.execute(
             select(models.PostInstance)
             .where(
@@ -196,12 +184,20 @@ async def topoff_scheduler_logic(
                 )
             )
         )
-        existing_instances = {inst.scheduled_for: inst for inst in existing_instances_result.scalars().all() if inst.scheduled_for}
+        # Create a dict keyed by datetime (rounded to minute) for matching
+        existing_instances = {}
+        for inst in existing_instances_result.scalars().all():
+            if inst.scheduled_for:
+                # Round to minute precision for matching
+                rounded_dt = inst.scheduled_for.replace(second=0, microsecond=0)
+                existing_instances[rounded_dt] = inst
         
         # Create missing instances using upsert pattern
         instances_to_create = []
         for target_dt in target_datetimes:
-            existing_instance = existing_instances.get(target_dt)
+            # Round target_dt to minute precision for matching
+            rounded_target_dt = target_dt.replace(second=0, microsecond=0)
+            existing_instance = existing_instances.get(rounded_target_dt)
             
             if existing_instance:
                 # Check if we should skip (has real content or beyond Planned/Draft)

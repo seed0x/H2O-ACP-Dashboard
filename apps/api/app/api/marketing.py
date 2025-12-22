@@ -654,11 +654,12 @@ async def get_calendar_view(
     query = query.order_by(models.PostInstance.scheduled_for)
     
     # Use joinedload to ensure relationships are loaded in the same query (avoids lazy loading issues)
+    # Use outerjoin for content_item since it can be null for planned slots
     from sqlalchemy.orm import joinedload
     result = await db.execute(
         query.options(
-            joinedload(models.PostInstance.content_item), 
-            joinedload(models.PostInstance.channel_account)
+            joinedload(models.PostInstance.content_item),  # This will be None for planned slots
+            joinedload(models.PostInstance.channel_account)  # This should always exist
         )
     )
     instances = result.unique().scalars().all()
@@ -671,7 +672,15 @@ async def get_calendar_view(
             if date_key not in calendar:
                 calendar[date_key] = []
             # Serialize using model_validate - joinedload ensures relationships are loaded
-            calendar[date_key].append(schemas_marketing.PostInstance.model_validate(instance))
+            # For planned slots, content_item will be None, which is handled by Optional in schema
+            try:
+                serialized = schemas_marketing.PostInstance.model_validate(instance)
+                calendar[date_key].append(serialized)
+            except Exception as e:
+                # Log but don't fail - skip problematic instances
+                import logging
+                logging.warning(f"Failed to serialize PostInstance {instance.id}: {e}")
+                continue
     
     return calendar
 
