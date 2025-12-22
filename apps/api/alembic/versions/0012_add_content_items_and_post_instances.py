@@ -87,3 +87,4 @@ def downgrade():
     op.drop_index('ix_content_items_tenant_id', table_name='content_items')
     op.drop_table('content_items')
 
+

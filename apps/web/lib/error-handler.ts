@@ -126,3 +126,4 @@ export function logError(error: unknown, context?: string): void {
     console.error('Error:', errorInfo)
   }
 }
+

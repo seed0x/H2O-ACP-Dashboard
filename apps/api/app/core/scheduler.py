@@ -37,3 +37,4 @@ def shutdown_scheduler():
         scheduler.shutdown()
         logger.info("Background scheduler stopped")
 
+

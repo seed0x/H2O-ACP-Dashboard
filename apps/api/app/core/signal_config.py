@@ -47,3 +47,4 @@ def get_default_owner(signal_id: str, fallback_owner: Optional[str] = None) -> O
     # No rule matched, return fallback
     return fallback_owner
 
+

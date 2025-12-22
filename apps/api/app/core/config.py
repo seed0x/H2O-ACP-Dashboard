@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     api_host: str = os.getenv("API_HOST", "0.0.0.0")
     api_port: int = int(os.getenv("API_PORT", "8000"))
     environment: str = os.getenv("ENVIRONMENT", "development")
-    cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+    cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://dataflow-eta.vercel.app")
     
     # Email/SMTP settings for review requests
     smtp_host: Optional[str] = os.getenv("SMTP_HOST", None)
@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     
     # Frontend URL for review links
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    
+    # Storage configuration (S3 or R2)
+    storage_provider: str = os.getenv("STORAGE_PROVIDER", "s3")  # 's3' or 'r2'
+    storage_bucket: Optional[str] = os.getenv("STORAGE_BUCKET", None)
+    storage_region: Optional[str] = os.getenv("STORAGE_REGION", None)
+    storage_access_key_id: Optional[str] = os.getenv("STORAGE_ACCESS_KEY_ID", None)
+    storage_secret_access_key: Optional[str] = os.getenv("STORAGE_SECRET_ACCESS_KEY", None)
+    storage_endpoint_url: Optional[str] = os.getenv("STORAGE_ENDPOINT_URL", None)  # Required for R2
     
     @property
     def cors_origins_list(self):

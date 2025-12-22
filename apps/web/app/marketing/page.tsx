@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
+import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
 
 const styles = `
   @media (max-width: 768px) {
@@ -418,12 +419,14 @@ export default function MarketingPage() {
 }
 
 function PostsView() {
-  const [contentItems, setContentItems] = useState<any[]>([])
+  const { currentTenant, getTenantName, getTenantColor, isTenantSelected } = useTenant()
+  const [postInstances, setPostInstances] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
+  const [contentStatusFilter, setContentStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [showNewPostModal, setShowNewPostModal] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [selectedPost, setSelectedPost] = useState<any>(null)
   const [channelAccounts, setChannelAccounts] = useState<any[]>([])
   const [error, setError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
@@ -438,9 +441,9 @@ function PostsView() {
   })
 
   useEffect(() => {
-    loadContentItems()
+    loadPostInstances()
     loadChannelAccounts()
-  }, [])
+  }, [currentTenant])
 
   async function loadChannelAccounts() {
     try {
@@ -452,6 +455,7 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
+      // For marketing, always use h2o tenant (marketing is h2o-specific)
       const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, {
         headers,
         credentials: 'include'
@@ -464,12 +468,15 @@ function PostsView() {
     }
   }
 
-  async function loadContentItems() {
+  async function loadPostInstances() {
     try {
+      setLoading(true)
       const token = localStorage.getItem('token')
-      const params = new URLSearchParams({ tenant_id: 'h2o' })
+      const params = new URLSearchParams()
+      
+      // For marketing, always use h2o tenant (marketing is h2o-specific)
+      params.append('tenant_id', 'h2o')
       if (statusFilter) params.append('status', statusFilter)
-      if (search) params.append('search', search)
       
       const headers: HeadersInit = {
         'Content-Type': 'application/json'
@@ -478,22 +485,40 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch(`${API_BASE_URL}/marketing/content-items?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/marketing/post-instances?${params}`, {
         headers,
         credentials: 'include'
       })
       
       if (!response.ok) {
-        throw new Error(`Failed to load content items: ${response.statusText}`)
+        throw new Error(`Failed to load post instances: ${response.statusText}`)
       }
       
-      const data = await response.json()
-      // Ensure data is always an array
-      setContentItems(Array.isArray(data) ? data : [])
+      let data = await response.json()
+      if (!Array.isArray(data)) {
+        data = []
+      }
+      
+      // Filter by content item status if specified
+      if (contentStatusFilter) {
+        data = data.filter((pi: any) => pi.content_item?.status === contentStatusFilter)
+      }
+      
+      // Filter by search term
+      if (search) {
+        const searchLower = search.toLowerCase()
+        data = data.filter((pi: any) => 
+          pi.content_item?.title?.toLowerCase().includes(searchLower) ||
+          pi.content_item?.base_caption?.toLowerCase().includes(searchLower) ||
+          pi.channel_account?.name?.toLowerCase().includes(searchLower)
+        )
+      }
+      
+      setPostInstances(data)
       setLoading(false)
     } catch (error) {
-      console.error('Failed to load content items:', error)
-      setContentItems([]) // Set to empty array on error
+      console.error('Failed to load post instances:', error)
+      setPostInstances([])
       setLoading(false)
     }
   }
@@ -575,7 +600,7 @@ function PostsView() {
       
       setShowNewPostModal(false)
       setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
-      await loadContentItems()
+      await loadPostInstances()
     } catch (error: any) {
       console.error('Failed to create post:', error)
       setError(error.message || 'Failed to create post. Please try again.')
@@ -584,10 +609,14 @@ function PostsView() {
     }
   }
 
+  useEffect(() => {
+    loadPostInstances()
+  }, [statusFilter, contentStatusFilter, search])
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
-        Loading content items...
+        Loading posts...
       </div>
     )
   }
@@ -797,7 +826,7 @@ function PostsView() {
       {/* Quick Accountability Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button
-          onClick={() => { setStatusFilter(''); setSearch(''); loadContentItems(); }}
+          onClick={() => { setStatusFilter(''); setContentStatusFilter(''); setSearch(''); }}
           style={{
             padding: '8px 16px',
             backgroundColor: !statusFilter && !search ? 'var(--color-primary)' : 'var(--color-hover)',
@@ -812,7 +841,7 @@ function PostsView() {
           All Posts
         </button>
         <button
-          onClick={() => { setStatusFilter('Needs Approval'); loadContentItems(); }}
+          onClick={() => { setContentStatusFilter('Needs Approval'); setStatusFilter(''); }}
           style={{
             padding: '8px 16px',
             backgroundColor: statusFilter === 'Needs_Approval' ? 'rgba(255, 152, 0, 0.2)' : 'var(--color-hover)',
@@ -831,8 +860,8 @@ function PostsView() {
             const now = new Date();
             const future48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
             setStatusFilter('Scheduled');
-            setSearch(`scheduled:${now.toISOString().split('T')[0]}-${future48h.toISOString().split('T')[0]}`);
-            loadContentItems();
+            setContentStatusFilter('');
+            setSearch('');
           }}
           style={{
             padding: '8px 16px',
@@ -848,7 +877,7 @@ function PostsView() {
           ⏰ Due in 48h
         </button>
         <button
-          onClick={() => { setStatusFilter('Draft'); setSearch('overdue'); loadContentItems(); }}
+          onClick={() => { setContentStatusFilter('Draft'); setStatusFilter(''); setSearch('overdue'); }}
           style={{
             padding: '8px 16px',
             backgroundColor: 'rgba(244, 67, 54, 0.2)',
@@ -898,33 +927,37 @@ function PostsView() {
               fontSize: '14px'
             }}
           >
-            <option value="">All Statuses</option>
+            <option value="">All PostInstance Status</option>
+            <option value="Planned">Planned</option>
+            <option value="Draft">Draft</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Posted">Posted</option>
+            <option value="Failed">Failed</option>
+          </select>
+          <select
+            value={contentStatusFilter}
+            onChange={(e) => setContentStatusFilter(e.target.value)}
+            style={{
+              padding: '10px 16px',
+              backgroundColor: 'var(--color-hover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              color: 'var(--color-text-primary)',
+              fontSize: '14px'
+            }}
+          >
+            <option value="">All Content Status</option>
             <option value="Idea">Idea</option>
             <option value="Draft">Draft</option>
             <option value="Needs Approval">Needs Approval</option>
             <option value="Scheduled">Scheduled</option>
             <option value="Posted">Posted</option>
           </select>
-          <button
-            onClick={loadContentItems}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: 'var(--color-primary)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}
-          >
-            Search
-          </button>
         </div>
       </div>
 
-      {/* Content Items Table */}
-      {!Array.isArray(contentItems) || contentItems.length === 0 ? (
+      {/* PostInstances Table */}
+      {!Array.isArray(postInstances) || postInstances.length === 0 ? (
         <div style={{
           backgroundColor: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -933,7 +966,7 @@ function PostsView() {
           textAlign: 'center',
           color: 'var(--color-text-secondary)'
         }}>
-          No content items found. Create your first marketing content item to get started.
+          No posts found. Create your first marketing post or run the scheduler to create planned slots.
         </div>
       ) : (
         <div className="marketing-table-wrapper" style={{
@@ -948,74 +981,118 @@ function PostsView() {
                 backgroundColor: 'var(--color-hover)',
                 borderBottom: '1px solid var(--color-border)'
               }}>
+                {currentTenant === 'both' && (
+                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Tenant</th>
+                )}
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Scheduled Date</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Account</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Title</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Status</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Owner</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Created</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Actions</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Type</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Approval Status</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Media</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>PostInstance Status</th>
               </tr>
             </thead>
             <tbody>
-              {Array.isArray(contentItems) && contentItems.map((item, index) => (
-                <tr
-                  key={item.id}
-                  onClick={() => setSelectedItem(item)}
-                  style={{
-                    borderBottom: index < contentItems.length - 1 ? '1px solid var(--color-border)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-                >
-                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>{item.title}</td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{
-                      padding: '4px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      ...getStatusColor(item.status)
-                    }}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>{item.owner}</td>
-                  <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setGenerateItem(item)
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: 'var(--color-primary)',
-                        border: 'none',
-                        borderRadius: '6px',
-                        color: '#ffffff',
+              {Array.isArray(postInstances) && postInstances.map((instance, index) => {
+                const contentItem = instance.content_item
+                const channelAccount = instance.channel_account
+                const tenantId = instance.tenant_id as 'h2o' | 'all_county'
+                return (
+                  <tr
+                    key={instance.id}
+                    onClick={() => setSelectedPost(instance)}
+                    style={{
+                      borderBottom: index < postInstances.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    {currentTenant === 'both' && (
+                      <td style={{ padding: '16px', fontSize: '14px' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          backgroundColor: TENANT_CONFIG[tenantId]?.bgColor || 'var(--color-hover)',
+                          color: TENANT_CONFIG[tenantId]?.color || 'var(--color-text-primary)',
+                          border: `1px solid ${TENANT_CONFIG[tenantId]?.borderColor || 'var(--color-border)'}`
+                        }}>
+                          {TENANT_CONFIG[tenantId]?.shortName || tenantId}
+                        </span>
+                      </td>
+                    )}
+                    <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {instance.scheduled_for ? new Date(instance.scheduled_for).toLocaleString() : 'Not scheduled'}
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {channelAccount?.name || 'Unknown Account'}
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {contentItem?.title || 'Planned'}
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                      -
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '14px' }}>
+                      {contentItem ? (
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          backgroundColor: contentItem.status === 'Needs Approval' ? 'rgba(255, 152, 0, 0.2)' : 'var(--color-hover)',
+                          color: contentItem.status === 'Needs Approval' ? '#FFA726' : 'var(--color-text-primary)'
+                        }}>
+                          {contentItem.status}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>N/A</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {contentItem?.media_assets ? contentItem.media_assets.length : 0}
+                    </td>
+                    <td style={{ padding: '16px', fontSize: '14px' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
                         fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Generate Posts
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        backgroundColor: instance.status === 'Planned' ? 'rgba(156, 39, 176, 0.2)' : 
+                                       instance.status === 'Scheduled' ? 'rgba(33, 150, 243, 0.2)' :
+                                       instance.status === 'Posted' ? 'rgba(76, 175, 80, 0.2)' :
+                                       instance.status === 'Failed' ? 'rgba(244, 67, 54, 0.2)' : 'var(--color-hover)',
+                        color: instance.status === 'Planned' ? '#9C27B0' :
+                               instance.status === 'Scheduled' ? '#2196F3' :
+                               instance.status === 'Posted' ? '#4CAF50' :
+                               instance.status === 'Failed' ? '#EF5350' : 'var(--color-text-primary)'
+                      }}>
+                        {instance.status}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Content Item Detail Modal */}
-      {selectedItem && <ContentItemDetailModal item={selectedItem} channelAccounts={channelAccounts} onClose={() => setSelectedItem(null)} onUpdate={() => { loadContentItems(); setSelectedItem(null); }} />}
+      {selectedPost && (
+        <PostInstanceDetailModal
+          instance={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onUpdate={() => {
+            loadPostInstances()
+            setSelectedPost(null)
+          }}
+        />
+      )}
       
       {/* Generate Posts Modal (from row action) */}
       {generateItem && (
@@ -1637,7 +1714,7 @@ function CalendarView() {
                             border: '1px solid var(--color-border)',
                             cursor: 'pointer'
                           }}
-                          title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}`}
+                          title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}${contentItem?.media_assets && contentItem.media_assets.length > 0 ? ` (${contentItem.media_assets.length} media)` : ''}`}
                         >
                           <div style={{
                             fontWeight: '600',
@@ -1655,6 +1732,15 @@ function CalendarView() {
                               contentItem?.title || 'Untitled'
                             )}
                           </div>
+                          {contentItem?.media_assets && contentItem.media_assets.length > 0 && (
+                            <div style={{
+                              fontSize: '9px',
+                              color: 'var(--color-text-secondary)',
+                              marginTop: '2px'
+                            }}>
+                              📷 {contentItem.media_assets.length}
+                            </div>
+                          )}
                           {viewMode === 'week' && (
                             <>
                               <div style={{
@@ -2585,6 +2671,10 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
   useEffect(() => {
     // Check if this is a planned slot (no content_item_id or status is Planned)
     setIsPlannedSlot(instance.content_item_id === null || instance.status === 'Planned')
+    // Auto-open editor for planned slots
+    if (instance.content_item_id === null || instance.status === 'Planned') {
+      setShowEditContentModal(true)
+    }
   }, [instance])
 
   return (
@@ -2740,8 +2830,56 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
 function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { instance: any, contentItem: any, onClose: () => void, onSuccess: () => void }) {
   const [title, setTitle] = useState('')
   const [baseCaption, setBaseCaption] = useState('')
+  const [postType, setPostType] = useState('Post')
+  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [uploadedMedia, setUploadedMedia] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  async function handleMediaUpload(file: File, contentItemId?: string): Promise<any> {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    let url = `${API_BASE_URL}/marketing/media/upload?tenant_id=${instance.tenant_id}`
+    if (contentItemId) {
+      url += `&content_item_id=${contentItemId}`
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include',
+      body: formData
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Failed to upload media' }))
+      throw new Error(errorData.detail || 'Failed to upload media')
+    }
+
+    return await response.json()
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    // Just store files for now, upload after content item is created
+    setMediaFiles([...mediaFiles, ...files])
+  }
+
+  function removeMedia(index: number) {
+    setUploadedMedia(uploadedMedia.filter((_, i) => i !== index))
+    setMediaFiles(mediaFiles.filter((_, i) => i !== index))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -2790,6 +2928,17 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
 
         const newItem = await newItemResponse.json()
 
+        // Upload media files and attach to content item
+        if (mediaFiles.length > 0) {
+          for (const file of mediaFiles) {
+            try {
+              await handleMediaUpload(file, newItem.id)
+            } catch (err) {
+              console.warn('Failed to upload media:', err)
+            }
+          }
+        }
+
         // Update the post instance to use the new content item
         const updateResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}`, {
           method: 'PATCH',
@@ -2826,6 +2975,17 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         if (!updateResponse.ok) {
           const errorData = await updateResponse.json().catch(() => ({ detail: 'Failed to update content' }))
           throw new Error(errorData.detail || 'Failed to update content')
+        }
+
+        // Upload and attach media to existing content item
+        if (mediaFiles.length > 0) {
+          for (const file of mediaFiles) {
+            try {
+              await handleMediaUpload(file, contentItem.id)
+            } catch (err) {
+              console.warn('Failed to upload media:', err)
+            }
+          }
         }
 
         // Update post instance status
@@ -2917,13 +3077,36 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
-                Content *
+                Type
+              </label>
+              <select
+                value={postType}
+                onChange={(e) => setPostType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="Post">Post</option>
+                <option value="Story">Story</option>
+                <option value="Reel">Reel</option>
+                <option value="Video">Video</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                Content / Idea *
               </label>
               <textarea
                 required
                 value={baseCaption}
                 onChange={(e) => setBaseCaption(e.target.value)}
-                placeholder="Post content..."
+                placeholder="Post content or idea..."
                 rows={5}
                 style={{
                   width: '100%',
@@ -2937,6 +3120,85 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
                   resize: 'vertical'
                 }}
               />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                Media (Images/Videos)
+              </label>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={handleFileChange}
+                disabled={uploading}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px',
+                  cursor: uploading ? 'not-allowed' : 'pointer'
+                }}
+              />
+              {mediaFiles.length > 0 && (
+                <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {mediaFiles.map((file, index) => (
+                    <div key={index} style={{ position: 'relative', display: 'inline-block' }}>
+                      {file.type.startsWith('image/') ? (
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          style={{
+                            width: '80px',
+                            height: '80px',
+                            objectFit: 'cover',
+                            borderRadius: '6px',
+                            border: '1px solid var(--color-border)'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '80px',
+                          height: '80px',
+                          backgroundColor: 'var(--color-hover)',
+                          borderRadius: '6px',
+                          border: '1px solid var(--color-border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '24px'
+                        }}>
+                          🎥
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeMedia(index)}
+                        style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          right: '-8px',
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          backgroundColor: '#EF5350',
+                          color: '#ffffff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>

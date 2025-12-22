@@ -239,6 +239,22 @@ class ContentItem(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     post_instances = relationship("PostInstance", back_populates="content_item", cascade="all, delete-orphan")
+    media_assets = relationship("MediaAsset", back_populates="content_item", cascade="all, delete-orphan")
+
+class MediaAsset(Base):
+    __tablename__ = "media_assets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    content_item_id = Column(UUID(as_uuid=True), ForeignKey("content_items.id"), nullable=True)
+    file_name = Column(String, nullable=False)
+    file_url = Column(String, nullable=False)  # S3/R2 cloud storage URL
+    file_type = Column(String, nullable=False)  # 'image', 'video'
+    file_size = Column(Integer, nullable=True)  # Size in bytes
+    mime_type = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    content_item = relationship("ContentItem", back_populates="media_assets")
 
 class PostInstance(Base):
     __tablename__ = "post_instances"

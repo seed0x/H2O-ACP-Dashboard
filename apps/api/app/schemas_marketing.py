@@ -140,10 +140,30 @@ class ContentItemUpdate(BaseModel):
     source_type: Optional[str] = None
     source_ref: Optional[str] = None
 
+class MediaAssetBase(BaseModel):
+    tenant_id: str
+    content_item_id: Optional[UUID] = None
+    file_name: str
+    file_url: str
+    file_type: str  # 'image', 'video'
+    file_size: Optional[int] = None
+    mime_type: Optional[str] = None
+
+class MediaAssetCreate(MediaAssetBase):
+    pass
+
+class MediaAsset(MediaAssetBase):
+    id: UUID
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class ContentItem(ContentItemBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    media_assets: Optional[List[MediaAsset]] = None
 
     class Config:
         from_attributes = True
@@ -176,6 +196,7 @@ class PostInstanceCreate(PostInstanceBase):
     pass
 
 class PostInstanceUpdate(BaseModel):
+    content_item_id: Optional[UUID] = None
     caption_override: Optional[str] = None
     scheduled_for: Optional[datetime] = None
     status: Optional[str] = None

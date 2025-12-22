@@ -48,3 +48,4 @@ def downgrade():
     op.drop_index('ix_notifications_user_id', table_name='notifications')
     op.drop_table('notifications')
 
+

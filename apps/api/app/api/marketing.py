@@ -1,7 +1,7 @@
 """
 Marketing module endpoints for content management and social media posting
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import selectinload, joinedload
@@ -217,7 +217,9 @@ async def list_content_items(
         query = query.where(models.ContentItem.title.ilike(f"%{search}%"))
     
     query = query.order_by(models.ContentItem.created_at.desc()).limit(limit).offset(offset)
-    result = await db.execute(query)
+    result = await db.execute(
+        query.options(selectinload(models.ContentItem.media_assets))
+    )
     return result.scalars().all()
 
 
@@ -250,7 +252,9 @@ async def get_content_item(
 ):
     """Get a content item by ID"""
     result = await db.execute(
-        select(models.ContentItem).where(models.ContentItem.id == item_id)
+        select(models.ContentItem)
+        .where(models.ContentItem.id == item_id)
+        .options(selectinload(models.ContentItem.media_assets))
     )
     item = result.scalar_one_or_none()
     if not item:
@@ -283,7 +287,13 @@ async def update_content_item(
         )
     
     await db.commit()
-    await db.refresh(item)
+    # Re-query with relationships
+    result = await db.execute(
+        select(models.ContentItem)
+        .where(models.ContentItem.id == item.id)
+        .options(selectinload(models.ContentItem.media_assets))
+    )
+    item = result.scalar_one()
     return item
 
 
@@ -335,7 +345,7 @@ async def list_post_instances(
     query = query.order_by(models.PostInstance.scheduled_for.desc().nullslast(), models.PostInstance.created_at.desc()).limit(limit).offset(offset)
     result = await db.execute(
         query.options(
-            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.content_item).selectinload(models.ContentItem.media_assets), 
             joinedload(models.PostInstance.channel_account)
         )
     )
@@ -658,7 +668,7 @@ async def get_calendar_view(
     from sqlalchemy.orm import joinedload
     result = await db.execute(
         query.options(
-            joinedload(models.PostInstance.content_item),  # This will be None for planned slots
+            joinedload(models.PostInstance.content_item).selectinload(models.ContentItem.media_assets),  # This will be None for planned slots
             joinedload(models.PostInstance.channel_account)  # This should always exist
         )
     )
@@ -683,4 +693,80 @@ async def get_calendar_view(
                 continue
     
     return calendar
+
+
+# Media Assets
+
+@router.post("/media/upload", response_model=schemas_marketing.MediaAsset, status_code=status.HTTP_201_CREATED)
+async def upload_media(
+    file: UploadFile = File(...),
+    tenant_id: str = Query(..., description="Tenant ID"),
+    content_item_id: Optional[UUID] = Query(None, description="Optional content item ID to attach to"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Upload a media file to S3/R2 storage"""
+    try:
+        from ..core.storage import upload_file, validate_file
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Determine file type from mime type
+        mime_type = file.content_type
+        if mime_type and mime_type.startswith('image/'):
+            file_type = 'image'
+        elif mime_type and mime_type.startswith('video/'):
+            file_type = 'video'
+        else:
+            # Try to infer from extension
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            if file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                file_type = 'image'
+            elif file_ext in ['.mp4', '.mov', '.avi']:
+                file_type = 'video'
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported file type. Only images and videos are allowed."
+                )
+        
+        # Upload to storage
+        file_url = upload_file(
+            file_content=file_content,
+            file_name=file.filename,
+            tenant_id=tenant_id,
+            folder="media",
+            mime_type=mime_type
+        )
+        
+        # Create MediaAsset record
+        media_asset = models.MediaAsset(
+            tenant_id=tenant_id,
+            content_item_id=content_item_id,
+            file_name=file.filename,
+            file_url=file_url,
+            file_type=file_type,
+            file_size=len(file_content),
+            mime_type=mime_type
+        )
+        db.add(media_asset)
+        await db.flush()
+        
+        # Audit log
+        await crud.write_audit(
+            db, None, 'media_asset', media_asset.id, 'create', current_user.username
+        )
+        
+        await db.commit()
+        await db.refresh(media_asset)
+        return media_asset
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload media: {str(e)}"
+        )
 
