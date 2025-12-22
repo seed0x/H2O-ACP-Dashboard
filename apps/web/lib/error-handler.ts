@@ -8,9 +8,21 @@ export interface ApiError {
 }
 
 export function getErrorMessage(error: any): string {
-  if (error.response?.data?.detail) return error.response.data.detail
+  const detail = error.response?.data?.detail
+  
+  // Handle Pydantic validation errors (array of {type, loc, msg, input, ctx})
+  if (Array.isArray(detail)) {
+    return detail.map((e: any) => e.msg || 'Validation error').join(', ')
+  }
+  
+  // Handle object detail (sometimes Pydantic returns object)
+  if (detail && typeof detail === 'object') {
+    return detail.msg || detail.message || JSON.stringify(detail)
+  }
+  
+  if (typeof detail === 'string') return detail
   if (error.response?.data?.message) return error.response.data.message
-  if (error.detail) return error.detail
+  if (error.detail) return typeof error.detail === 'string' ? error.detail : 'Validation error'
   if (error.message) return error.message
   if (typeof error === 'string') return error
   return 'An unexpected error occurred'

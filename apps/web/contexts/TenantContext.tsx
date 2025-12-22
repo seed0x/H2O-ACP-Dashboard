@@ -160,6 +160,48 @@ export function useTenantParam() {
   }, [currentTenant])
 }
 
+/**
+ * Build API query string with tenant_id parameter
+ * Use this when calling endpoints that require tenant_id
+ * 
+ * @param requiredTenant - The tenant this endpoint requires (e.g., 'h2o' for reviews)
+ * @param currentTenant - The user's currently selected tenant
+ * @param additionalParams - Any other query params to include
+ */
+export function buildTenantQuery(
+  requiredTenant: 'h2o' | 'all_county',
+  currentTenant: TenantId,
+  additionalParams?: Record<string, string>
+): string {
+  const params = new URLSearchParams()
+  
+  // Always pass the required tenant for tenant-specific endpoints
+  // When user selects 'both', still use the required tenant for the endpoint
+  params.set('tenant_id', requiredTenant)
+  
+  if (additionalParams) {
+    Object.entries(additionalParams).forEach(([key, value]) => {
+      if (value) params.set(key, value)
+    })
+  }
+  
+  return params.toString()
+}
+
+/**
+ * Build optional tenant query - returns empty string if 'both' is selected
+ * Use this for endpoints that support filtering by tenant but don't require it
+ */
+export function buildOptionalTenantQuery(
+  currentTenant: TenantId,
+  defaultTenant?: 'h2o' | 'all_county'
+): string {
+  if (currentTenant === 'both') {
+    return defaultTenant ? `tenant_id=${defaultTenant}` : ''
+  }
+  return `tenant_id=${currentTenant}`
+}
+
 export function getPageTenant(pageName: string): TenantId {
   switch (pageName) {
     case 'marketing':

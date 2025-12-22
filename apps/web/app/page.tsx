@@ -80,37 +80,33 @@ export default function Dashboard() {
       let overdueRequestsRes = { data: [] }
       let overdueTicketsRes = { data: [] }
       
-      // Load overdue jobs (All County)
+      // Load overdue jobs (All County) - always pass tenant_id
       if (isTenantSelected('all_county')) {
         try {
-          const jobsParams = currentTenant === 'both' ? '' : '?tenant_id=all_county'
-          overdueJobsRes = await axios.get(`${API_BASE_URL}/jobs/overdue${jobsParams}`, { headers, withCredentials: true })
+          overdueJobsRes = await axios.get(`${API_BASE_URL}/jobs/overdue?tenant_id=all_county`, { headers, withCredentials: true })
         } catch (error) {
-          handleApiError(error, 'Loading overdue jobs', loadDashboard)
+          console.error('Failed to load overdue jobs:', error)
         }
       }
       
-      // Load overdue service calls (H2O)
+      // Load overdue service calls (H2O) - always pass tenant_id
       if (isTenantSelected('h2o')) {
         try {
-          const callsParams = currentTenant === 'both' ? '' : '?tenant_id=h2o'
-          overdueCallsRes = await axios.get(`${API_BASE_URL}/service-calls/overdue${callsParams}`, { headers, withCredentials: true })
+          overdueCallsRes = await axios.get(`${API_BASE_URL}/service-calls/overdue?tenant_id=h2o`, { headers, withCredentials: true })
         } catch (error) {
-          handleApiError(error, 'Loading overdue service calls', loadDashboard)
+          console.error('Failed to load overdue service calls:', error)
         }
         
         try {
-          const requestsParams = currentTenant === 'both' ? '' : '?tenant_id=h2o'
-          overdueRequestsRes = await axios.get(`${API_BASE_URL}/reviews/requests/overdue${requestsParams}`, { headers, withCredentials: true })
+          overdueRequestsRes = await axios.get(`${API_BASE_URL}/reviews/requests/overdue?tenant_id=h2o`, { headers, withCredentials: true })
         } catch (error) {
-          handleApiError(error, 'Loading overdue review requests', loadDashboard)
+          console.error('Failed to load overdue review requests:', error)
         }
         
         try {
-          const ticketsParams = currentTenant === 'both' ? '' : '?tenant_id=h2o'
-          overdueTicketsRes = await axios.get(`${API_BASE_URL}/recovery-tickets/overdue${ticketsParams}`, { headers, withCredentials: true })
+          overdueTicketsRes = await axios.get(`${API_BASE_URL}/recovery-tickets/overdue?tenant_id=h2o`, { headers, withCredentials: true })
         } catch (error) {
-          handleApiError(error, 'Loading overdue recovery tickets', loadDashboard)
+          console.error('Failed to load overdue recovery tickets:', error)
         }
       }
 

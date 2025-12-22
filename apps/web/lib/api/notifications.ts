@@ -20,28 +20,42 @@ export interface NotificationCount {
 
 export const notificationApi = {
   list: async (read?: boolean, limit: number = 50, offset: number = 0): Promise<Notification[]> => {
-    const token = localStorage.getItem('token')
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-    const params = new URLSearchParams()
-    if (read !== undefined) params.append('read', String(read))
-    params.append('limit', String(limit))
-    params.append('offset', String(offset))
-    
-    const res = await axios.get(`${API_BASE_URL}/notifications?${params}`, {
-      headers,
-      withCredentials: true
-    })
-    return res.data
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return []
+      
+      const headers = { 'Authorization': `Bearer ${token}` }
+      const params = new URLSearchParams()
+      if (read !== undefined) params.append('read', String(read))
+      params.append('limit', String(limit))
+      params.append('offset', String(offset))
+      
+      const res = await axios.get(`${API_BASE_URL}/notifications?${params}`, {
+        headers,
+        withCredentials: true
+      })
+      return res.data
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error)
+      return []
+    }
   },
 
   getUnreadCount: async (): Promise<number> => {
-    const token = localStorage.getItem('token')
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-    const res = await axios.get(`${API_BASE_URL}/notifications/unread-count`, {
-      headers,
-      withCredentials: true
-    })
-    return res.data.count
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return 0
+      
+      const headers = { 'Authorization': `Bearer ${token}` }
+      const res = await axios.get(`${API_BASE_URL}/notifications/unread-count`, {
+        headers,
+        withCredentials: true
+      })
+      return res.data.count
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error)
+      return 0
+    }
   },
 
   markRead: async (notificationId: string): Promise<Notification> => {

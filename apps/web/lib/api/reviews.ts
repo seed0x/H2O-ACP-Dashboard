@@ -1,6 +1,18 @@
 import axios from 'axios'
 import { API_BASE_URL } from '../config'
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token')
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
+function createAuthAxios() {
+  return axios.create({
+    headers: getAuthHeaders(),
+    withCredentials: true
+  })
+}
+
 export interface ReviewRequest {
   id: string
   tenant_id: string
@@ -78,7 +90,7 @@ export interface PublicReviewCreate {
 export const reviewApi = {
   // Review Requests
   createRequest: async (data: ReviewRequestCreate): Promise<ReviewRequest> => {
-    const res = await axios.post(`${API_BASE_URL}/reviews/requests`, data)
+    const res = await axios.post(`${API_BASE_URL}/reviews/requests`, data, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
@@ -86,33 +98,33 @@ export const reviewApi = {
     const params = new URLSearchParams({ tenant_id: tenantId })
     if (status) params.append('status', status)
     if (serviceCallId) params.append('service_call_id', serviceCallId)
-    const res = await axios.get(`${API_BASE_URL}/reviews/requests?${params}`)
+    const res = await axios.get(`${API_BASE_URL}/reviews/requests?${params}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   getRequest: async (requestId: string): Promise<ReviewRequest> => {
-    const res = await axios.get(`${API_BASE_URL}/reviews/requests/${requestId}`)
+    const res = await axios.get(`${API_BASE_URL}/reviews/requests/${requestId}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   updateRequest: async (requestId: string, data: Partial<ReviewRequest>): Promise<ReviewRequest> => {
-    const res = await axios.patch(`${API_BASE_URL}/reviews/requests/${requestId}`, data)
+    const res = await axios.patch(`${API_BASE_URL}/reviews/requests/${requestId}`, data, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   sendRequest: async (requestId: string): Promise<ReviewRequest> => {
-    const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/send`)
+    const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/send`, {}, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   markRequestAsLost: async (requestId: string): Promise<ReviewRequest> => {
-    const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/mark-lost`)
+    const res = await axios.post(`${API_BASE_URL}/reviews/requests/${requestId}/mark-lost`, {}, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   getStats: async (tenantId: string): Promise<ReviewStats> => {
     const params = new URLSearchParams({ tenant_id: tenantId })
-    const res = await axios.get(`${API_BASE_URL}/reviews/stats?${params}`)
+    const res = await axios.get(`${API_BASE_URL}/reviews/stats?${params}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
@@ -121,17 +133,17 @@ export const reviewApi = {
     const params = new URLSearchParams()
     if (tenantId) params.append('tenant_id', tenantId)
     if (isPublic !== undefined) params.append('is_public', String(isPublic))
-    const res = await axios.get(`${API_BASE_URL}/reviews?${params}`)
+    const res = await axios.get(`${API_BASE_URL}/reviews?${params}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   getReview: async (reviewId: string): Promise<Review> => {
-    const res = await axios.get(`${API_BASE_URL}/reviews/${reviewId}`)
+    const res = await axios.get(`${API_BASE_URL}/reviews/${reviewId}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   updateReview: async (reviewId: string, data: { is_public?: boolean }): Promise<Review> => {
-    const res = await axios.patch(`${API_BASE_URL}/reviews/${reviewId}`, data)
+    const res = await axios.patch(`${API_BASE_URL}/reviews/${reviewId}`, data, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
@@ -145,19 +157,19 @@ export const reviewApi = {
     customer_phone?: string
     issue_description: string
   }): Promise<RecoveryTicket> => {
-    const res = await axios.post(`${API_BASE_URL}/recovery-tickets`, data)
+    const res = await axios.post(`${API_BASE_URL}/recovery-tickets`, data, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   listRecoveryTickets: async (tenantId: string, status?: string): Promise<RecoveryTicket[]> => {
     const params = new URLSearchParams({ tenant_id: tenantId })
     if (status) params.append('status', status)
-    const res = await axios.get(`${API_BASE_URL}/recovery-tickets?${params}`)
+    const res = await axios.get(`${API_BASE_URL}/recovery-tickets?${params}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
   getRecoveryTicket: async (ticketId: string): Promise<RecoveryTicket> => {
-    const res = await axios.get(`${API_BASE_URL}/recovery-tickets/${ticketId}`)
+    const res = await axios.get(`${API_BASE_URL}/recovery-tickets/${ticketId}`, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 
@@ -166,7 +178,7 @@ export const reviewApi = {
     assigned_to?: string
     resolution_notes?: string
   }): Promise<RecoveryTicket> => {
-    const res = await axios.patch(`${API_BASE_URL}/recovery-tickets/${ticketId}`, data)
+    const res = await axios.patch(`${API_BASE_URL}/recovery-tickets/${ticketId}`, data, { headers: getAuthHeaders(), withCredentials: true })
     return res.data
   },
 }
