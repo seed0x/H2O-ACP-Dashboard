@@ -13,6 +13,32 @@ from .. import models
 logger = logging.getLogger(__name__)
 
 
+async def topoff_marketing_slots():
+    """Top-off marketing post slots for all tenants (runs daily)"""
+    try:
+        # Import here to avoid circular dependency
+        from ..api.marketing_scheduler import topoff_scheduler_logic
+        
+        async with AsyncSessionLocal() as db:
+            # Get all unique tenant_ids from channel_accounts
+            tenants_result = await db.execute(
+                select(models.ChannelAccount.tenant_id).distinct()
+            )
+            tenants = [row[0] for row in tenants_result.all()]
+            
+            for tenant_id in tenants:
+                try:
+                    # Call the logic function with the db session
+                    result = await topoff_scheduler_logic(tenant_id, days=28, db=db)
+                    logger.info(f"Marketing slots top-off for {tenant_id}: {result['instances_created']} created, {result['instances_skipped']} skipped")
+                except Exception as e:
+                    logger.error(f"Error top-off slots for tenant {tenant_id}: {e}", exc_info=True)
+                    await db.rollback()
+            
+    except Exception as e:
+        logger.error(f"Error in topoff_marketing_slots: {e}", exc_info=True)
+
+
 async def create_notification(
     db: AsyncSession,
     tenant_id: str,

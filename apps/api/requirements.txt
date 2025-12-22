@@ -17,3 +17,5 @@ pytest-asyncio
 httpx
 apscheduler>=3.10.0
 mangum
+pytz
+python-dateutil

@@ -721,6 +721,7 @@ function PostsView() {
 
 function getStatusColor(status: string) {
   const colors: Record<string, any> = {
+    'Planned': { backgroundColor: 'rgba(156, 39, 176, 0.15)', color: '#9C27B0' }, // Purple for planned slots
     'Idea': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
     'Draft': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
     'Needs Approval': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
@@ -763,6 +764,7 @@ function CalendarView() {
   })
   const [error, setError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
+  const [topoffLoading, setTopoffLoading] = useState(false)
   
   // Save view mode preference
   const handleViewModeChange = (mode: 'week' | 'month') => {
@@ -941,6 +943,39 @@ function CalendarView() {
     const dateStr = date.toISOString().split('T')[0]
     const dayData = calendarData.find(d => d.date === dateStr)
     return dayData?.instances || []
+  }
+
+  async function handleTopoff() {
+    setTopoffLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/marketing/scheduler/topoff?tenant_id=h2o&days=28`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to top off slots' }))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      showToast(`Created ${result.instances_created} new slots, skipped ${result.instances_skipped} existing`, 'success')
+      await loadCalendar()
+    } catch (error: any) {
+      console.error('Failed to top off slots:', error)
+      showToast(error.message || 'Failed to top off slots', 'error')
+    } finally {
+      setTopoffLoading(false)
+    }
   }
 
   async function handleCreatePost(e: React.FormEvent) {
@@ -1146,6 +1181,24 @@ function CalendarView() {
             }}
           >
             + New Post
+          </button>
+          <button
+            onClick={handleTopoff}
+            disabled={topoffLoading}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: topoffLoading ? 'var(--color-hover)' : 'rgba(156, 39, 176, 0.8)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: topoffLoading ? 'not-allowed' : 'pointer',
+              opacity: topoffLoading ? 0.6 : 1
+            }}
+            title="Generate planned slots for the next 28 days"
+          >
+            {topoffLoading ? 'Generating...' : '📅 Top off 28 days'}
           </button>
           <div style={{
             display: 'flex',

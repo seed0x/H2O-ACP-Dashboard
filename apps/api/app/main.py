@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
                 # Start background scheduler
                 try:
                     from .core.scheduler import start_scheduler, get_scheduler
-                    from .core.tasks import check_overdue_items, automate_review_requests, escalate_stale_items, daily_summary
+                    from .core.tasks import check_overdue_items, automate_review_requests, escalate_stale_items, daily_summary, topoff_marketing_slots
                     from apscheduler.triggers.cron import CronTrigger
                     from apscheduler.triggers.interval import IntervalTrigger
                     
@@ -115,6 +115,14 @@ async def lifespan(app: FastAPI):
                         daily_summary,
                         trigger=CronTrigger(hour=8, minute=0),
                         id='daily_summary',
+                        replace_existing=True
+                    )
+                    
+                    # Marketing slot top-off: run daily at 2 AM
+                    scheduler.add_job(
+                        topoff_marketing_slots,
+                        trigger=CronTrigger(hour=2, minute=0),
+                        id='topoff_marketing_slots',
                         replace_existing=True
                     )
                     

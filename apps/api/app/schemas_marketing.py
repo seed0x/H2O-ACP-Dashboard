@@ -33,6 +33,9 @@ class ChannelAccountBase(BaseModel):
     oauth_token_ref: Optional[str] = None
     status: str = 'active'
     notes: Optional[str] = None
+    posts_per_week: Optional[int] = 3
+    schedule_timezone: Optional[str] = 'America/Los_Angeles'
+    schedule_times: Optional[List[str]] = None
 
 class ChannelAccountCreate(ChannelAccountBase):
     pass
@@ -48,6 +51,9 @@ class ChannelAccountUpdate(BaseModel):
     oauth_token_ref: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    posts_per_week: Optional[int] = None
+    schedule_timezone: Optional[str] = None
+    schedule_times: Optional[List[str]] = None
 
 class ChannelAccount(ChannelAccountBase):
     id: UUID
@@ -161,7 +167,7 @@ class PostInstanceBase(BaseModel):
 
     @validator('status')
     def validate_status(cls, v):
-        valid_statuses = ['Draft', 'Scheduled', 'Posted', 'Failed']
+        valid_statuses = ['Planned', 'Draft', 'Scheduled', 'Posted', 'Failed']
         if v not in valid_statuses:
             raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
         return v

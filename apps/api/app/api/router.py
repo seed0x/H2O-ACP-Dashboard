@@ -30,6 +30,7 @@ from uuid import UUID
 import logging
 logger = logging.getLogger(__name__)
 marketing_router = None
+marketing_scheduler_router = None
 try:
     from .marketing import router as marketing_router
     logger.info("✓ Marketing routes imported successfully")
@@ -43,6 +44,16 @@ except Exception as e:
     import traceback
     logger.error(f"Traceback: {traceback.format_exc()}")
     marketing_router = None
+
+try:
+    from .marketing_scheduler import router as marketing_scheduler_router
+    logger.info("✓ Marketing scheduler routes imported successfully")
+except ImportError as e:
+    logger.warning(f"Marketing scheduler routes import failed: {e}")
+    marketing_scheduler_router = None
+except Exception as e:
+    logger.warning(f"Marketing scheduler routes import failed: {e}")
+    marketing_scheduler_router = None
 
 # Import review system routes
 try:
@@ -94,6 +105,11 @@ if marketing_router:
     logger.info("Marketing routes included successfully in main router")
 else:
     logger.error("Marketing routes NOT included - marketing_router is None. Endpoints will return 404!")
+
+# Include marketing scheduler routes if available
+if marketing_scheduler_router:
+    router.include_router(marketing_scheduler_router)
+    logger.info("Marketing scheduler routes included successfully in main router")
 
 # Include review system routes if available
 if reviews_router:

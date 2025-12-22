@@ -206,6 +206,10 @@ class ChannelAccount(Base):
     oauth_token_ref = Column(String, nullable=True)
     status = Column(String, nullable=False, default='active')
     notes = Column(Text, nullable=True)
+    # Scheduling configuration
+    posts_per_week = Column(Integer, nullable=True, default=3)  # Number of posts per week
+    schedule_timezone = Column(String, nullable=True, default='America/Los_Angeles')  # IANA timezone
+    schedule_times = Column(ARRAY(String), nullable=True)  # Array of times like ["09:00", "14:00"]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
