@@ -107,7 +107,10 @@ function DemandSignalsPanel() {
   const [error, setError] = useState<string>('')
 
   useEffect(() => {
-    if (isOpen && !signals) {
+    if (isOpen) {
+      // Reset signals when period changes to show loading state
+      setSignals(null)
+      setError('')
       loadDemandSignals()
     }
   }, [isOpen, period])
@@ -121,23 +124,32 @@ function DemandSignalsPanel() {
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${API_BASE_URL}/marketing/demand-signals?tenant_id=h2o&days=${period}`, {
+      const url = `${API_BASE_URL}/marketing/demand-signals?tenant_id=h2o&days=${period}`
+      console.log('Fetching demand signals from:', url)
+      
+      const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         credentials: 'include'
       })
 
+      console.log('Demand signals response status:', response.status, response.statusText)
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to load demand signals' }))
-        throw new Error(errorData.detail || 'Failed to load demand signals')
+        const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }))
+        console.error('Demand signals API error:', errorData)
+        throw new Error(errorData.detail || `Failed to load demand signals: ${response.statusText}`)
       }
 
       const data = await response.json()
+      console.log('Demand signals data received:', data)
       setSignals(data)
     } catch (error: any) {
       console.error('Failed to load demand signals:', error)
       setError(error.message || 'Failed to load demand signals')
+      setSignals(null) // Clear signals on error
     } finally {
       setLoading(false)
     }
@@ -259,7 +271,7 @@ function DemandSignalsPanel() {
       {/* Period Selector */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button
-          onClick={() => { setPeriod(7); setSignals(null); }}
+          onClick={() => setPeriod(7)}
           style={{
             flex: 1,
             padding: '8px',
@@ -275,7 +287,7 @@ function DemandSignalsPanel() {
           7 Days
         </button>
         <button
-          onClick={() => { setPeriod(30); setSignals(null); }}
+          onClick={() => setPeriod(30)}
           style={{
             flex: 1,
             padding: '8px',

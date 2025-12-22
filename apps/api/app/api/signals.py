@@ -4,6 +4,7 @@ Signals API - Aggregates actionable items across Reviews, Marketing, and Dispatc
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
+from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -209,7 +210,6 @@ async def get_marketing_signals(tenant_id: str, db: AsyncSession) -> List[dict]:
     # A post is "not ready" if it's Scheduled status but missing caption or scheduled_for
     upcoming_instances_result = await db.execute(
         select(models.PostInstance)
-        .join(models.ContentItem)
         .where(
             and_(
                 models.PostInstance.tenant_id == tenant_id,
@@ -222,8 +222,12 @@ async def get_marketing_signals(tenant_id: str, db: AsyncSession) -> List[dict]:
                 )
             )
         )
+        .options(
+            joinedload(models.PostInstance.content_item),
+            joinedload(models.PostInstance.channel_account)
+        )
     )
-    upcoming_instances = upcoming_instances_result.scalars().all()
+    upcoming_instances = upcoming_instances_result.unique().scalars().all()
     
     not_ready = []
     for instance in upcoming_instances:
@@ -267,7 +271,6 @@ async def get_marketing_signals(tenant_id: str, db: AsyncSession) -> List[dict]:
     # Signal 2: Posts past scheduled time not marked Posted
     past_due_result = await db.execute(
         select(models.PostInstance)
-        .join(models.ContentItem)
         .where(
             and_(
                 models.PostInstance.tenant_id == tenant_id,
@@ -276,8 +279,12 @@ async def get_marketing_signals(tenant_id: str, db: AsyncSession) -> List[dict]:
                 models.PostInstance.status.in_(['Scheduled', 'Draft'])
             )
         )
+        .options(
+            joinedload(models.PostInstance.content_item),
+            joinedload(models.PostInstance.channel_account)
+        )
     )
-    past_due = past_due_result.scalars().all()
+    past_due = past_due_result.unique().scalars().all()
     
     if past_due:
         # Get owner from content item if available
