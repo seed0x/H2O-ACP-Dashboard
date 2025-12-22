@@ -85,13 +85,315 @@ function MarketingContent() {
         </div>
 
         {/* Tab Content */}
-        <div>
-          {activeTab === 'calendar' && <CalendarView />}
-          {activeTab === 'posts' && <PostsView />}
-          {activeTab === 'accounts' && <AccountsView />}
+        <div style={{ display: 'flex', gap: '24px', position: 'relative' }}>
+          <div style={{ flex: 1 }}>
+            {activeTab === 'calendar' && <CalendarView />}
+            {activeTab === 'posts' && <PostsView />}
+            {activeTab === 'accounts' && <AccountsView />}
+          </div>
+          <DemandSignalsPanel />
         </div>
       </div>
     </>
+  )
+}
+
+// Demand Signals Panel Component
+function DemandSignalsPanel() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [signals, setSignals] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [period, setPeriod] = useState<7 | 30>(7)
+  const [error, setError] = useState<string>('')
+
+  useEffect(() => {
+    if (isOpen && !signals) {
+      loadDemandSignals()
+    }
+  }, [isOpen, period])
+
+  async function loadDemandSignals() {
+    setLoading(true)
+    setError('')
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/marketing/demand-signals?tenant_id=h2o&days=${period}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to load demand signals' }))
+        throw new Error(errorData.detail || 'Failed to load demand signals')
+      }
+
+      const data = await response.json()
+      setSignals(data)
+    } catch (error: any) {
+      console.error('Failed to load demand signals:', error)
+      setError(error.message || 'Failed to load demand signals')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCreateContent(query: string, category: string) {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Create a draft ContentItem pre-filled with the query
+      const title = `Content for: ${query}`
+      const baseCaption = `Based on search demand: "${query}"\n\nCreate engaging content about ${query} for ${category} services.`
+
+      const response = await fetch(`${API_BASE_URL}/marketing/content-items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          tenant_id: 'h2o',
+          title: title,
+          base_caption: baseCaption,
+          status: 'Idea',
+          owner: 'admin',
+          tags: [category, 'demand-signal'],
+          source_type: 'demand_signal',
+          source_ref: query
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to create content' }))
+        throw new Error(errorData.detail || 'Failed to create content')
+      }
+
+      showToast(`Created draft content for "${query}"`, 'success')
+      // Optionally refresh signals or navigate to posts tab
+    } catch (error: any) {
+      console.error('Failed to create content:', error)
+      showToast(error.message || 'Failed to create content', 'error')
+    }
+  }
+
+  const categoryLabels: Record<string, string> = {
+    water_heater: 'Water Heater',
+    plumbing: 'Plumbing',
+    emergency: 'Emergency',
+    installation: 'Installation',
+    repair: 'Repair',
+    maintenance: 'Maintenance',
+    general: 'General'
+  }
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        style={{
+          position: 'fixed',
+          right: '20px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          padding: '12px 16px',
+          backgroundColor: 'var(--color-primary)',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '8px 0 0 8px',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: '600',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          zIndex: 100
+        }}
+        title="Show Demand Signals"
+      >
+        📊 Demand Signals
+      </button>
+    )
+  }
+
+  return (
+    <div style={{
+      width: '380px',
+      backgroundColor: 'var(--color-card)',
+      border: '1px solid var(--color-border)',
+      borderRadius: '8px',
+      padding: '20px',
+      maxHeight: 'calc(100vh - 200px)',
+      overflowY: 'auto',
+      position: 'sticky',
+      top: '20px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+          📊 Demand Signals
+        </h3>
+        <button
+          onClick={() => setIsOpen(false)}
+          style={{
+            padding: '4px 8px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-secondary)',
+            cursor: 'pointer',
+            fontSize: '20px',
+            lineHeight: 1
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Period Selector */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <button
+          onClick={() => { setPeriod(7); setSignals(null); }}
+          style={{
+            flex: 1,
+            padding: '8px',
+            backgroundColor: period === 7 ? 'var(--color-primary)' : 'var(--color-hover)',
+            color: period === 7 ? '#ffffff' : 'var(--color-text-primary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: period === 7 ? '600' : '500'
+          }}
+        >
+          7 Days
+        </button>
+        <button
+          onClick={() => { setPeriod(30); setSignals(null); }}
+          style={{
+            flex: 1,
+            padding: '8px',
+            backgroundColor: period === 30 ? 'var(--color-primary)' : 'var(--color-hover)',
+            color: period === 30 ? '#ffffff' : 'var(--color-text-primary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: period === 30 ? '600' : '500'
+          }}
+        >
+          30 Days
+        </button>
+      </div>
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>
+          Loading...
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          padding: '12px',
+          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+          border: '1px solid #EF5350',
+          borderRadius: '6px',
+          color: '#EF5350',
+          fontSize: '13px',
+          marginBottom: '16px'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && signals && (
+        <>
+          {!signals.configured && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: 'rgba(255, 193, 7, 0.1)',
+              border: '1px solid #FFC107',
+              borderRadius: '6px',
+              color: '#F57C00',
+              fontSize: '13px',
+              marginBottom: '16px'
+            }}>
+              {signals.message || 'Google Search Console not configured'}
+            </div>
+          )}
+
+          {signals.configured && signals.queries && signals.queries.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>
+              No search data available
+            </div>
+          )}
+
+          {signals.configured && signals.queries && signals.queries.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+                Top {signals.queries.length} queries ({signals.period})
+              </div>
+              {signals.queries.slice(0, 10).map((item: any, index: number) => (
+                <div
+                  key={index}
+                  style={{
+                    padding: '12px',
+                    backgroundColor: 'var(--color-hover)',
+                    borderRadius: '6px',
+                    border: '1px solid var(--color-border)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '4px', fontSize: '14px' }}>
+                        {item.query}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        {categoryLabels[item.category] || item.category} • {item.clicks} clicks
+                      </div>
+                    </div>
+                    {item.trend && (
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        color: item.trend.direction === 'up' ? '#4CAF50' : item.trend.direction === 'down' ? '#EF5350' : 'var(--color-text-secondary)',
+                        padding: '2px 6px',
+                        backgroundColor: item.trend.direction === 'up' ? 'rgba(76, 175, 80, 0.1)' : item.trend.direction === 'down' ? 'rgba(239, 83, 80, 0.1)' : 'transparent',
+                        borderRadius: '4px'
+                      }}>
+                        {item.trend.direction === 'up' ? '↑' : item.trend.direction === 'down' ? '↓' : '→'} {item.trend.change_pct > 0 ? '+' : ''}{item.trend.change_pct}%
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleCreateContent(item.query, item.category)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 12px',
+                      backgroundColor: 'var(--color-primary)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Create Content
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 

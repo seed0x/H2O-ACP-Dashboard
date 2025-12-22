@@ -55,6 +55,18 @@ except Exception as e:
     logger.warning(f"Marketing scheduler routes import failed: {e}")
     marketing_scheduler_router = None
 
+# Import demand signals routes
+demand_signals_router = None
+try:
+    from .demand_signals import router as demand_signals_router
+    logger.info("✓ Demand signals routes imported successfully")
+except ImportError as e:
+    logger.warning(f"Demand signals routes import failed: {e}")
+    demand_signals_router = None
+except Exception as e:
+    logger.warning(f"Demand signals routes import failed: {e}")
+    demand_signals_router = None
+
 # Import review system routes
 try:
     from .reviews import router as reviews_router
@@ -110,6 +122,11 @@ else:
 if marketing_scheduler_router:
     router.include_router(marketing_scheduler_router)
     logger.info("Marketing scheduler routes included successfully in main router")
+
+# Include demand signals routes if available
+if demand_signals_router:
+    router.include_router(demand_signals_router)
+    logger.info("Demand signals routes included successfully in main router")
 
 # Include review system routes if available
 if reviews_router:

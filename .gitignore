@@ -28,3 +28,9 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Credentials (never commit these!)
+*.json
+credentials/
+apps/api/credentials/
+**/credentials/*.json
