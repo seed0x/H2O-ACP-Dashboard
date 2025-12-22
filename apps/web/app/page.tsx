@@ -1,174 +1,137 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { useMobile } from '../lib/useMobile'
-import { Dataflow } from '../components/Dataflow'
 import { handleApiError } from '../lib/error-handler'
 import { StatSkeleton } from '../components/ui/Skeleton'
 import { useTenant } from '../contexts/TenantContext'
 import { TodaysSchedule } from '../components/TodaysSchedule'
+import { Dataflow } from '../components/Dataflow'
 
 export default function Dashboard() {
+  const router = useRouter()
   const isMobile = useMobile()
   const { currentTenant, isTenantSelected } = useTenant()
   const [stats, setStats] = useState({
-    activeJobs: 0,
-    pendingServiceCalls: 0,
-    totalBuilders: 0,
-    completedThisWeek: 0,
-    overdueJobs: 0,
-    overdueServiceCalls: 0,
-    overdueReviewRequests: 0,
-    overdueRecoveryTickets: 0
+    openTasks: 0,
+    soldThisWeek: 0,
+    totalOverdue: 0,
+    pendingReviews: 0,
+    marketingPosts: 0
   })
-  const [recentJobs, setRecentJobs] = useState<any[]>([])
-  const [recentCalls, setRecentCalls] = useState<any[]>([])
-  const [overdueJobs, setOverdueJobs] = useState<any[]>([])
-  const [overdueServiceCalls, setOverdueServiceCalls] = useState<any[]>([])
-  const [overdueReviewRequests, setOverdueReviewRequests] = useState<any[]>([])
-  const [overdueRecoveryTickets, setOverdueRecoveryTickets] = useState<any[]>([])
-  const [todayJobs, setTodayJobs] = useState<any[]>([])
-  const [todayServiceCalls, setTodayServiceCalls] = useState<any[]>([])
-  const [thisWeekJobs, setThisWeekJobs] = useState<any[]>([])
-  const [thisWeekServiceCalls, setThisWeekServiceCalls] = useState<any[]>([])
+  const [overdueItems, setOverdueItems] = useState<any[]>([])
+  const [openTasks, setOpenTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadDashboard()
-  }, [currentTenant]) // Reload when tenant changes
+  }, [currentTenant])
 
   async function loadDashboard() {
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       
-      // Load core data with error handling
-      let jobs = { data: [] }
-      let serviceCalls = { data: [] }
-      let builders = { data: [] }
+      let jobs: any[] = []
+      let serviceCalls: any[] = []
+      let bids: any[] = []
+      let reviewRequests: any[] = []
+      let overdueJobsData: any[] = []
+      let overdueCallsData: any[] = []
+      let overdueReviewsData: any[] = []
+      let overdueTicketsData: any[] = []
       
-      // Load jobs (All County specific or filter by current tenant)
+      // Load jobs (All County)
       if (isTenantSelected('all_county')) {
         try {
-          const jobsParams = currentTenant === 'both' ? '' : `?tenant_id=all_county`
-          jobs = await axios.get(`${API_BASE_URL}/jobs${jobsParams}`, { headers, withCredentials: true })
-        } catch (error) {
-          handleApiError(error, 'Loading jobs', loadDashboard)
-        }
+          const res = await axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { headers, withCredentials: true })
+          jobs = res.data || []
+        } catch (e) { console.error('Failed to load jobs:', e) }
+        
+        try {
+          const res = await axios.get(`${API_BASE_URL}/jobs/overdue?tenant_id=all_county`, { headers, withCredentials: true })
+          overdueJobsData = res.data || []
+        } catch (e) { console.error('Failed to load overdue jobs:', e) }
       }
       
-      // Load service calls (H2O specific or filter by current tenant)
+      // Load service calls & reviews (H2O)
       if (isTenantSelected('h2o')) {
         try {
-          const callsParams = currentTenant === 'both' ? '' : `?tenant_id=h2o`
-          serviceCalls = await axios.get(`${API_BASE_URL}/service-calls${callsParams}`, { headers, withCredentials: true })
-        } catch (error) {
-          handleApiError(error, 'Loading service calls', loadDashboard)
-        }
+          const res = await axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { headers, withCredentials: true })
+          serviceCalls = res.data || []
+        } catch (e) { console.error('Failed to load service calls:', e) }
+        
+        try {
+          const res = await axios.get(`${API_BASE_URL}/service-calls/overdue?tenant_id=h2o`, { headers, withCredentials: true })
+          overdueCallsData = res.data || []
+        } catch (e) { console.error('Failed to load overdue calls:', e) }
+        
+        try {
+          const res = await axios.get(`${API_BASE_URL}/reviews/requests?tenant_id=h2o`, { headers, withCredentials: true })
+          reviewRequests = res.data || []
+        } catch (e) { console.error('Failed to load review requests:', e) }
+        
+        try {
+          const res = await axios.get(`${API_BASE_URL}/reviews/requests/overdue?tenant_id=h2o`, { headers, withCredentials: true })
+          overdueReviewsData = res.data || []
+        } catch (e) { console.error('Failed to load overdue reviews:', e) }
+        
+        try {
+          const res = await axios.get(`${API_BASE_URL}/recovery-tickets/overdue?tenant_id=h2o`, { headers, withCredentials: true })
+          overdueTicketsData = res.data || []
+        } catch (e) { console.error('Failed to load overdue tickets:', e) }
       }
       
+      // Load bids for "sold this week"
       try {
-        builders = await axios.get(`${API_BASE_URL}/builders`, { headers, withCredentials: true })
-      } catch (error) {
-        handleApiError(error, 'Loading builders', loadDashboard)
-      }
+        const res = await axios.get(`${API_BASE_URL}/bids`, { headers, withCredentials: true })
+        bids = res.data || []
+      } catch (e) { console.error('Failed to load bids:', e) }
       
-      // Load overdue data with individual error handling
-      let overdueJobsRes = { data: [] }
-      let overdueCallsRes = { data: [] }
-      let overdueRequestsRes = { data: [] }
-      let overdueTicketsRes = { data: [] }
+      // Calculate sold this week (bids with status 'Accepted' updated this week)
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      const soldThisWeek = bids.filter((b: any) => 
+        b.status === 'Accepted' && new Date(b.updated_at) >= weekAgo
+      ).length
       
-      // Load overdue jobs (All County) - always pass tenant_id
-      if (isTenantSelected('all_county')) {
-        try {
-          overdueJobsRes = await axios.get(`${API_BASE_URL}/jobs/overdue?tenant_id=all_county`, { headers, withCredentials: true })
-        } catch (error) {
-          console.error('Failed to load overdue jobs:', error)
-        }
-      }
+      // Open tasks = jobs not completed + service calls not completed
+      const openJobTasks = jobs.filter((j: any) => j.status !== 'Completed')
+      const openCallTasks = serviceCalls.filter((c: any) => c.status !== 'Completed')
+      const allOpenTasks = [
+        ...openJobTasks.map((j: any) => ({ ...j, type: 'job' })),
+        ...openCallTasks.map((c: any) => ({ ...c, type: 'service_call' }))
+      ].slice(0, 8)
       
-      // Load overdue service calls (H2O) - always pass tenant_id
-      if (isTenantSelected('h2o')) {
-        try {
-          overdueCallsRes = await axios.get(`${API_BASE_URL}/service-calls/overdue?tenant_id=h2o`, { headers, withCredentials: true })
-        } catch (error) {
-          console.error('Failed to load overdue service calls:', error)
-        }
-        
-        try {
-          overdueRequestsRes = await axios.get(`${API_BASE_URL}/reviews/requests/overdue?tenant_id=h2o`, { headers, withCredentials: true })
-        } catch (error) {
-          console.error('Failed to load overdue review requests:', error)
-        }
-        
-        try {
-          overdueTicketsRes = await axios.get(`${API_BASE_URL}/recovery-tickets/overdue?tenant_id=h2o`, { headers, withCredentials: true })
-        } catch (error) {
-          console.error('Failed to load overdue recovery tickets:', error)
-        }
-      }
-
-      const activeJobs = jobs.data.filter((j: any) => j.status !== 'Completed').length
-      const pendingCalls = serviceCalls.data.filter((c: any) => c.status === 'New' || c.status === 'Scheduled').length
+      // Total overdue
+      const totalOverdue = overdueJobsData.length + overdueCallsData.length + 
+                          overdueReviewsData.length + overdueTicketsData.length
+      
+      // Combine all overdue items
+      const allOverdue = [
+        ...overdueJobsData.map((j: any) => ({ ...j, type: 'job' })),
+        ...overdueCallsData.map((c: any) => ({ ...c, type: 'service_call' })),
+        ...overdueReviewsData.map((r: any) => ({ ...r, type: 'review_request' })),
+        ...overdueTicketsData.map((t: any) => ({ ...t, type: 'recovery_ticket' }))
+      ].slice(0, 5)
+      
+      // Pending reviews = review requests not completed
+      const pendingReviews = reviewRequests.filter((r: any) => 
+        r.status !== 'completed' && r.status !== 'review_received'
+      ).length
       
       setStats({
-        activeJobs,
-        pendingServiceCalls: pendingCalls,
-        totalBuilders: builders.data.length,
-        completedThisWeek: 0,
-        overdueJobs: overdueJobsRes.data.length,
-        overdueServiceCalls: overdueCallsRes.data.length,
-        overdueReviewRequests: overdueRequestsRes.data.length,
-        overdueRecoveryTickets: overdueTicketsRes.data.length
+        openTasks: openJobTasks.length + openCallTasks.length,
+        soldThisWeek,
+        totalOverdue,
+        pendingReviews,
+        marketingPosts: 0 // Marketing endpoint not active yet
       })
-
-      setRecentJobs(jobs.data.slice(0, 5))
-      setRecentCalls(serviceCalls.data.slice(0, 5))
-      setOverdueJobs(overdueJobsRes.data.slice(0, 5))
-      setOverdueServiceCalls(overdueCallsRes.data.slice(0, 5))
-      setOverdueReviewRequests(overdueRequestsRes.data.slice(0, 5))
-      setOverdueRecoveryTickets(overdueTicketsRes.data.slice(0, 5))
       
-      // Filter today's items
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      
-      const todayJobsList = jobs.data.filter((j: any) => {
-        if (!j.scheduled_start) return false
-        const scheduled = new Date(j.scheduled_start)
-        return scheduled >= today && scheduled < tomorrow
-      })
-      setTodayJobs(todayJobsList.slice(0, 5))
-      
-      const todayCallsList = serviceCalls.data.filter((c: any) => {
-        if (!c.scheduled_start) return false
-        const scheduled = new Date(c.scheduled_start)
-        return scheduled >= today && scheduled < tomorrow
-      })
-      setTodayServiceCalls(todayCallsList.slice(0, 5))
-      
-      // Filter this week's items
-      const weekEnd = new Date(today)
-      weekEnd.setDate(weekEnd.getDate() + 7)
-      
-      const weekJobsList = jobs.data.filter((j: any) => {
-        if (!j.scheduled_start) return false
-        const scheduled = new Date(j.scheduled_start)
-        return scheduled >= today && scheduled < weekEnd
-      })
-      setThisWeekJobs(weekJobsList.slice(0, 10))
-      
-      const weekCallsList = serviceCalls.data.filter((c: any) => {
-        if (!c.scheduled_start) return false
-        const scheduled = new Date(c.scheduled_start)
-        return scheduled >= today && scheduled < weekEnd
-      })
-      setThisWeekServiceCalls(weekCallsList.slice(0, 10))
-      
+      setOpenTasks(allOpenTasks)
+      setOverdueItems(allOverdue)
       setLoading(false)
     } catch (err) {
       console.error('Failed to load dashboard', err)
@@ -179,589 +142,231 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div style={{ padding: isMobile ? '16px' : '32px' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <div style={{ width: '300px', height: '40px', backgroundColor: 'var(--color-hover)', borderRadius: '8px', marginBottom: '12px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
-          <div style={{ width: '200px', height: '20px', backgroundColor: 'var(--color-hover)', borderRadius: '4px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ width: '300px', height: '36px', backgroundColor: 'var(--color-hover)', borderRadius: '8px', marginBottom: '8px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
         </div>
-        <StatSkeleton count={4} />
+        <StatSkeleton count={5} />
       </div>
     )
   }
 
   return (
-    <div style={{ 
-      padding: isMobile ? '16px' : '32px'
-    }}>
+    <div style={{ padding: isMobile ? '16px' : '32px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{
-          fontSize: '32px',
-          fontWeight: '700',
-          color: 'var(--color-text-primary)',
-          marginBottom: '8px'
-        }}>Operations Dashboard</h1>
-        <p style={{
-          fontSize: '14px',
-          color: 'var(--color-text-secondary)'
-        }}>H2O Plumbing & All County Construction</p>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
+          Operations Dashboard
+        </h1>
+        <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+          H2O Plumbing & All County Construction
+        </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - 5 key cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '20px',
-        marginBottom: '32px'
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+        gap: '16px',
+        marginBottom: '24px'
       }}>
         <StatCard
-          title="Active Jobs"
-          value={stats.activeJobs}
+          title="Open Tasks"
+          value={stats.openTasks}
           color="#60A5FA"
+          href="/jobs"
         />
         <StatCard
-          title="Pending Service Calls"
-          value={stats.pendingServiceCalls}
-          color="#FF9800"
-        />
-        <StatCard
-          title="Total Builders"
-          value={stats.totalBuilders}
+          title="Sold This Week"
+          value={stats.soldThisWeek}
           color="#4CAF50"
+          href="/bids"
         />
         <StatCard
-          title="Completed This Week"
-          value={stats.completedThisWeek}
-          color="#2196F3"
+          title="Overdue"
+          value={stats.totalOverdue}
+          color={stats.totalOverdue > 0 ? '#EF5350' : '#9E9E9E'}
+          href="/jobs?overdue=true"
+          alert={stats.totalOverdue > 0}
+        />
+        <StatCard
+          title="Pending Reviews"
+          value={stats.pendingReviews}
+          color="#FF9800"
+          href="/reviews"
+        />
+        <StatCard
+          title="Marketing Posts"
+          value={stats.marketingPosts}
+          color="#9C27B0"
+          href="/marketing"
         />
       </div>
 
       {/* Today's Schedule */}
-      <div style={{ marginBottom: '32px' }}>
+      <div style={{ marginBottom: '24px' }}>
         <TodaysSchedule />
       </div>
 
-      {/* Dataflow - Actionable Signals */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            color: 'var(--color-text-primary)',
-            marginBottom: '8px'
-          }}>
-            Dataflow
-          </h2>
-          <p style={{
-            fontSize: '14px',
-            color: 'var(--color-text-secondary)'
-          }}>
-            Actionable items requiring attention
-          </p>
-        </div>
+      {/* Dataflow - Dispatch Signals */}
+      <div style={{ marginBottom: '24px' }}>
         <Dataflow />
       </div>
 
-      {/* Overdue Alerts Section */}
-      {(stats.overdueJobs > 0 || stats.overdueServiceCalls > 0 || stats.overdueReviewRequests > 0 || stats.overdueRecoveryTickets > 0) && (
+      {/* Two Column Layout */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: '24px'
+      }}>
+        {/* Left Column - Open Tasks */}
         <div style={{
-          backgroundColor: 'rgba(239, 83, 80, 0.1)',
-          border: '1px solid #EF5350',
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
           borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '32px'
+          padding: '20px'
         }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#EF5350',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span>⚠️</span> Overdue Items Requiring Attention
-          </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            marginBottom: '20px'
-          }}>
-            {stats.overdueJobs > 0 && (
-              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Jobs</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueJobs}</div>
-                <a href="/jobs?overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
-              </div>
-            )}
-            {stats.overdueServiceCalls > 0 && (
-              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Service Calls</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueServiceCalls}</div>
-                <a href="/service-calls?overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
-              </div>
-            )}
-            {stats.overdueReviewRequests > 0 && (
-              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Review Requests</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueReviewRequests}</div>
-                <a href="/reviews?overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
-              </div>
-            )}
-            {stats.overdueRecoveryTickets > 0 && (
-              <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#EF5350', marginBottom: '4px', textTransform: 'uppercase' }}>Overdue Recovery Tickets</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#EF5350' }}>{stats.overdueRecoveryTickets}</div>
-                <a href="/reviews?tab=tickets&overdue=true" style={{ fontSize: '12px', color: '#EF5350', textDecoration: 'none' }}>View All →</a>
-              </div>
-            )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Open Tasks</h2>
+            <a href="/jobs" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
           </div>
-          
-          {/* Show top overdue items */}
-          {(overdueJobs.length > 0 || overdueServiceCalls.length > 0 || overdueReviewRequests.length > 0 || overdueRecoveryTickets.length > 0) && (
-            <div style={{ marginTop: '20px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#EF5350', marginBottom: '12px' }}>Top Overdue Items</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {overdueJobs.slice(0, 3).map((job: any) => (
-                  <a
-                    key={job.id}
-                    href={`/jobs/${job.id}`}
-                    style={{
-                      display: 'block',
-                      padding: '12px',
-                      backgroundColor: 'white',
-                      borderRadius: '6px',
-                      textDecoration: 'none',
-                      borderLeft: '3px solid #EF5350'
-                    }}
-                  >
-                    <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
-                      {job.community} - Lot {job.lot_number} ({job.days_overdue} days overdue)
+          {openTasks.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+              No open tasks
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {openTasks.map((item: any) => (
+                <a
+                  key={item.id}
+                  href={item.type === 'job' ? `/jobs/${item.id}` : `/service-calls/${item.id}`}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px',
+                    backgroundColor: 'var(--color-hover)',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    borderLeft: `3px solid ${item.type === 'job' ? '#60A5FA' : '#FF9800'}`
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', fontSize: '14px', marginBottom: '2px' }}>
+                      {item.type === 'job' ? `${item.community} - Lot ${item.lot_number}` : item.customer_name}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Assigned to: {job.assigned_to || 'Unassigned'}</div>
-                  </a>
-                ))}
-                {overdueServiceCalls.slice(0, 3).map((call: any) => (
-                  <a
-                    key={call.id}
-                    href={`/service-calls/${call.id}`}
-                    style={{
-                      display: 'block',
-                      padding: '12px',
-                      backgroundColor: 'white',
-                      borderRadius: '6px',
-                      textDecoration: 'none',
-                      borderLeft: '3px solid #EF5350'
-                    }}
-                  >
-                    <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
-                      {call.customer_name} ({call.days_overdue} days overdue)
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      {item.type === 'job' ? 'Job' : 'Service Call'} • {item.status}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Assigned to: {call.assigned_to || 'Unassigned'}</div>
-                  </a>
-                ))}
-              </div>
+                  </div>
+                  <span style={{
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    backgroundColor: item.type === 'job' ? 'rgba(96, 165, 250, 0.15)' : 'rgba(255, 152, 0, 0.15)',
+                    color: item.type === 'job' ? '#60A5FA' : '#FF9800'
+                  }}>
+                    {item.type === 'job' ? 'JOB' : 'CALL'}
+                  </span>
+                </a>
+              ))}
             </div>
           )}
         </div>
-      )}
 
-      {/* Today's Focus */}
-      {(todayJobs.length > 0 || todayServiceCalls.length > 0) && (
+        {/* Right Column - Overdue Items */}
         <div style={{
-          backgroundColor: 'rgba(96, 165, 250, 0.05)',
-          border: '1px solid #60A5FA',
+          backgroundColor: stats.totalOverdue > 0 ? 'rgba(239, 83, 80, 0.05)' : 'var(--color-card)',
+          border: `1px solid ${stats.totalOverdue > 0 ? '#EF5350' : 'var(--color-border)'}`,
           borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '32px'
+          padding: '20px'
         }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#60A5FA',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span>📅</span> Today's Focus
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-            {todayJobs.length > 0 && (
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-text-primary)' }}>
-                  Jobs Scheduled Today ({todayJobs.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {todayJobs.map((job: any) => (
-                    <a
-                      key={job.id}
-                      href={`/jobs/${job.id}`}
-                      style={{
-                        display: 'block',
-                        padding: '12px',
-                        backgroundColor: 'white',
-                        borderRadius: '6px',
-                        textDecoration: 'none',
-                        borderLeft: '3px solid #60A5FA'
-                      }}
-                    >
-                      <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
-                        {job.community} - Lot {job.lot_number}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                        {job.scheduled_start ? new Date(job.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time set'}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            {todayServiceCalls.length > 0 && (
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-text-primary)' }}>
-                  Service Calls Scheduled Today ({todayServiceCalls.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {todayServiceCalls.map((call: any) => (
-                    <a
-                      key={call.id}
-                      href={`/service-calls/${call.id}`}
-                      style={{
-                        display: 'block',
-                        padding: '12px',
-                        backgroundColor: 'white',
-                        borderRadius: '6px',
-                        textDecoration: 'none',
-                        borderLeft: '3px solid #60A5FA'
-                      }}
-                    >
-                      <div style={{ fontWeight: '500', color: '#111827', marginBottom: '4px' }}>
-                        {call.customer_name}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                        {call.scheduled_start ? new Date(call.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time set'}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: stats.totalOverdue > 0 ? '#EF5350' : 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {stats.totalOverdue > 0 && <span>⚠️</span>} Overdue Items
+            </h2>
           </div>
-        </div>
-      )}
-
-      {/* This Week */}
-      {(thisWeekJobs.length > 0 || thisWeekServiceCalls.length > 0) && (
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '32px'
-        }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: 'var(--color-text-primary)',
-            marginBottom: '20px'
-          }}>
-            This Week
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-            {thisWeekJobs.length > 0 && (
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
-                  Upcoming Jobs ({thisWeekJobs.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {thisWeekJobs.map((job: any) => (
-                    <a
-                      key={job.id}
-                      href={`/jobs/${job.id}`}
-                      style={{
-                        display: 'block',
-                        padding: '12px',
-                        backgroundColor: 'var(--color-hover)',
-                        borderRadius: '6px',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                        {job.community} - Lot {job.lot_number}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        {job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString() : 'No date set'}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            {thisWeekServiceCalls.length > 0 && (
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
-                  Upcoming Service Calls ({thisWeekServiceCalls.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {thisWeekServiceCalls.map((call: any) => (
-                    <a
-                      key={call.id}
-                      href={`/service-calls/${call.id}`}
-                      style={{
-                        display: 'block',
-                        padding: '12px',
-                        backgroundColor: 'var(--color-hover)',
-                        borderRadius: '6px',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                        {call.customer_name}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        {call.scheduled_start ? new Date(call.scheduled_start).toLocaleDateString() : 'No date set'}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Content Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(400px, 1fr))',
-        gap: isMobile ? '16px' : '24px'
-      }}>
-        {/* Recent Jobs */}
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          borderRadius: '12px',
-          border: '1px solid var(--color-border)',
-          padding: '24px'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '20px'
-          }}>
-            <h2 style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: 'var(--color-text-primary)'
-            }}>Recent Jobs</h2>
-            <a href="/jobs" style={{
-              fontSize: '14px',
-              color: 'var(--color-primary)',
-              textDecoration: 'none'
-            }}>View All →</a>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {recentJobs.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '32px',
-                color: 'var(--color-text-secondary)'
-              }}>No jobs found</div>
-            ) : (
-              recentJobs.map((job) => (
+          {overdueItems.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+              ✓ No overdue items
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {overdueItems.map((item: any) => (
                 <a
-                  key={job.id}
-                  href={`/jobs/${job.id}`}
+                  key={item.id}
+                  href={
+                    item.type === 'job' ? `/jobs/${item.id}` :
+                    item.type === 'service_call' ? `/service-calls/${item.id}` :
+                    item.type === 'review_request' ? `/review-requests/${item.id}` :
+                    `/recovery-tickets/${item.id}`
+                  }
                   style={{
-                    display: 'block',
-                    padding: '16px',
-                    backgroundColor: 'var(--color-hover)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px',
+                    backgroundColor: 'white',
                     borderRadius: '8px',
-                    border: '1px solid var(--color-border)',
                     textDecoration: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-bg)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                    borderLeft: '3px solid #EF5350'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                    <div>
-                      <div style={{
-                        fontWeight: '500',
-                        color: 'var(--color-text-primary)',
-                        marginBottom: '4px'
-                      }}>{job.community} - Lot {job.lot_number}</div>
-                      <div style={{
-                        fontSize: '13px',
-                        color: 'var(--color-text-secondary)'
-                      }}>{job.address_line1}, {job.city}</div>
+                  <div>
+                    <div style={{ fontWeight: '500', color: '#111827', fontSize: '14px', marginBottom: '2px' }}>
+                      {item.type === 'job' ? `${item.community} - Lot ${item.lot_number}` :
+                       item.type === 'service_call' ? item.customer_name :
+                       item.type === 'review_request' ? item.customer_name :
+                       `Recovery: ${item.customer_name}`}
                     </div>
-                    <span style={{
-                      padding: '4px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      ...getStatusStyle(job.status)
-                    }}>
-                      {job.status}
-                    </span>
-                  </div>
-                </a>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Recent Service Calls */}
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          borderRadius: '12px',
-          border: '1px solid var(--color-border)',
-          padding: '24px'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '20px'
-          }}>
-            <h2 style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: 'var(--color-text-primary)'
-            }}>Recent Service Calls</h2>
-            <a href="/service-calls" style={{
-              fontSize: '14px',
-              color: 'var(--color-primary)',
-              textDecoration: 'none'
-            }}>View All →</a>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {recentCalls.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '32px',
-                color: 'var(--color-text-secondary)'
-              }}>No service calls found</div>
-            ) : (
-              recentCalls.map((call) => (
-                <a
-                  key={call.id}
-                  href={`/service-calls/${call.id}`}
-                  style={{
-                    display: 'block',
-                    padding: '16px',
-                    backgroundColor: 'var(--color-hover)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--color-border)',
-                    textDecoration: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-bg)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontWeight: '500',
-                        color: 'var(--color-text-primary)',
-                        marginBottom: '4px'
-                      }}>{call.customer_name}</div>
-                      <div style={{
-                        fontSize: '13px',
-                        color: 'var(--color-text-secondary)'
-                      }}>{call.issue_description?.substring(0, 50)}...</div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                      <span style={{
-                        padding: '4px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        ...getStatusStyle(call.status)
-                      }}>
-                        {call.status}
-                      </span>
-                      {call.priority === 'High' && (
-                        <span style={{
-                          padding: '4px 12px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          backgroundColor: 'rgba(244, 67, 54, 0.2)',
-                          color: '#EF5350'
-                        }}>
-                          High Priority
-                        </span>
-                      )}
+                    <div style={{ fontSize: '12px', color: '#EF5350' }}>
+                      {item.days_overdue} days overdue
                     </div>
                   </div>
                 </a>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function StatCard({ title, value, color }: {
+function StatCard({ title, value, color, href, alert }: {
   title: string
   value: number
   color: string
+  href?: string
+  alert?: boolean
 }) {
-  return (
+  const content = (
     <div style={{
-      backgroundColor: 'var(--color-card)',
-      border: '1px solid var(--color-border)',
+      backgroundColor: alert ? 'rgba(239, 83, 80, 0.05)' : 'var(--color-card)',
+      border: `1px solid ${alert ? '#EF5350' : 'var(--color-border)'}`,
       borderRadius: '12px',
-      padding: '24px',
+      padding: '16px',
       transition: 'all 0.2s',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.borderColor = color
-      e.currentTarget.style.transform = 'translateY(-2px)'
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.borderColor = 'var(--color-border)'
-      e.currentTarget.style.transform = 'translateY(0)'
-    }}
-    >
+      cursor: href ? 'pointer' : 'default'
+    }}>
       <div style={{
-        fontSize: '13px',
+        fontSize: '11px',
         color: 'var(--color-text-secondary)',
-        marginBottom: '12px',
+        marginBottom: '8px',
         textTransform: 'uppercase',
         letterSpacing: '0.5px',
         fontWeight: '500'
       }}>{title}</div>
       <div style={{
-        fontSize: '36px',
+        fontSize: '28px',
         fontWeight: '700',
         color: color
       }}>{value}</div>
     </div>
   )
-}
-
-function getStatusStyle(status: string): React.CSSProperties {
-  const statusStyles: Record<string, React.CSSProperties> = {
-    'New': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
-    'Scheduled': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
-    'In Progress': { backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#60A5FA' },
-    'Dispatched': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
-    'Completed': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
-    'On Hold': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
+  
+  if (href) {
+    return <a href={href} style={{ textDecoration: 'none' }}>{content}</a>
   }
-  return statusStyles[status] || { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' }
+  return content
 }
