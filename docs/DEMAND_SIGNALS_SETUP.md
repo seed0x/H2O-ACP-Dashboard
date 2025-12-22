@@ -19,10 +19,14 @@ The Demand Signals component shows top search queries from Google Search Console
    - Go to https://console.cloud.google.com
    - Create a new project or select existing
 
-2. **Enable Search Console API**:
-   - Go to "APIs & Services" > "Library"
+2. **Enable Search Console API** (REQUIRED - Do this first!):
+   - Go to "APIs & Services" > "Library" in Google Cloud Console
    - Search for "Google Search Console API"
-   - Click "Enable"
+   - Click on it and click "Enable"
+   - **OR** use this direct link (replace PROJECT_ID with your project ID):
+     - https://console.developers.google.com/apis/api/searchconsole.googleapis.com/overview?project=PROJECT_ID
+   - Wait a few minutes after enabling for the change to propagate
+   - **Note**: If you get a 403 error saying "API has not been used in project X before or it is disabled", this means the API is not enabled. Enable it using the steps above.
 
 3. **Create Service Account**:
    - Go to "APIs & Services" > "Credentials"
@@ -134,9 +138,20 @@ Once configured, the Demand Signals panel will:
 - Ensure the service account has read access
 
 ### API Errors
+
+#### "Google Search Console API has not been used in project X before or it is disabled"
+- **This means the API is not enabled for your project**
+- Go to Google Cloud Console > APIs & Services > Library
+- Search for "Google Search Console API" and click "Enable"
+- Or use direct link: https://console.developers.google.com/apis/api/searchconsole.googleapis.com/overview?project=YOUR_PROJECT_ID
+- Wait 2-5 minutes after enabling for changes to propagate
+- Retry the request
+
+#### Other API Errors
 - Verify Search Console API is enabled in Google Cloud Console
 - Check service account permissions
 - Ensure the property exists in Search Console
+- Verify the service account email has been added to Search Console users
 
 ## Security Notes
 

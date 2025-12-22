@@ -152,7 +152,7 @@ class ContentItem(ContentItemBase):
 
 class PostInstanceBase(BaseModel):
     tenant_id: str
-    content_item_id: UUID
+    content_item_id: Optional[UUID] = None  # Nullable for planned slots
     channel_account_id: UUID
     caption_override: Optional[str] = None
     scheduled_for: Optional[datetime] = None
@@ -191,6 +191,8 @@ class PostInstance(PostInstanceBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    content_item: Optional[ContentItem] = None  # Relationship field (nullable for planned slots)
+    channel_account: Optional[ChannelAccount] = None  # Relationship field
 
     class Config:
         from_attributes = True

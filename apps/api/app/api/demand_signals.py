@@ -119,10 +119,37 @@ async def fetch_google_search_console_data(
         logger.error("Google API client libraries not installed. Install: pip install google-api-python-client google-auth-oauthlib")
         return []
     except HttpError as e:
+        error_msg = str(e)
         logger.error(f"Google Search Console API error: {e}")
+        
+        # Check if API is not enabled
+        if "has not been used" in error_msg or "is disabled" in error_msg or "accessNotConfigured" in error_msg:
+            # Extract project ID from error if available
+            project_id = None
+            if "project" in error_msg:
+                import re
+                match = re.search(r'project (\d+)', error_msg)
+                if match:
+                    project_id = match.group(1)
+            
+            enable_url = f"https://console.developers.google.com/apis/api/searchconsole.googleapis.com/overview"
+            if project_id:
+                enable_url += f"?project={project_id}"
+            
+            detail = (
+                f"Google Search Console API is not enabled for your project. "
+                f"Please enable it at: {enable_url}\n\n"
+                f"After enabling, wait 2-5 minutes for the change to propagate, then retry.\n\n"
+                f"Original error: {error_msg}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail
+            )
+        
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch Search Console data: {str(e)}"
+            detail=f"Failed to fetch Search Console data: {error_msg}"
         )
     except Exception as e:
         logger.error(f"Error fetching Search Console data: {e}", exc_info=True)
@@ -132,7 +159,7 @@ async def fetch_google_search_console_data(
         )
 
 
-async def calculate_trends(
+def calculate_trends(
     current_data: List[Dict[str, Any]],
     previous_data: List[Dict[str, Any]]
 ) -> Dict[str, Dict[str, Any]]:
@@ -171,7 +198,6 @@ async def calculate_trends(
 async def get_demand_signals(
     tenant_id: str = Query(..., description="Tenant ID"),
     days: int = Query(7, ge=1, le=90, description="Number of days to analyze (7 or 30)"),
-    db: AsyncSession = Depends(get_session),
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -200,8 +226,8 @@ async def get_demand_signals(
         # For 30d: compare last 30 days vs previous 30 days (days 31-60)
         previous_data = await fetch_google_search_console_data(site_url, days, start_date_offset=days)
         
-        # Calculate trends
-        trends = await calculate_trends(current_data, previous_data)
+        # Calculate trends (synchronous function, no await needed)
+        trends = calculate_trends(current_data, previous_data)
         
         # Categorize and group queries
         categorized = {}

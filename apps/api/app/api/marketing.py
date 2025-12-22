@@ -576,16 +576,24 @@ async def get_calendar_view(
     query = query.where(models.PostInstance.scheduled_for.isnot(None))
     query = query.order_by(models.PostInstance.scheduled_for)
     
-    result = await db.execute(query.options(selectinload(models.PostInstance.content_item), selectinload(models.PostInstance.channel_account)))
-    instances = result.scalars().all()
+    # Use joinedload to ensure relationships are loaded in the same query (avoids lazy loading issues)
+    from sqlalchemy.orm import joinedload
+    result = await db.execute(
+        query.options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    instances = result.unique().scalars().all()
     
-    # Group by date
+    # Group by date - serialize while still in async session context
     calendar = {}
     for instance in instances:
         if instance.scheduled_for:
             date_key = instance.scheduled_for.date().isoformat()
             if date_key not in calendar:
                 calendar[date_key] = []
+            # Serialize using model_validate - joinedload ensures relationships are loaded
             calendar[date_key].append(schemas_marketing.PostInstance.model_validate(instance))
     
     return calendar
