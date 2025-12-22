@@ -1102,7 +1102,7 @@ function PostsView() {
           onClose={() => setGenerateItem(null)}
           onSuccess={() => {
             setGenerateItem(null)
-            loadContentItems()
+            loadPostInstances()
           }}
         />
       )}
