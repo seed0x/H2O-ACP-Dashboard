@@ -52,10 +52,54 @@ async def ensure_admin_user():
         logger.warning(f"⚠ Could not create admin user: {e}", exc_info=True)
         return False
 
+async def ensure_default_users():
+    """Create default users (max and northwynd) if they don't exist"""
+    try:
+        from .db.session import AsyncSessionLocal
+        from .models import User
+        from .core.password import hash_password
+        from sqlalchemy import select
+        
+        default_users = [
+            {"username": "max", "password": "max123", "full_name": "Max", "role": "user", "tenant_id": "h2o"},
+            {"username": "northwynd", "password": "user123", "full_name": "Northwynd", "role": "user", "tenant_id": "h2o"}
+        ]
+        
+        async with AsyncSessionLocal() as db:
+            for user_data in default_users:
+                result = await db.execute(
+                    select(User).where(User.username == user_data["username"])
+                )
+                existing_user = result.scalar_one_or_none()
+                
+                if not existing_user:
+                    # Create user
+                    new_user = User(
+                        username=user_data["username"],
+                        email=f"{user_data['username']}@h2oplumbers.com",
+                        hashed_password=hash_password(user_data["password"]),
+                        full_name=user_data["full_name"],
+                        role=user_data["role"],
+                        tenant_id=user_data["tenant_id"],
+                        is_active=True
+                    )
+                    db.add(new_user)
+                    logger.info(f"✓ Created user: {user_data['username']}")
+                else:
+                    # Update password if user exists
+                    existing_user.hashed_password = hash_password(user_data["password"])
+                    existing_user.is_active = True
+                    logger.info(f"✓ Updated user: {user_data['username']}")
+            
+            await db.commit()
+            return True
+    except Exception as e:
+        logger.warning(f"⚠ Could not create default users: {e}", exc_info=True)
+        return False
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown"""
-    # Startup
     logger.info("=" * 50)
     logger.info("Starting Plumbing Ops API")
     logger.info("=" * 50)
@@ -79,6 +123,9 @@ async def lifespan(app: FastAPI):
                 
                 # Create admin user
                 await ensure_admin_user()
+                
+                # Create default users (max and northwynd)
+                await ensure_default_users()
                 
                 # Start background scheduler
                 try:

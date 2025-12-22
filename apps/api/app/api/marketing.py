@@ -4,7 +4,7 @@ Marketing module endpoints for content management and social media posting
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, timezone
@@ -333,8 +333,16 @@ async def list_post_instances(
         query = query.where(models.PostInstance.status == status)
     
     query = query.order_by(models.PostInstance.scheduled_for.desc().nullslast(), models.PostInstance.created_at.desc()).limit(limit).offset(offset)
-    result = await db.execute(query.options(selectinload(models.PostInstance.content_item), selectinload(models.PostInstance.channel_account)))
-    return result.scalars().all()
+    result = await db.execute(
+        query.options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    instances = result.unique().scalars().all()
+    
+    # Explicitly serialize while still in async session context
+    return [schemas_marketing.PostInstance.model_validate(instance) for instance in instances]
 
 
 @router.post("/post-instances", response_model=schemas_marketing.PostInstance, status_code=status.HTTP_201_CREATED)
@@ -370,8 +378,18 @@ async def create_post_instance(
     )
     
     await db.commit()
-    await db.refresh(instance)
-    return instance
+    # Re-query with relationships after commit to ensure they're loaded
+    result = await db.execute(
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance.id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    instance = result.scalar_one()
+    # Explicitly serialize while still in async session context
+    return schemas_marketing.PostInstance.model_validate(instance)
 
 
 @router.post("/post-instances/bulk", response_model=List[schemas_marketing.PostInstance], status_code=status.HTTP_201_CREATED)
@@ -419,9 +437,19 @@ async def create_post_instances_bulk(
         )
     
     await db.commit()
-    for instance in instances:
-        await db.refresh(instance)
-    return instances
+    # Re-query all instances with relationships after commit
+    instance_ids = [inst.id for inst in instances]
+    result = await db.execute(
+        select(models.PostInstance)
+        .where(models.PostInstance.id.in_(instance_ids))
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    loaded_instances = result.unique().scalars().all()
+    # Explicitly serialize while still in async session context
+    return [schemas_marketing.PostInstance.model_validate(instance) for instance in loaded_instances]
 
 
 @router.get("/post-instances/{instance_id}", response_model=schemas_marketing.PostInstance)
@@ -434,12 +462,16 @@ async def get_post_instance(
     result = await db.execute(
         select(models.PostInstance)
         .where(models.PostInstance.id == instance_id)
-        .options(selectinload(models.PostInstance.content_item), selectinload(models.PostInstance.channel_account))
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
     )
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=404, detail="Post instance not found")
-    return instance
+    # Explicitly serialize while still in async session context
+    return schemas_marketing.PostInstance.model_validate(instance)
 
 
 @router.patch("/post-instances/{instance_id}", response_model=schemas_marketing.PostInstance)
@@ -451,7 +483,12 @@ async def update_post_instance(
 ):
     """Update a post instance"""
     result = await db.execute(
-        select(models.PostInstance).where(models.PostInstance.id == instance_id)
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance_id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
     )
     instance = result.scalar_one_or_none()
     if not instance:
@@ -467,8 +504,18 @@ async def update_post_instance(
         )
     
     await db.commit()
-    await db.refresh(instance)
-    return instance
+    # Re-query with relationships after commit to ensure they're loaded
+    result = await db.execute(
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance.id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    instance = result.scalar_one()
+    # Explicitly serialize while still in async session context
+    return schemas_marketing.PostInstance.model_validate(instance)
 
 
 @router.delete("/post-instances/{instance_id}")
@@ -504,7 +551,12 @@ async def mark_post_instance_posted(
 ):
     """Mark a post instance as posted"""
     result = await db.execute(
-        select(models.PostInstance).where(models.PostInstance.id == instance_id)
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance_id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
     )
     instance = result.scalar_one_or_none()
     if not instance:
@@ -522,8 +574,18 @@ async def mark_post_instance_posted(
     )
     
     await db.commit()
-    await db.refresh(instance)
-    return instance
+    # Re-query with relationships after commit to ensure they're loaded
+    result = await db.execute(
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance.id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    instance = result.scalar_one()
+    # Explicitly serialize while still in async session context
+    return schemas_marketing.PostInstance.model_validate(instance)
 
 
 @router.post("/post-instances/{instance_id}/mark-failed", response_model=schemas_marketing.PostInstance)
@@ -535,7 +597,12 @@ async def mark_post_instance_failed(
 ):
     """Mark a post instance as failed"""
     result = await db.execute(
-        select(models.PostInstance).where(models.PostInstance.id == instance_id)
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance_id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
     )
     instance = result.scalar_one_or_none()
     if not instance:
@@ -551,8 +618,18 @@ async def mark_post_instance_failed(
     )
     
     await db.commit()
-    await db.refresh(instance)
-    return instance
+    # Re-query with relationships after commit to ensure they're loaded
+    result = await db.execute(
+        select(models.PostInstance)
+        .where(models.PostInstance.id == instance.id)
+        .options(
+            joinedload(models.PostInstance.content_item), 
+            joinedload(models.PostInstance.channel_account)
+        )
+    )
+    instance = result.scalar_one()
+    # Explicitly serialize while still in async session context
+    return schemas_marketing.PostInstance.model_validate(instance)
 
 
 # Calendar View

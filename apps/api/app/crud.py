@@ -352,7 +352,8 @@ async def get_service_call(db: AsyncSession, sc_id: UUID) -> models.ServiceCall 
     res = await db.execute(select(models.ServiceCall).where(models.ServiceCall.id == sc_id))
     return res.scalar_one_or_none()
 
-async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, search: str | None, limit: int = 25, offset: int = 0):
+async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, search: str | None, assigned_to: str | None = None, scheduled_date: str | None = None, limit: int = 25, offset: int = 0):
+    from datetime import datetime, timezone
     q = select(models.ServiceCall)
     if tenant_id:
         q = q.where(models.ServiceCall.tenant_id == tenant_id)
@@ -362,7 +363,18 @@ async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: st
         q = q.where(models.ServiceCall.builder_id == builder_id)
     if search:
         q = q.where(models.ServiceCall.customer_name.ilike(f"%{search}%") | models.ServiceCall.address_line1.ilike(f"%{search}%"))
-    q = q.order_by(models.ServiceCall.created_at.desc()).limit(limit).offset(offset)
+    if assigned_to:
+        q = q.where(models.ServiceCall.assigned_to == assigned_to)
+    if scheduled_date:
+        # Filter by scheduled_start date (match the date part only)
+        try:
+            date_obj = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00')).date()
+            start_of_day = datetime.combine(date_obj, datetime.min.time()).replace(tzinfo=timezone.utc)
+            end_of_day = datetime.combine(date_obj, datetime.max.time()).replace(tzinfo=timezone.utc)
+            q = q.where(models.ServiceCall.scheduled_start >= start_of_day).where(models.ServiceCall.scheduled_start <= end_of_day)
+        except (ValueError, AttributeError):
+            pass  # Invalid date format, ignore filter
+    q = q.order_by(models.ServiceCall.scheduled_start.asc().nullslast(), models.ServiceCall.created_at.desc()).limit(limit).offset(offset)
     res = await db.execute(q)
     return res.scalars().all()
 

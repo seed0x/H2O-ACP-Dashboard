@@ -2,6 +2,21 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
+// Helper function to check if user is a tech user
+function isTechUser(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]))
+      const username = payload.username || null
+      return username === 'max' || username === 'northwynd'
+    }
+  } catch (error) {
+    console.error('Failed to parse token:', error)
+  }
+  return false
+}
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -20,6 +35,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     // If no token and not on login page, redirect to login
     if (!token) {
       router.replace('/login')
+      return
+    }
+    
+    // Check if user is a tech user
+    const techUser = isTechUser(token)
+    
+    // Tech users can only access tech-schedule page
+    if (techUser && pathname !== '/tech-schedule') {
+      router.replace('/tech-schedule')
       return
     }
     

@@ -34,6 +34,11 @@ const navItems: NavItem[] = [
   { name: 'Directory', href: '/directory', icon: UilFolder },
 ]
 
+// Tech users only see their schedule
+const techNavItems: NavItem[] = [
+  { name: 'My Schedule', href: '/tech-schedule', icon: UilCalendarAlt },
+]
+
 interface SidebarProps {
   isMobile?: boolean
   isOpen?: boolean
@@ -41,6 +46,31 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarProps) {
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [isTechUser, setIsTechUser] = useState(false)
+  
+  useEffect(() => {
+    // Get user role from JWT token
+    try {
+      const token = localStorage.getItem('token')
+      if (token) {
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]))
+          const role = payload.role || null
+          const username = payload.username || null
+          setUserRole(role)
+          // Check if user is a tech user (max or northwynd)
+          setIsTechUser(username === 'max' || username === 'northwynd')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse token for role:', error)
+    }
+  }, [])
+  
+  // Use tech nav items for tech users, otherwise use full nav
+  const displayNavItems = isTechUser ? techNavItems : navItems
   const pathname = usePathname()
   const { currentTenant } = useTenant()
   const [signalCounts, setSignalCounts] = useState<{ reviews: number; marketing: number; dispatch: number }>({
@@ -161,7 +191,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
         flexDirection: 'column',
         gap: '8px',
       }}>
-        {navItems.map((item) => {
+        {displayNavItems.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
           return (

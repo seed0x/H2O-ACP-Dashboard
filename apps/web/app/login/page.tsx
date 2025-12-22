@@ -4,6 +4,24 @@ import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
 
+// Helper function to check if user is a tech user and get redirect path
+function getRedirectPath(token: string): string {
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]))
+      const username = payload.username || null
+      // Tech users (max and northwynd) go to tech schedule
+      if (username === 'max' || username === 'northwynd') {
+        return '/tech-schedule'
+      }
+    }
+  } catch (error) {
+    console.error('Failed to parse token:', error)
+  }
+  return '/'
+}
+
 export default function Login() {
   const router = useRouter()
   const [username, setUsername] = useState('admin')
@@ -15,7 +33,7 @@ export default function Login() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (token) {
-      router.push('/')
+      router.push(getRedirectPath(token))
     }
   }, [router])
 
@@ -33,10 +51,13 @@ export default function Login() {
       // Store token in localStorage for Authorization headers
       if (res.data.access_token) {
         localStorage.setItem('token', res.data.access_token)
+        // Redirect tech users to tech schedule, others to dashboard
+        const redirectPath = getRedirectPath(res.data.access_token)
+        window.location.href = redirectPath
+      } else {
+        // Fallback redirect
+        window.location.href = '/'
       }
-      
-      // Redirect on success (cookie is automatically set by server)
-      window.location.href = '/'
     } catch (err: any) {
       console.error('Login error:', err)
       if (err.response) {

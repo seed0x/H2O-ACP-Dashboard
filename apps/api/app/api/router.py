@@ -490,8 +490,8 @@ async def create_service_call(sc_in: ServiceCallCreate, db: AsyncSession = Depen
     return sc
 
 @router.get('/service-calls')
-async def list_service_calls(tenant_id: Optional[str] = 'h2o', status: Optional[str] = None, builder_id: Optional[UUID] = None, search: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
-    scs = await crud.list_service_calls(db, tenant_id, status, builder_id, search, limit, offset)
+async def list_service_calls(tenant_id: Optional[str] = 'h2o', status: Optional[str] = None, builder_id: Optional[UUID] = None, search: Optional[str] = None, assigned_to: Optional[str] = None, scheduled_date: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
+    scs = await crud.list_service_calls(db, tenant_id, status, builder_id, search, assigned_to, scheduled_date, limit, offset)
     return scs
 
 @router.get('/service-calls/{id}', response_model=ServiceCallOut)
