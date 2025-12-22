@@ -25,6 +25,20 @@ interface ScheduleItem {
   issue_description: string
 }
 
+function formatTime(dateString: string | null): string {
+  if (!dateString) return 'No time'
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    })
+  } catch {
+    return 'Invalid time'
+  }
+}
+
 export default function TechSchedulePage() {
   const router = useRouter()
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
@@ -57,20 +71,6 @@ export default function TechSchedulePage() {
       showToast(errorMsg, 'error')
     } finally {
       setLoading(false)
-    }
-  }
-
-  function formatTime(dateString: string | null): string {
-    if (!dateString) return 'No time'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      })
-    } catch {
-      return 'Invalid time'
     }
   }
 
@@ -127,17 +127,12 @@ export default function TechSchedulePage() {
     <div style={{ padding: '32px' }}>
       <PageHeader
         title={`Today's Schedule - ${TECH_USERNAME}`}
-        description={`${new Date().toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        })} • ${scheduleItems.length} ${scheduleItems.length === 1 ? 'appointment' : 'appointments'} scheduled`}
+        description={`${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • ${scheduleItems.length} ${scheduleItems.length === 1 ? 'appointment' : 'appointments'} scheduled`}
         action={<Button onClick={() => router.push('/')}>← Back to Dashboard</Button>}
       />
 
-        {/* Schedule Items */}
-        {scheduleItems.length === 0 ? (
+      {/* Schedule Items */}
+      {scheduleItems.length === 0 ? (
           <div style={{
             backgroundColor: 'var(--color-card)',
             border: '1px solid var(--color-border)',
@@ -175,11 +170,7 @@ export default function TechSchedulePage() {
                   borderRadius: '12px',
                   padding: '20px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  ':hover': {
-                    borderColor: 'var(--color-primary)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                  }
+                  transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-primary)'
@@ -272,7 +263,6 @@ export default function TechSchedulePage() {
             ))}
           </div>
         )}
-      </div>
     </div>
   )
 }
