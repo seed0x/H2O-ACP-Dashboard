@@ -162,7 +162,7 @@ export default function TechSchedulePage() {
           padding: '24px'
         }}>
           <div style={{ color: '#ef4444', marginBottom: '16px' }}>Error: {error}</div>
-          <Button onClick={loadTodaysSchedule}>Retry</Button>
+          <Button onClick={() => loadTodaysSchedule()}>Retry</Button>
         </div>
       </div>
     )
@@ -176,7 +176,7 @@ export default function TechSchedulePage() {
         action={
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button 
-              onClick={loadTodaysSchedule}
+              onClick={() => loadTodaysSchedule()}
               style={{ 
                 backgroundColor: 'var(--color-hover)',
                 color: 'var(--color-text-primary)'
