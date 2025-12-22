@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     api_host: str = os.getenv("API_HOST", "0.0.0.0")
     api_port: int = int(os.getenv("API_PORT", "8000"))
     environment: str = os.getenv("ENVIRONMENT", "development")
-    cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://dataflow-eta.vercel.app")
+    _cors_origins_raw: str = os.getenv("CORS_ORIGINS", "http://localhost:3000")
     
     # Email/SMTP settings for review requests
     smtp_host: Optional[str] = os.getenv("SMTP_HOST", None)
@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     storage_access_key_id: Optional[str] = os.getenv("STORAGE_ACCESS_KEY_ID", None)
     storage_secret_access_key: Optional[str] = os.getenv("STORAGE_SECRET_ACCESS_KEY", None)
     storage_endpoint_url: Optional[str] = os.getenv("STORAGE_ENDPOINT_URL", None)  # Required for R2
+    
+    @property
+    def cors_origins(self) -> str:
+        """Get CORS origins, ensuring https://dataflow-eta.vercel.app is included"""
+        required_origin = "https://dataflow-eta.vercel.app"
+        origins_list = [origin.strip() for origin in self._cors_origins_raw.split(",") if origin.strip()]
+        
+        # Add required origin if not present
+        if required_origin not in origins_list:
+            origins_list.append(required_origin)
+        
+        return ",".join(origins_list)
     
     @property
     def cors_origins_list(self):
