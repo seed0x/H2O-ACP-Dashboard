@@ -240,7 +240,7 @@ function PostsView() {
         }
       }
 
-      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk`, {
+      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk?tenant_id=h2o`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -751,6 +751,18 @@ function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedPost, setSelectedPost] = useState<any>(null)
   const [channels, setChannels] = useState<any[]>([])
+  const [showNewPostModal, setShowNewPostModal] = useState(false)
+  const [channelAccounts, setChannelAccounts] = useState<any[]>([])
+  const [postForm, setPostForm] = useState({
+    title: '',
+    base_caption: '',
+    scheduled_for: '',
+    channel_account_ids: [] as string[],
+    status: 'Idea',
+    owner: 'admin'
+  })
+  const [error, setError] = useState<string>('')
+  const [submitting, setSubmitting] = useState(false)
   
   // Save view mode preference
   const handleViewModeChange = (mode: 'week' | 'month') => {
@@ -761,7 +773,30 @@ function CalendarView() {
   useEffect(() => {
     loadCalendar()
     loadChannels()
+    loadChannelAccounts()
   }, [currentDate, viewMode])
+
+  async function loadChannelAccounts() {
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, {
+        headers,
+        credentials: 'include'
+      })
+      const data = await response.json()
+      setChannelAccounts(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Failed to load channel accounts:', error)
+      setChannelAccounts([])
+    }
+  }
 
   async function loadChannels() {
     try {
@@ -821,8 +856,8 @@ function CalendarView() {
 
       const params = new URLSearchParams({
         tenant_id: 'h2o',
-        date_from: start.toISOString(),
-        date_to: end.toISOString()
+        start_date: start.toISOString(),
+        end_date: end.toISOString()
       })
       
       const response = await fetch(`${API_BASE_URL}/marketing/calendar?${params}`, {
@@ -906,6 +941,95 @@ function CalendarView() {
     const dateStr = date.toISOString().split('T')[0]
     const dayData = calendarData.find(d => d.date === dateStr)
     return dayData?.instances || []
+  }
+
+  async function handleCreatePost(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
+      // Validate required fields
+      if (!postForm.title.trim()) {
+        throw new Error('Title is required')
+      }
+      if (!postForm.base_caption.trim()) {
+        throw new Error('Content is required')
+      }
+      if (!postForm.channel_account_ids || postForm.channel_account_ids.length === 0) {
+        throw new Error('Please select at least one account')
+      }
+
+      // Step 1: Create ContentItem
+      const contentItemBody: any = {
+        tenant_id: 'h2o',
+        title: postForm.title.trim(),
+        base_caption: postForm.base_caption.trim(),
+        status: postForm.status,
+        owner: postForm.owner
+      }
+      
+      const itemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify(contentItemBody)
+      })
+      
+      if (!itemResponse.ok) {
+        const errorData = await itemResponse.json().catch(() => ({ detail: 'Failed to create content item' }))
+        throw new Error(errorData.detail || `HTTP ${itemResponse.status}: ${itemResponse.statusText}`)
+      }
+      
+      const contentItem = await itemResponse.json()
+
+      // Step 2: Create PostInstances for selected accounts
+      let scheduledFor: string | undefined
+      if (postForm.scheduled_for) {
+        const scheduledDate = new Date(postForm.scheduled_for)
+        if (!isNaN(scheduledDate.getTime())) {
+          scheduledFor = scheduledDate.toISOString()
+        }
+      }
+
+      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk?tenant_id=h2o`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          content_item_id: contentItem.id,
+          channel_account_ids: postForm.channel_account_ids,
+          scheduled_for: scheduledFor
+        })
+      })
+      
+      if (!instancesResponse.ok) {
+        const errorData = await instancesResponse.json().catch(() => ({ detail: 'Failed to create post instances' }))
+        throw new Error(errorData.detail || `HTTP ${instancesResponse.status}: ${instancesResponse.statusText}`)
+      }
+      
+      setShowNewPostModal(false)
+      setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
+      setError('')
+      await loadCalendar()
+      showToast('Post created successfully', 'success')
+    } catch (error: any) {
+      console.error('Failed to create post:', error)
+      setError(error.message || 'Failed to create post. Please try again.')
+      showToast(error.message || 'Failed to create post', 'error')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (loading) {
@@ -1007,12 +1131,28 @@ function CalendarView() {
           {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
 
-        <div style={{
-          display: 'flex',
-          backgroundColor: 'var(--color-hover)',
-          borderRadius: '8px',
-          padding: '4px'
-        }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            onClick={() => setShowNewPostModal(true)}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: 'var(--color-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            + New Post
+          </button>
+          <div style={{
+            display: 'flex',
+            backgroundColor: 'var(--color-hover)',
+            borderRadius: '8px',
+            padding: '4px'
+          }}>
           <button
             onClick={() => handleViewModeChange('week')}
             style={{
@@ -1045,6 +1185,7 @@ function CalendarView() {
           >
             Month
           </button>
+        </div>
         </div>
       </div>
 
@@ -1204,6 +1345,188 @@ function CalendarView() {
 
       {/* Post Instance Detail Modal */}
       {selectedPost && <PostInstanceDetailModal instance={selectedPost} onClose={() => setSelectedPost(null)} onUpdate={() => { loadCalendar(); setSelectedPost(null); }} />}
+
+      {/* New Post Modal */}
+      {showNewPostModal && (
+        <div className="marketing-modal" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div className="marketing-modal-content" style={{
+            backgroundColor: 'var(--color-card)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+              Create New Post
+            </h3>
+            {error && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                border: '1px solid #EF5350',
+                borderRadius: '8px',
+                color: '#EF5350',
+                fontSize: '14px',
+                marginBottom: '16px'
+              }}>
+                {error}
+              </div>
+            )}
+            <form onSubmit={handleCreatePost}>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Title *
+                  </label>
+                  <input
+                    required
+                    value={postForm.title}
+                    onChange={(e) => setPostForm({ ...postForm, title: e.target.value })}
+                    placeholder="Post title"
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Content *
+                  </label>
+                  <textarea
+                    required
+                    value={postForm.base_caption}
+                    onChange={(e) => setPostForm({ ...postForm, base_caption: e.target.value })}
+                    placeholder="Post content..."
+                    rows={5}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Scheduled Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={postForm.scheduled_for}
+                    onChange={(e) => setPostForm({ ...postForm, scheduled_for: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Accounts *
+                  </label>
+                  <div style={{ display: 'grid', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {Array.isArray(channelAccounts) && channelAccounts.length > 0 ? (
+                      channelAccounts.map(account => (
+                        <label key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={postForm.channel_account_ids.includes(account.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setPostForm({ ...postForm, channel_account_ids: [...postForm.channel_account_ids, account.id] })
+                              } else {
+                                setPostForm({ ...postForm, channel_account_ids: postForm.channel_account_ids.filter(id => id !== account.id) })
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                            {account.name}
+                            {account.channel && ` (${account.channel.display_name || account.channel.key})`}
+                          </span>
+                        </label>
+                      ))
+                    ) : (
+                      <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '8px' }}>
+                        No accounts available. Please add channel accounts first.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: submitting ? 'var(--color-hover)' : 'var(--color-primary)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    opacity: submitting ? 0.6 : 1
+                  }}
+                >
+                  {submitting ? 'Creating...' : 'Create Post'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewPostModal(false)
+                    setError('')
+                    setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: 'var(--color-hover)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2568,9 +2891,23 @@ function AccountsView() {
 
   async function loadData() {
     try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
       const [accountsRes, channelsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, { credentials: 'include' }),
-        fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, { credentials: 'include' })
+        fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, { 
+          headers,
+          credentials: 'include' 
+        }),
+        fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, { 
+          headers,
+          credentials: 'include' 
+        })
       ])
       
       if (!accountsRes.ok || !channelsRes.ok) {
@@ -2581,6 +2918,7 @@ function AccountsView() {
       const channelsData = await channelsRes.json()
       setAccounts(Array.isArray(accountsData) ? accountsData : [])
       setChannels(Array.isArray(channelsData) ? channelsData : [])
+      setLoading(false)
       setLoading(false)
     } catch (error) {
       console.error('Failed to load accounts:', error)
