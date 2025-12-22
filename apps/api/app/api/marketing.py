@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, timezone
+import os
 
 from ..db.session import get_session
 from .. import models
@@ -20,12 +21,61 @@ router = APIRouter(prefix="/marketing", tags=["marketing"])
 
 # Marketing Channels
 
+# Default channels to seed if none exist
+DEFAULT_CHANNELS = [
+    {"key": "google_business_profile", "display_name": "Google Business Profile", "supports_autopost": True},
+    {"key": "facebook_page", "display_name": "Facebook Page", "supports_autopost": True},
+    {"key": "instagram_business", "display_name": "Instagram Business", "supports_autopost": True},
+    {"key": "nextdoor", "display_name": "Nextdoor", "supports_autopost": False},
+]
+
+
+async def ensure_channels_seeded(db: AsyncSession):
+    """Ensure default marketing channels exist in database"""
+    result = await db.execute(select(models.MarketingChannel))
+    existing = result.scalars().all()
+    
+    if len(existing) == 0:
+        # No channels exist, seed them
+        for channel_data in DEFAULT_CHANNELS:
+            channel = models.MarketingChannel(**channel_data)
+            db.add(channel)
+        await db.commit()
+
+
+# Optional seed secret: if set, callers must provide it as ?secret=... to the seed endpoint.
+_MARKETING_SEED_SECRET = os.getenv("MARKETING_SEED_SECRET")
+
+
 @router.get("/channels", response_model=List[schemas_marketing.MarketingChannel])
 async def list_channels(
     db: AsyncSession = Depends(get_session),
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """List all available marketing channels"""
+    # Auto-seed channels if none exist
+    await ensure_channels_seeded(db)
+    
+    result = await db.execute(select(models.MarketingChannel).order_by(models.MarketingChannel.display_name))
+    return result.scalars().all()
+
+
+@router.post("/seed-channels", response_model=List[schemas_marketing.MarketingChannel])
+async def seed_channels(
+    db: AsyncSession = Depends(get_session),
+    secret: Optional[str] = Query(None, description="Optional seed secret")
+):
+    """Seed default marketing channels into the database.
+
+    This endpoint is intentionally lightweight so you can seed channels without access to the Render shell.
+    If the environment variable MARKETING_SEED_SECRET is set, callers must provide the same value as the
+    `secret` query parameter; otherwise the endpoint is open.
+    The seeding is idempotent: it will only populate channels if none exist.
+    """
+    if _MARKETING_SEED_SECRET and secret != _MARKETING_SEED_SECRET:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid seed secret")
+
+    await ensure_channels_seeded(db)
     result = await db.execute(select(models.MarketingChannel).order_by(models.MarketingChannel.display_name))
     return result.scalars().all()
 
