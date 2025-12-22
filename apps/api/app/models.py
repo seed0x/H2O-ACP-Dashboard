@@ -242,10 +242,13 @@ class ContentItem(Base):
 
 class PostInstance(Base):
     __tablename__ = "post_instances"
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'channel_account_id', 'scheduled_for', name='uq_post_instance_schedule'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(Text, nullable=False)
-    content_item_id = Column(UUID(as_uuid=True), ForeignKey("content_items.id"), nullable=False)
+    content_item_id = Column(UUID(as_uuid=True), ForeignKey("content_items.id"), nullable=True)  # Nullable for planned slots
     channel_account_id = Column(UUID(as_uuid=True), ForeignKey("channel_accounts.id"), nullable=False)
     
     # Per-account customization

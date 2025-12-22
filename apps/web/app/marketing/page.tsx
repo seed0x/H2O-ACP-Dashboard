@@ -1308,6 +1308,7 @@ function CalendarView() {
                       const contentItem = instance.content_item
                       const channelAccount = instance.channel_account
                       const accountName = channelAccount?.name || 'Unknown Account'
+                      const isPlanned = instance.status === 'Planned' || !instance.content_item_id
                       
                       return (
                         <div
@@ -1322,7 +1323,7 @@ function CalendarView() {
                             border: '1px solid var(--color-border)',
                             cursor: 'pointer'
                           }}
-                          title={`${contentItem?.title || 'Untitled'} - ${accountName}`}
+                          title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}`}
                         >
                           <div style={{
                             fontWeight: '600',
@@ -1332,7 +1333,13 @@ function CalendarView() {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                           }}>
-                            {contentItem?.title || 'Untitled'}
+                            {isPlanned ? (
+                              <span style={{ fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>
+                                Needs content
+                              </span>
+                            ) : (
+                              contentItem?.title || 'Untitled'
+                            )}
                           </div>
                           {viewMode === 'week' && (
                             <>
@@ -2258,6 +2265,13 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
   const contentItem = instance.content_item
   const channelAccount = instance.channel_account
   const [showMarkPostedModal, setShowMarkPostedModal] = useState(false)
+  const [showEditContentModal, setShowEditContentModal] = useState(false)
+  const [isPlannedSlot, setIsPlannedSlot] = useState(false)
+  
+  useEffect(() => {
+    // Check if this is a planned slot (no content_item_id or status is Planned)
+    setIsPlannedSlot(instance.content_item_id === null || instance.status === 'Planned')
+  }, [instance])
 
   return (
     <div className="marketing-modal" style={{
@@ -2286,7 +2300,7 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
         <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
           <div>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-              {contentItem?.title || 'Untitled'}
+              {instance.content_item_id ? (contentItem?.title || 'Untitled') : 'Planned Slot'}
             </h3>
             <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
               {channelAccount?.name || 'Unknown Account'} • {instance.status}
@@ -2309,16 +2323,39 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Content</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Content</h4>
+            {isPlannedSlot && (
+              <button
+                onClick={() => setShowEditContentModal(true)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: 'var(--color-primary)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Add Content
+              </button>
+            )}
+          </div>
           <div style={{
             padding: '12px',
-            backgroundColor: 'var(--color-hover)',
+            backgroundColor: isPlannedSlot ? 'rgba(156, 39, 176, 0.1)' : 'var(--color-hover)',
             borderRadius: '8px',
             fontSize: '14px',
-            color: 'var(--color-text-primary)',
-            whiteSpace: 'pre-wrap'
+            color: isPlannedSlot ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+            whiteSpace: 'pre-wrap',
+            fontStyle: isPlannedSlot ? 'italic' : 'normal'
           }}>
-            {instance.caption_override || contentItem?.base_caption || 'No content'}
+            {isPlannedSlot 
+              ? '📅 Planned slot - Click "Add Content" to fill this post'
+              : (instance.caption_override || contentItem?.base_caption || 'No content')
+            }
           </div>
         </div>
 
@@ -2336,23 +2373,25 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
           </div>
         )}
 
-        {instance.status !== 'Posted' && (
-          <button
-            onClick={() => setShowMarkPostedModal(true)}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: 'var(--color-primary)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}
-          >
-            Mark as Posted
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {instance.status !== 'Posted' && (
+            <button
+              onClick={() => setShowMarkPostedModal(true)}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: 'var(--color-primary)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              Mark as Posted
+            </button>
+          )}
+        </div>
       </div>
       
       {/* Mark Posted Modal */}
@@ -2366,6 +2405,262 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
           }}
         />
       )}
+
+      {/* Edit Content Modal for Planned Slots */}
+      {showEditContentModal && (
+        <EditPlannedSlotModal
+          instance={instance}
+          contentItem={contentItem}
+          onClose={() => setShowEditContentModal(false)}
+          onSuccess={() => {
+            setShowEditContentModal(false)
+            onUpdate()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Edit Planned Slot Modal - Allows adding content to planned slots
+function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { instance: any, contentItem: any, onClose: () => void, onSuccess: () => void }) {
+  const [title, setTitle] = useState('')
+  const [baseCaption, setBaseCaption] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    
+    if (!title.trim()) {
+      setError('Title is required')
+      return
+    }
+    if (!baseCaption.trim()) {
+      setError('Content is required')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      // If content_item_id is null (planned slot), create a new content item and link it
+      // Otherwise, update the existing content item
+      if (!instance.content_item_id || !contentItem) {
+        // Create new content item for planned slot
+        const newItemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            tenant_id: instance.tenant_id,
+            title: title.trim(),
+            base_caption: baseCaption.trim(),
+            status: 'Draft',
+            owner: 'admin'
+          })
+        })
+
+        if (!newItemResponse.ok) {
+          const errorData = await newItemResponse.json().catch(() => ({ detail: 'Failed to create content' }))
+          throw new Error(errorData.detail || 'Failed to create content')
+        }
+
+        const newItem = await newItemResponse.json()
+
+        // Update the post instance to use the new content item
+        const updateResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            content_item_id: newItem.id,
+            status: 'Draft'
+          })
+        })
+
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update post instance')
+        }
+      } else {
+        // Update existing content item
+        const updateResponse = await fetch(`${API_BASE_URL}/marketing/content-items/${contentItem.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            title: title.trim(),
+            base_caption: baseCaption.trim(),
+            status: 'Draft'
+          })
+        })
+
+        if (!updateResponse.ok) {
+          const errorData = await updateResponse.json().catch(() => ({ detail: 'Failed to update content' }))
+          throw new Error(errorData.detail || 'Failed to update content')
+        }
+
+        // Update post instance status
+        await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            status: 'Draft'
+          })
+        })
+      }
+
+      showToast('Content added successfully', 'success')
+      onSuccess()
+    } catch (error: any) {
+      console.error('Failed to add content:', error)
+      setError(error.message || 'Failed to add content')
+      showToast(error.message || 'Failed to add content', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="marketing-modal" style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1001,
+      padding: '20px'
+    }}>
+      <div className="marketing-modal-content" style={{
+        backgroundColor: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '12px',
+        padding: '24px',
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+          Add Content to Planned Slot
+        </h3>
+        {error && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: 'rgba(239, 83, 80, 0.1)',
+            border: '1px solid #EF5350',
+            borderRadius: '8px',
+            color: '#EF5350',
+            fontSize: '14px',
+            marginBottom: '16px'
+          }}>
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'grid', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                Title *
+              </label>
+              <input
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Post title"
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                Content *
+              </label>
+              <textarea
+                required
+                value={baseCaption}
+                onChange={(e) => setBaseCaption(e.target.value)}
+                placeholder="Post content..."
+                rows={5}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: submitting ? 'var(--color-hover)' : 'var(--color-primary)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.6 : 1
+              }}
+            >
+              {submitting ? 'Saving...' : 'Save Content'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: 'var(--color-hover)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                color: 'var(--color-text-primary)',
+                fontSize: '14px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

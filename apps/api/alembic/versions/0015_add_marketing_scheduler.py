@@ -25,6 +25,9 @@ def upgrade():
     op.execute("UPDATE channel_accounts SET posts_per_week = 3 WHERE posts_per_week IS NULL")
     op.execute("UPDATE channel_accounts SET schedule_timezone = 'America/Los_Angeles' WHERE schedule_timezone IS NULL")
     
+    # Make content_item_id nullable for planned slots (allows empty slots without placeholder ContentItems)
+    op.alter_column('post_instances', 'content_item_id', nullable=True)
+    
     # Add unique constraint to prevent duplicate PostInstances
     # This ensures idempotency: (tenant_id, channel_account_id, scheduled_for) must be unique
     # First, remove any existing duplicates (keep the first one)
@@ -41,14 +44,16 @@ def upgrade():
     
     # Now create the unique constraint
     op.create_unique_constraint(
-        'uq_post_instances_tenant_account_scheduled',
+        'uq_post_instance_schedule',
         'post_instances',
         ['tenant_id', 'channel_account_id', 'scheduled_for']
     )
 
 
 def downgrade():
-    op.drop_constraint('uq_post_instances_tenant_account_scheduled', 'post_instances', type_='unique')
+    op.drop_constraint('uq_post_instance_schedule', 'post_instances', type_='unique')
+    # Note: Cannot safely make content_item_id NOT NULL if there are NULL values
+    # op.alter_column('post_instances', 'content_item_id', nullable=False)
     op.drop_column('channel_accounts', 'schedule_times')
     op.drop_column('channel_accounts', 'schedule_timezone')
     op.drop_column('channel_accounts', 'posts_per_week')

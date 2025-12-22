@@ -18,42 +18,10 @@ from .. import crud
 router = APIRouter(prefix="/marketing/scheduler", tags=["marketing-scheduler"])
 
 
-def get_or_create_placeholder_content_item(db: AsyncSession, tenant_id: str) -> models.ContentItem:
-    """Get or create a placeholder ContentItem for planned slots"""
-    # Try to find existing placeholder
-    result = await db.execute(
-        select(models.ContentItem)
-        .where(
-            and_(
-                models.ContentItem.tenant_id == tenant_id,
-                models.ContentItem.title == "[PLANNED SLOT]",
-                models.ContentItem.status == "Idea"
-            )
-        )
-        .limit(1)
-    )
-    placeholder = result.scalar_one_or_none()
-    
-    if not placeholder:
-        # Create new placeholder
-        placeholder = models.ContentItem(
-            tenant_id=tenant_id,
-            title="[PLANNED SLOT]",
-            base_caption="This is a planned slot. Content will be added later.",
-            status="Idea",
-            owner="system"
-        )
-        db.add(placeholder)
-        await db.flush()
-    
-    return placeholder
-
-
 def compute_schedule_datetimes(
     account: models.ChannelAccount,
     start_date: datetime,
-    end_date: datetime,
-    placeholder: models.ContentItem
+    end_date: datetime
 ) -> list[datetime]:
     """Compute target datetimes for an account based on its schedule configuration"""
     datetimes = []
@@ -81,44 +49,69 @@ def compute_schedule_datetimes(
     days_in_range = (end_local.date() - start_local.date()).days + 1
     weeks_in_range = days_in_range / 7.0
     
-    # Total target posts
+    # Total target posts (posts_per_week * number of weeks)
     total_posts = int(posts_per_week * weeks_in_range)
     
     # Distribute posts evenly across the range
     if total_posts == 0:
         return []
     
-    # Generate dates evenly spaced
-    date_step = days_in_range / max(total_posts, 1)
-    current_date = start_local.date()
+    # Generate dates evenly spaced across the range
+    datetimes = []
     
-    for i in range(total_posts):
-        # Calculate target date
-        days_offset = int(i * date_step)
-        target_date = start_local.date() + timedelta(days=days_offset)
-        
-        if target_date > end_local.date():
-            break
-        
-        # For each schedule time, create a datetime
-        for time_str in schedule_times:
-            try:
-                # Parse time (HH:MM format)
-                hour, minute = map(int, time_str.split(':'))
-                target_datetime_local = tz.localize(
-                    datetime.combine(target_date, datetime.min.time().replace(hour=hour, minute=minute))
-                )
-                # Convert to UTC for storage
-                target_datetime_utc = target_datetime_local.astimezone(pytz.utc).replace(tzinfo=None)
-                
-                # Only include if within range
-                if start_date.replace(tzinfo=None) <= target_datetime_utc <= end_date.replace(tzinfo=None):
-                    datetimes.append(target_datetime_utc)
-            except (ValueError, AttributeError):
-                # Skip invalid time format
-                continue
+    # Better distribution: calculate target dates first, then assign times
+    # This ensures posts are spread across different days
+    target_dates = []
     
-    return datetimes
+    if total_posts == 1:
+        # Single post: put it in the middle
+        mid_day = days_in_range // 2
+        target_dates.append(start_local.date() + timedelta(days=mid_day))
+    else:
+        # Distribute posts evenly across the date range
+        # Calculate spacing to ensure posts are on different days
+        step = (days_in_range - 1) / (total_posts - 1)
+        
+        for i in range(total_posts):
+            # Calculate day offset (use floor to avoid clustering)
+            days_offset = int(i * step)
+            target_date = start_local.date() + timedelta(days=days_offset)
+            
+            # Ensure we don't exceed bounds
+            if target_date > end_local.date():
+                target_date = end_local.date()
+            if target_date < start_local.date():
+                target_date = start_local.date()
+            
+            # Only add if it's a new date (avoid duplicates on same day)
+            if target_date not in target_dates:
+                target_dates.append(target_date)
+    
+    # Now assign times to each date
+    for i, target_date in enumerate(target_dates):
+        # Use schedule time (rotate through if multiple times)
+        time_str = schedule_times[i % len(schedule_times)]
+        
+        try:
+            # Parse time (HH:MM format)
+            hour, minute = map(int, time_str.split(':'))
+            target_datetime_local = tz.localize(
+                datetime.combine(target_date, datetime.min.time().replace(hour=hour, minute=minute))
+            )
+            # Convert to UTC for storage
+            target_datetime_utc = target_datetime_local.astimezone(pytz.utc).replace(tzinfo=None)
+            
+            # Only include if within range
+            start_utc = start_date.replace(tzinfo=None) if start_date.tzinfo is None else start_date
+            end_utc = end_date.replace(tzinfo=None) if end_date.tzinfo is None else end_date
+            
+            if start_utc <= target_datetime_utc <= end_utc:
+                datetimes.append(target_datetime_utc)
+        except (ValueError, AttributeError) as e:
+            # Skip invalid time format
+            continue
+    
+    return sorted(datetimes)  # Return sorted list
 
 
 async def topoff_scheduler_logic(
@@ -136,10 +129,6 @@ async def topoff_scheduler_logic(
             result = await topoff_scheduler_logic(tenant_id, days, db)
             await db.commit()
             return result
-    
-    # Get or create placeholder content item
-    placeholder = await get_or_create_placeholder_content_item(db, tenant_id)
-    await db.flush()  # Flush to get ID, but don't commit yet
     
     # Calculate date range
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -176,7 +165,7 @@ async def topoff_scheduler_logic(
         accounts_processed += 1
         
         # Compute target datetimes for this account
-        target_datetimes = compute_schedule_datetimes(account, start_date, end_date, placeholder)
+        target_datetimes = compute_schedule_datetimes(account, start_date, end_date)
         
         if not target_datetimes:
             continue
@@ -209,29 +198,29 @@ async def topoff_scheduler_logic(
         )
         existing_instances = {inst.scheduled_for: inst for inst in existing_instances_result.scalars().all() if inst.scheduled_for}
         
-        # Create missing instances
+        # Create missing instances using upsert pattern
         instances_to_create = []
         for target_dt in target_datetimes:
             existing_instance = existing_instances.get(target_dt)
             
             if existing_instance:
                 # Check if we should skip (has real content or beyond Planned/Draft)
-                if existing_instance.content_item_id != placeholder.id:
-                    # Has real content, skip
+                if existing_instance.content_item_id is not None:
+                    # Has real content, skip - do not overwrite human work
                     total_skipped += 1
                     continue
                 if existing_instance.status not in ['Planned', 'Draft']:
-                    # Beyond planned/draft, skip
+                    # Beyond planned/draft, skip - do not overwrite human work
                     total_skipped += 1
                     continue
-                # Already exists with placeholder content and Planned/Draft status, skip
+                # Already exists as planned slot (content_item_id is None), skip
                 total_skipped += 1
                 continue
             
-            # Create new instance
+            # Create new planned instance with null content_item_id
             instance = models.PostInstance(
                 tenant_id=tenant_id,
-                content_item_id=placeholder.id,
+                content_item_id=None,  # Null for planned slots
                 channel_account_id=account.id,
                 scheduled_for=target_dt,
                 status='Planned'
