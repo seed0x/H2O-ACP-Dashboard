@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
@@ -44,13 +44,41 @@ export default function TechSchedulePage() {
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const isInitialLoad = useRef(true)
 
   useEffect(() => {
-    loadTodaysSchedule()
+    let pollInterval: NodeJS.Timeout | null = null
+    
+    // Initial load
+    loadTodaysSchedule(false)
+    
+    // Set up polling to refresh every 30 seconds (silent refresh)
+    pollInterval = setInterval(() => {
+      loadTodaysSchedule(true) // silent = true to avoid loading spinner
+    }, 30000) // 30 seconds
+    
+    // Refresh when page becomes visible (user switches back to tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadTodaysSchedule(true) // silent refresh when tab becomes visible
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Cleanup
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
-  async function loadTodaysSchedule() {
-    setLoading(true)
+  async function loadTodaysSchedule(silent = false) {
+    // Don't show loading spinner on silent refreshes (polling)
+    if (!silent) {
+      setLoading(true)
+    }
     setError(null)
     try {
       const token = localStorage.getItem('token')
@@ -63,14 +91,31 @@ export default function TechSchedulePage() {
       )
       
       const calls = Array.isArray(response.data) ? response.data : []
+      const previousCount = scheduleItems.length
+      
+      // Check if new items were added before updating state
+      const hasNewItems = !isInitialLoad.current && previousCount > 0 && calls.length > previousCount
+      const newCount = hasNewItems ? calls.length - previousCount : 0
+      
       setScheduleItems(calls)
+      isInitialLoad.current = false
+      
+      // Show toast if new items were added (but not on initial load)
+      if (hasNewItems && !silent) {
+        showToast(`📅 ${newCount} new ${newCount === 1 ? 'appointment' : 'appointments'} added to your schedule!`, 'success')
+      }
     } catch (err: any) {
       logError(err, 'loadTechSchedule')
       const errorMsg = handleApiError(err)
-      setError(errorMsg)
-      showToast(errorMsg, 'error')
+      // Only show error on manual refresh, not on polling
+      if (!silent) {
+        setError(errorMsg)
+        showToast(errorMsg, 'error')
+      }
     } finally {
-      setLoading(false)
+      if (!silent) {
+        setLoading(false)
+      }
     }
   }
 
@@ -128,7 +173,20 @@ export default function TechSchedulePage() {
       <PageHeader
         title={`Today's Schedule - ${TECH_USERNAME}`}
         description={`${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • ${scheduleItems.length} ${scheduleItems.length === 1 ? 'appointment' : 'appointments'} scheduled`}
-        action={<Button onClick={() => router.push('/')}>← Back to Dashboard</Button>}
+        action={
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button 
+              onClick={loadTodaysSchedule}
+              style={{ 
+                backgroundColor: 'var(--color-hover)',
+                color: 'var(--color-text-primary)'
+              }}
+            >
+              🔄 Refresh
+            </Button>
+            <Button onClick={() => router.push('/')}>← Back to Dashboard</Button>
+          </div>
+        }
       />
 
       {/* Schedule Items */}
