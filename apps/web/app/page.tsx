@@ -14,6 +14,7 @@ import { useTenant } from '../contexts/TenantContext'
 import { TodaysSchedule } from '../components/TodaysSchedule'
 import { Dataflow } from '../components/Dataflow'
 import { TechPerformance } from '../components/TechPerformance'
+import { ServiceCallsCalendar } from '../components/ServiceCallsCalendar'
 import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
 
@@ -295,6 +296,13 @@ export default function Dashboard() {
       <div style={{ marginBottom: '24px' }}>
         <Dataflow />
       </div>
+
+      {/* Service Calls Calendar */}
+      {isTenantSelected('h2o') && (
+        <div style={{ marginBottom: '24px' }}>
+          <ServiceCallsCalendar />
+        </div>
+      )}
 
       {/* Tech Performance */}
       <div style={{ marginBottom: '24px' }}>

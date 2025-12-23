@@ -131,6 +131,7 @@ class Job(Base):
         UniqueConstraint('builder_id', 'community', 'lot_number', 'phase', 'tenant_id', name='uq_job_per_lot_phase'),
     )
     
+    builder = relationship("Builder")
     tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
 
 class JobTask(Base):

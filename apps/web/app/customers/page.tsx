@@ -43,7 +43,9 @@ export default function CustomersPage() {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       
-      const params: any = { tenant_id: currentTenant }
+      // Customers are only for H2O tenant
+      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+      const params: any = { tenant_id: tenantId }
       if (search) params.search = search
       
       const response = await axios.get(`${API_BASE_URL}/customers`, {

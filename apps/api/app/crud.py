@@ -265,16 +265,16 @@ async def create_job(db: AsyncSession, job_in: schemas.JobCreate, changed_by: st
     return job
 
 async def get_job(db: AsyncSession, job_id: UUID) -> models.Job | None:
-    from sqlalchemy.orm import selectinload
     res = await db.execute(
         select(models.Job)
         .where(models.Job.id == job_id)
-        .options(selectinload(models.Job.tasks))
+        .options(selectinload(models.Job.builder), selectinload(models.Job.tasks))
     )
     return res.scalar_one_or_none()
 
-async def list_jobs(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, community: str | None, lot: str | None, search: str | None, limit: int = 25, offset: int = 0):
-    q = select(models.Job)
+async def list_jobs(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, community: str | None, lot: str | None, search: str | None, scheduled_date: str | None = None, limit: int = 25, offset: int = 0):
+    from datetime import datetime, timezone
+    q = select(models.Job).options(selectinload(models.Job.builder))
     if tenant_id:
         q = q.where(models.Job.tenant_id == tenant_id)
     if status:
@@ -287,6 +287,23 @@ async def list_jobs(db: AsyncSession, tenant_id: str | None, status: str | None,
         q = q.where(models.Job.lot_number.ilike(f"%{lot}%"))
     if search:
         q = q.where(models.Job.address_line1.ilike(f"%{search}%") | models.Job.lot_number.ilike(f"%{search}%"))
+    if scheduled_date:
+        # Filter by scheduled_start date (match the date part only)
+        try:
+            # Handle both YYYY-MM-DD and ISO datetime formats
+            if 'T' in scheduled_date or '+' in scheduled_date or 'Z' in scheduled_date:
+                date_obj = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00')).date()
+            else:
+                # Plain date string YYYY-MM-DD
+                date_obj = datetime.fromisoformat(scheduled_date).date()
+            
+            start_of_day = datetime.combine(date_obj, datetime.min.time()).replace(tzinfo=timezone.utc)
+            end_of_day = datetime.combine(date_obj, datetime.max.time()).replace(tzinfo=timezone.utc)
+            q = q.where(models.Job.scheduled_start >= start_of_day).where(models.Job.scheduled_start <= end_of_day)
+        except (ValueError, AttributeError) as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Invalid scheduled_date format '{scheduled_date}': {e}")
+            pass  # Invalid date format, ignore filter
     q = q.order_by(models.Job.created_at.desc()).limit(limit).offset(offset)
     res = await db.execute(q)
     return res.scalars().all()
@@ -778,6 +795,223 @@ async def suggest_portals(
             result.append(portal)
     
     return result
+
+### Customers
+async def create_customer(db: AsyncSession, customer_in: schemas.CustomerCreate, changed_by: str) -> models.Customer:
+    customer = models.Customer(**customer_in.dict())
+    db.add(customer)
+    await db.flush()
+    await write_audit(db, customer.tenant_id, 'customer', customer.id, 'create', changed_by)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise ValueError('Failed to create customer')
+    await db.refresh(customer)
+    return customer
+
+async def get_customer(db: AsyncSession, customer_id: UUID) -> Optional[models.Customer]:
+    res = await db.execute(
+        select(models.Customer)
+        .where(models.Customer.id == customer_id)
+        .options(selectinload(models.Customer.service_calls))
+    )
+    return res.scalar_one_or_none()
+
+async def list_customers(db: AsyncSession, tenant_id: str, search: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[dict]:
+    q = select(models.Customer, func.count(models.ServiceCall.id).label('service_calls_count')).outerjoin(
+        models.ServiceCall, models.ServiceCall.customer_id == models.Customer.id
+    ).where(models.Customer.tenant_id == tenant_id).group_by(models.Customer.id)
+    
+    if search:
+        search_term = f"%{search}%"
+        q = q.where(
+            or_(
+                models.Customer.name.ilike(search_term),
+                models.Customer.phone.ilike(search_term),
+                models.Customer.email.ilike(search_term),
+                models.Customer.address_line1.ilike(search_term)
+            )
+        )
+    
+    q = q.order_by(models.Customer.created_at.desc()).limit(limit).offset(offset)
+    res = await db.execute(q)
+    rows = res.all()
+    
+    customers = []
+    for customer, service_calls_count in rows:
+        customer_dict = {
+            'id': str(customer.id),
+            'tenant_id': customer.tenant_id,
+            'name': customer.name,
+            'phone': customer.phone,
+            'email': customer.email,
+            'address_line1': customer.address_line1,
+            'city': customer.city,
+            'state': customer.state,
+            'zip': customer.zip,
+            'notes': customer.notes,
+            'tags': customer.tags,
+            'created_at': customer.created_at.isoformat() if customer.created_at else None,
+            'updated_at': customer.updated_at.isoformat() if customer.updated_at else None,
+            'service_calls_count': service_calls_count or 0,
+        }
+        customers.append(customer_dict)
+    
+    return customers
+
+async def update_customer(db: AsyncSession, customer_id: UUID, customer_in: schemas.CustomerUpdate, changed_by: str) -> models.Customer:
+    customer = await get_customer(db, customer_id)
+    if not customer:
+        raise ValueError('Customer not found')
+    
+    for field, value in customer_in.dict(exclude_unset=True).items():
+        old = getattr(customer, field)
+        setattr(customer, field, value)
+        await write_audit(db, customer.tenant_id, 'customer', customer.id, 'update', changed_by, field, str(old) if old is not None else None, str(value) if value is not None else None)
+    
+    db.add(customer)
+    await db.commit()
+    await db.refresh(customer)
+    return customer
+
+async def delete_customer(db: AsyncSession, customer_id: UUID, changed_by: str) -> bool:
+    customer = await get_customer(db, customer_id)
+    if not customer:
+        return False
+    
+    # Set customer_id to NULL on related service calls
+    await db.execute(
+        update(models.ServiceCall)
+        .where(models.ServiceCall.customer_id == customer_id)
+        .values(customer_id=None)
+    )
+    
+    await write_audit(db, customer.tenant_id, 'customer', customer.id, 'delete', changed_by)
+    await db.delete(customer)
+    await db.commit()
+    return True
+
+async def find_or_create_customer_by_contact(db: AsyncSession, tenant_id: str, name: str, phone: Optional[str] = None, email: Optional[str] = None, changed_by: str = "system") -> Optional[models.Customer]:
+    """Find existing customer by phone/email, or create new one"""
+    if not phone and not email:
+        return None
+    
+    # Try to find by phone first, then email
+    q = select(models.Customer).where(models.Customer.tenant_id == tenant_id)
+    if phone:
+        q = q.where(models.Customer.phone == phone)
+    elif email:
+        q = q.where(models.Customer.email == email)
+    
+    res = await db.execute(q)
+    existing = res.scalar_one_or_none()
+    
+    if existing:
+        return existing
+    
+    # Create new customer
+    customer_in = schemas.CustomerCreate(
+        tenant_id=tenant_id,
+        name=name,
+        phone=phone,
+        email=email
+    )
+    return await create_customer(db, customer_in, changed_by)
+
+async def get_customer_stats(db: AsyncSession, customer_id: UUID, tenant_id: str) -> dict:
+    customer = await get_customer(db, customer_id)
+    if not customer:
+        raise ValueError('Customer not found')
+    
+    # Get service calls
+    service_calls_result = await db.execute(
+        select(models.ServiceCall)
+        .where(models.ServiceCall.customer_id == customer_id)
+        .where(models.ServiceCall.tenant_id == tenant_id)
+    )
+    service_calls = service_calls_result.scalars().all()
+    
+    # Calculate stats
+    total_calls = len(service_calls)
+    status_counts = {}
+    priority_counts = {}
+    
+    for sc in service_calls:
+        status_counts[sc.status] = status_counts.get(sc.status, 0) + 1
+        priority_counts[sc.priority] = priority_counts.get(sc.priority, 0) + 1
+    
+    # Get first and last service call dates
+    if service_calls:
+        dates = [sc.created_at for sc in service_calls if sc.created_at]
+        dates.sort()
+        first_call_date = dates[0].isoformat() if dates else None
+        last_call_date = dates[-1].isoformat() if dates else None
+    else:
+        first_call_date = None
+        last_call_date = None
+    
+    return {
+        'customer_id': str(customer_id),
+        'total_service_calls': total_calls,
+        'status_breakdown': status_counts,
+        'priority_breakdown': priority_counts,
+        'first_service_call_date': first_call_date,
+        'last_service_call_date': last_call_date,
+        'customer_since': customer.created_at.isoformat() if customer.created_at else None,
+    }
+
+async def merge_customers(db: AsyncSession, source_customer_id: UUID, target_customer_id: UUID, changed_by: str) -> models.Customer:
+    source = await get_customer(db, source_customer_id)
+    target = await get_customer(db, target_customer_id)
+    
+    if not source or not target:
+        raise ValueError("One or both customers not found")
+    
+    if source.tenant_id != target.tenant_id:
+        raise ValueError("Cannot merge customers from different tenants")
+    
+    try:
+        # Transfer service calls
+        await db.execute(
+            update(models.ServiceCall)
+            .where(models.ServiceCall.customer_id == source_customer_id)
+            .values(customer_id=target_customer_id)
+        )
+        
+        # Merge customer data (prefer non-null values from both)
+        update_data = {}
+        if not target.phone and source.phone:
+            update_data['phone'] = source.phone
+        if not target.email and source.email:
+            update_data['email'] = source.email
+        if not target.address_line1 and source.address_line1:
+            update_data['address_line1'] = source.address_line1
+            update_data['city'] = source.city
+            update_data['state'] = source.state
+            update_data['zip'] = source.zip
+        if source.notes and (not target.notes or len(source.notes) > len(target.notes)):
+            update_data['notes'] = source.notes
+        if source.tags:
+            existing_tags = set(target.tags or [])
+            merged_tags = list(existing_tags.union(set(source.tags)))
+            if merged_tags:
+                update_data['tags'] = merged_tags
+        
+        if update_data:
+            customer_update = schemas.CustomerUpdate(**update_data)
+            await update_customer(db, target_customer_id, customer_update, changed_by=changed_by)
+            target = await get_customer(db, target_customer_id)
+        
+        # Delete source customer
+        await delete_customer(db, source_customer_id, changed_by=changed_by)
+        
+        await db.commit()
+        await db.refresh(target)
+        return target
+    except Exception as e:
+        await db.rollback()
+        raise e
 
 async def find_duplicate_job(db: AsyncSession, tenant_id: str, builder_id: UUID, community: str, lot_number: str, phase: str) -> Optional[models.Job]:
     """Find duplicate job based on uniqueness constraint"""

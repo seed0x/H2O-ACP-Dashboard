@@ -484,8 +484,8 @@ async def create_job(job_in: JobCreate, db: AsyncSession = Depends(get_session),
     return job
 
 @router.get('/jobs')
-async def list_jobs(tenant_id: Optional[str] = 'all_county', status: Optional[str] = None, builder_id: Optional[UUID] = None, community: Optional[str] = None, lot: Optional[str] = None, search: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
-    jobs = await crud.list_jobs(db, tenant_id, status, builder_id, community, lot, search, limit, offset)
+async def list_jobs(tenant_id: Optional[str] = 'all_county', status: Optional[str] = None, builder_id: Optional[UUID] = None, community: Optional[str] = None, lot: Optional[str] = None, search: Optional[str] = None, scheduled_date: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
+    jobs = await crud.list_jobs(db, tenant_id, status, builder_id, community, lot, search, scheduled_date, limit, offset)
     return jobs
 
 @router.get('/jobs/{id}', response_model=JobOut)

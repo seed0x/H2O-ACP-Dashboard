@@ -97,7 +97,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
     try {
       const headers = getAuthHeaders()
       const statsRes = await axios.get(
-        `${API_BASE_URL}/customers/${customerId}/stats?tenant_id=${currentTenant}`,
+        `${API_BASE_URL}/customers/${customerId}/stats?tenant_id=${currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'}`,
         { headers, withCredentials: true }
       )
       if (statsRes.data) {

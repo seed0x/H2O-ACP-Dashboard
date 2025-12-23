@@ -214,6 +214,7 @@ class JobOut(JobBase):
     created_at: datetime
     updated_at: datetime
     tasks: Optional[List[JobTask]] = None
+    builder: Optional[BuilderOut] = None
 
     class Config:
         from_attributes = True
