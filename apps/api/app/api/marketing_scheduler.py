@@ -156,11 +156,8 @@ def compute_schedule_datetimes(
             # Convert to UTC for storage
             target_datetime_utc = target_datetime_local.astimezone(pytz.utc).replace(tzinfo=None)
             
-            # Only include if within range
-            start_utc = start_date.replace(tzinfo=None) if start_date.tzinfo is None else start_date
-            end_utc = end_date.replace(tzinfo=None) if end_date.tzinfo is None else end_date
-            
-            if start_utc <= target_datetime_utc <= end_utc:
+            # Only include if within range (all should be timezone-naive now)
+            if start_date <= target_datetime_utc <= end_date:
                 datetimes.append(target_datetime_utc)
         except (ValueError, AttributeError) as e:
             # Skip invalid time format
@@ -185,7 +182,7 @@ async def topoff_scheduler_logic(
             await db.commit()
             return result
     
-    # Calculate date range
+    # Calculate date range (all timezone-naive for comparison)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=days)

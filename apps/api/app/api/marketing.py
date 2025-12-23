@@ -349,7 +349,14 @@ async def create_content_item(
     )
     
     await db.commit()
-    await db.refresh(item)
+    
+    # Re-query with relationships loaded to avoid MissingGreenlet error
+    result = await db.execute(
+        select(models.ContentItem)
+        .where(models.ContentItem.id == item.id)
+        .options(selectinload(models.ContentItem.media_assets))
+    )
+    item = result.scalar_one()
     return item
 
 

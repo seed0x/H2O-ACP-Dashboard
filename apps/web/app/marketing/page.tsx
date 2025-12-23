@@ -540,7 +540,11 @@ function PostsView() {
         title: postForm.title.trim(),
         base_caption: postForm.base_caption.trim(),
         status: postForm.status,
-        owner: postForm.owner
+        owner: postForm.owner,
+        content_category: postForm.content_category || null,
+        media_urls: postForm.media_urls.length > 0 ? postForm.media_urls : null,
+        cta_type: postForm.cta_type || null,
+        cta_url: postForm.cta_url || null
       }
       
       const itemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
@@ -1497,8 +1501,13 @@ function CalendarView() {
     scheduled_for: '',
     channel_account_ids: [] as string[],
     status: 'Idea',
-    owner: 'admin'
+    owner: 'admin',
+    content_category: '',
+    media_urls: [] as string[],
+    cta_type: '',
+    cta_url: ''
   })
+  const [mediaUrlInput, setMediaUrlInput] = useState('')
   const [error, setError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [topoffLoading, setTopoffLoading] = useState(false)
@@ -1753,7 +1762,11 @@ function CalendarView() {
         title: postForm.title.trim(),
         base_caption: postForm.base_caption.trim(),
         status: postForm.status,
-        owner: postForm.owner
+        owner: postForm.owner,
+        content_category: postForm.content_category || null,
+        media_urls: postForm.media_urls.length > 0 ? postForm.media_urls : null,
+        cta_type: postForm.cta_type || null,
+        cta_url: postForm.cta_url || null
       }
       
       const itemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
@@ -1802,7 +1815,8 @@ function CalendarView() {
       }
       
       setShowNewPostModal(false)
-      setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
+      setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin', content_category: '', media_urls: [], cta_type: '', cta_url: '' })
+      setMediaUrlInput('')
       setError('')
       await loadCalendar()
       showToast('Post created successfully', 'success')
@@ -2374,7 +2388,8 @@ function CalendarView() {
                   onClick={() => {
                     setShowNewPostModal(false)
                     setError('')
-                    setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
+                    setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin', content_category: '', media_urls: [], cta_type: '', cta_url: '' })
+                    setMediaUrlInput('')
                   }}
                   style={{
                     padding: '10px 20px',
