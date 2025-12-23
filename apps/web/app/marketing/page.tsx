@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
 import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
@@ -86,8 +87,8 @@ function MarketingContent() {
         </div>
 
         {/* Tab Content */}
-        <div style={{ display: 'flex', gap: '24px', position: 'relative' }}>
-          <div style={{ flex: 1 }}>
+        <div className="flex gap-6 relative">
+          <div className="flex-1">
             {activeTab === 'calendar' && <CalendarView />}
             {activeTab === 'posts' && <PostsView />}
             {activeTab === 'accounts' && <AccountsView />}
@@ -237,18 +238,7 @@ function DemandSignalsPanel() {
   }
 
   return (
-    <div style={{
-      width: '380px',
-      backgroundColor: 'var(--color-card)',
-      border: '1px solid var(--color-border)',
-      borderRadius: '8px',
-      padding: '20px',
-      maxHeight: 'calc(100vh - 200px)',
-      overflowY: 'auto',
-      position: 'sticky',
-      top: '20px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-    }}>
+    <div className="w-[300px] bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 max-h-[calc(100vh-200px)] overflow-y-auto sticky top-6 shadow-lg flex-shrink-0">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
           📊 Demand Signals
@@ -1704,43 +1694,31 @@ function CalendarView() {
                       return (
                         <div
                           key={instance.id}
-                          className={viewMode === 'month' ? 'marketing-month-view-post' : ''}
                           onClick={() => setSelectedPost(instance)}
-                          style={{
-                            padding: viewMode === 'month' ? '6px' : '8px',
-                            borderRadius: '6px',
-                            fontSize: viewMode === 'month' ? '10px' : '11px',
-                            backgroundColor: 'var(--color-hover)',
-                            border: '1px solid var(--color-border)',
-                            cursor: 'pointer'
-                          }}
+                          className={`
+                            ${viewMode === 'month' ? 'p-1.5 text-[10px]' : 'p-2 text-xs'}
+                            rounded-md cursor-pointer transition-all
+                            ${isPlanned 
+                              ? 'bg-[var(--color-hover)]/50 border-2 border-dashed border-white/[0.08] opacity-50 hover:opacity-75' 
+                              : instance.status === 'Posted'
+                              ? 'bg-[var(--color-hover)]/50 border-l-2 border-green-500 border-solid border-white/[0.08] shadow-[2px_0_10px_rgba(34,197,94,0.15)] hover:border-[var(--color-primary)]/50'
+                              : 'bg-[var(--color-hover)]/50 border-2 border-solid border-white/[0.08] hover:border-[var(--color-primary)]/50'
+                            }
+                          `}
                           title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}${contentItem?.media_assets && contentItem.media_assets.length > 0 ? ` (${contentItem.media_assets.length} media)` : ''}`}
                         >
-                          <div style={{
-                            fontWeight: '600',
-                            color: 'var(--color-text-primary)',
-                            marginBottom: '4px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}>
+                          <div className="font-semibold text-[var(--color-text-primary)] mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
                             {isPlanned ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="italic text-[var(--color-text-secondary)] text-xs">
                                   Needs content
                                 </span>
                                 {instance.suggested_category && (
-                                  <span style={{
-                                    fontSize: '9px',
-                                    padding: '2px 4px',
-                                    borderRadius: '4px',
-                                    backgroundColor: 'rgba(156, 39, 176, 0.2)',
-                                    color: '#9C27B0',
-                                    fontWeight: '500',
-                                    textTransform: 'capitalize'
-                                  }}>
-                                    {instance.suggested_category.replace('_', ' ')}
-                                  </span>
+                                  <StatusBadge 
+                                    status={instance.suggested_category.replace(/_/g, ' ')} 
+                                    variant="category"
+                                    className="text-[9px] px-1 py-0"
+                                  />
                                 )}
                               </div>
                             ) : (

@@ -4,80 +4,38 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   children: React.ReactNode
+  className?: string
 }
 
 export function Button({ 
   variant = 'primary', 
   size = 'md', 
   children, 
+  className = '',
   ...props 
 }: ButtonProps) {
-  const getVariantStyles = (): React.CSSProperties => {
-    const variants: Record<string, React.CSSProperties> = {
-      primary: {
-        backgroundColor: 'var(--color-primary)',
-        color: '#ffffff',
-        border: 'none'
-      },
-      secondary: {
-        backgroundColor: 'var(--color-hover)',
-        color: 'var(--color-text-primary)',
-        border: '1px solid var(--color-border)'
-      },
-      danger: {
-        backgroundColor: '#EF5350',
-        color: '#ffffff',
-        border: 'none'
-      },
-      ghost: {
-        backgroundColor: 'transparent',
-        color: 'var(--color-text-secondary)',
-        border: '1px solid var(--color-border)'
-      }
-    }
-    return variants[variant]
+  const variantClasses = {
+    primary: 'bg-[var(--color-primary)] text-white border-transparent hover:bg-[var(--color-primary-hover)]',
+    secondary: 'bg-[var(--color-hover)] text-[var(--color-text-primary)] border border-[var(--color-border)] hover:bg-[var(--color-card)]',
+    danger: 'bg-red-500 text-white border-transparent hover:bg-red-600',
+    ghost: 'bg-transparent text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-hover)]'
   }
 
-  const getSizeStyles = (): React.CSSProperties => {
-    const sizes: Record<string, React.CSSProperties> = {
-      sm: { padding: '6px 12px', fontSize: '13px' },
-      md: { padding: '10px 20px', fontSize: '14px' },
-      lg: { padding: '14px 28px', fontSize: '16px' }
-    }
-    return sizes[size]
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-xs min-h-[36px]',
+    md: 'px-5 py-2.5 text-sm min-h-[44px]',
+    lg: 'px-7 py-3.5 text-base min-h-[48px]'
   }
 
   return (
     <button
-      style={{
-        fontWeight: '500',
-        borderRadius: '8px',
-        transition: 'all 0.2s',
-        cursor: props.disabled ? 'not-allowed' : 'pointer',
-        opacity: props.disabled ? 0.5 : 1,
-        ...getVariantStyles(),
-        ...getSizeStyles()
-      }}
-      onMouseEnter={(e) => {
-        if (!props.disabled) {
-          if (variant === 'primary') {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
-          } else {
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.opacity = '0.9'
-          }
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!props.disabled) {
-          if (variant === 'primary') {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary)'
-          } else {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.opacity = '1'
-          }
-        }
-      }}
+      className={`
+        font-medium rounded-lg transition-all active:scale-[0.98]
+        ${variantClasses[variant]}
+        ${sizeClasses[size]}
+        ${props.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        ${className}
+      `}
       {...props}
     >
       {children}

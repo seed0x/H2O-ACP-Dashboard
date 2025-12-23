@@ -354,13 +354,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
       margin: '0 auto'
     }}>
       {/* Improved Header with Key Info */}
-      <div style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px'
-      }}>
+      <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6 mb-6">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
@@ -452,22 +446,18 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {/* Main Content Layout */}
+      {/* Main Content Layout - 60/40 Split with Sticky Sidebar */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: isMobile ? '1fr' : '1fr 400px', 
+        gridTemplateColumns: isMobile ? '1fr' : '3fr 2fr', 
         gap: '24px',
-        marginBottom: '24px'
+        marginBottom: '24px',
+        alignItems: 'start'
       }}>
-        {/* Main Column */}
+        {/* Main Column (60%) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Status & Assignment Section */}
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
+          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
             <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
               Status & Assignment
             </h2>
@@ -529,12 +519,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
           </div>
 
           {/* Improved Scheduling Section */}
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
+          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
             <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
               Scheduling
             </h2>
@@ -612,12 +597,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
           </div>
 
           {/* Collapsible Warranty Section */}
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
+          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: warrantyExpanded ? '20px' : '0' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
                 🔧 Warranty
@@ -694,12 +674,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
           </div>
 
           {/* Improved Notes Section */}
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
+          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
             <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
               📝 Notes & Updates
             </h2>
@@ -729,12 +704,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
           </div>
 
           {/* Improved Activity Timeline */}
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
+          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: timelineExpanded ? '20px' : '0' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
                 📊 Activity Timeline
@@ -796,16 +766,20 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Sidebar (40%) - Sticky Summary */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '24px',
+          position: isMobile ? 'relative' : 'sticky',
+          top: '24px',
+          alignSelf: 'start',
+          maxHeight: isMobile ? 'none' : 'calc(100vh - 48px)',
+          overflowY: isMobile ? 'visible' : 'auto'
+        }}>
           {/* Enhanced Builder Card */}
           {builder && (
-            <div style={{
-              backgroundColor: 'var(--color-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '12px',
-              padding: '24px'
-            }}>
+            <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
               <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
                 Builder
               </h2>
@@ -857,12 +831,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
 
           {/* Suggested Portals - Only show if has portals */}
           {hasPortals && (
-            <div style={{
-              backgroundColor: 'var(--color-card)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '12px',
-              padding: '24px'
-            }}>
+            <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
                   🔗 Integration Portals

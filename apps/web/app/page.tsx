@@ -289,14 +289,9 @@ export default function Dashboard() {
         marginBottom: '24px'
       }}>
         {/* Left Column - Open Tasks */}
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
+        <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-5">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Open Tasks</h2>
+            <h2 className="text-base font-semibold text-[var(--color-text-primary)] uppercase tracking-widest text-xs">Open Tasks</h2>
             <a href="/jobs" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
           </div>
           {openTasks.length === 0 ? (
@@ -322,7 +317,9 @@ export default function Dashboard() {
                 >
                   <div>
                     <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', fontSize: '14px', marginBottom: '2px' }}>
-                      {item.type === 'job' ? `${item.community} - Lot ${item.lot_number}` : item.customer_name}
+                      {item.type === 'job' ? (
+                        <>{item.community} - Lot <span className="font-mono">{item.lot_number}</span></>
+                      ) : item.customer_name}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                       {item.type === 'job' ? 'Job' : 'Service Call'} • {item.status}
@@ -345,14 +342,9 @@ export default function Dashboard() {
         </div>
 
         {/* Middle Column - Bids Pipeline */}
-        <div style={{
-          backgroundColor: bidFollowUps.length > 0 ? 'rgba(96, 165, 250, 0.05)' : 'var(--color-card)',
-          border: `1px solid ${bidFollowUps.length > 0 ? '#60A5FA' : 'var(--color-border)'}`,
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
+        <div className={`bg-[var(--color-card)]/50 border backdrop-blur-sm shadow-xl rounded-lg p-5 ${bidFollowUps.length > 0 ? 'border-blue-500/30' : 'border-white/[0.08]'}`}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 className="text-base font-semibold text-[var(--color-text-primary)] uppercase tracking-widest text-xs flex items-center gap-2">
               📋 Bids Pipeline
             </h2>
             <a href="/bids" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
@@ -362,7 +354,7 @@ export default function Dashboard() {
               ✓ No bids need follow-up
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex flex-col gap-4 sm:gap-2">
               {bidFollowUps.map((bid: any) => {
                 let reasonText = ''
                 let reasonColor = 'var(--color-text-secondary)'
@@ -382,27 +374,22 @@ export default function Dashboard() {
                   borderColor = '#FF9800'
                 }
                 
+                const isWon = bid.status === 'Won'
+                
                 return (
                   <a
                     key={bid.id}
                     href={`/bids/${bid.id}`}
+                    className={`
+                      flex flex-col p-3 bg-[var(--color-card)]/50 rounded-lg no-underline border-l-2 transition-all
+                      ${isWon 
+                        ? 'border-green-500 shadow-[2px_0_10px_rgba(34,197,94,0.15)]' 
+                        : `border-[${borderColor}]`
+                      }
+                      hover:translate-x-1 hover:shadow-lg
+                    `}
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      padding: '12px',
-                      backgroundColor: 'white',
-                      borderRadius: '8px',
-                      textDecoration: 'none',
-                      borderLeft: `3px solid ${borderColor}`,
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateX(4px)'
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateX(0)'
-                      e.currentTarget.style.boxShadow = 'none'
+                      borderLeftColor: isWon ? undefined : borderColor
                     }}
                   >
                     <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', fontSize: '14px', marginBottom: '4px' }}>
@@ -423,7 +410,7 @@ export default function Dashboard() {
                         {bid.status}
                       </span>
                       {bid.amount_cents && (
-                        <span>• ${(bid.amount_cents / 100).toFixed(2)}</span>
+                        <span className="font-mono">• ${(bid.amount_cents / 100).toFixed(2)}</span>
                       )}
                     </div>
                   </a>
@@ -434,14 +421,9 @@ export default function Dashboard() {
         </div>
 
         {/* Right Column - Overdue Items */}
-        <div style={{
-          backgroundColor: stats.totalOverdue > 0 ? 'rgba(239, 83, 80, 0.05)' : 'var(--color-card)',
-          border: `1px solid ${stats.totalOverdue > 0 ? '#EF5350' : 'var(--color-border)'}`,
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
+        <div className={`bg-[var(--color-card)]/50 border backdrop-blur-sm shadow-xl rounded-lg p-5 ${stats.totalOverdue > 0 ? 'border-red-500/30' : 'border-white/[0.08]'}`}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: '600', color: stats.totalOverdue > 0 ? '#EF5350' : 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 className={`text-base font-semibold uppercase tracking-widest text-xs flex items-center gap-2 ${stats.totalOverdue > 0 ? 'text-red-500' : 'text-[var(--color-text-primary)]'}`}>
               {stats.totalOverdue > 0 && <span>⚠️</span>} Overdue Items
             </h2>
           </div>
@@ -450,7 +432,7 @@ export default function Dashboard() {
               ✓ No overdue items
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex flex-col gap-4 sm:gap-2">
               {overdueItems.map((item: any) => (
                 <a
                   key={item.id}
@@ -473,8 +455,9 @@ export default function Dashboard() {
                 >
                   <div>
                     <div style={{ fontWeight: '500', color: '#111827', fontSize: '14px', marginBottom: '2px' }}>
-                      {item.type === 'job' ? `${item.community} - Lot ${item.lot_number}` :
-                       item.type === 'service_call' ? item.customer_name :
+                      {item.type === 'job' ? (
+                        <>{item.community} - Lot <span className="font-mono">{item.lot_number}</span></>
+                      ) : item.type === 'service_call' ? item.customer_name :
                        item.type === 'review_request' ? item.customer_name :
                        `Recovery: ${item.customer_name}`}
                     </div>
@@ -500,32 +483,34 @@ function StatCard({ title, value, color, href, alert }: {
   alert?: boolean
 }) {
   const content = (
-    <div style={{
-      backgroundColor: alert ? 'rgba(239, 83, 80, 0.05)' : 'var(--color-card)',
-      border: `1px solid ${alert ? '#EF5350' : 'var(--color-border)'}`,
-      borderRadius: '12px',
-      padding: '16px',
-      transition: 'all 0.2s',
-      cursor: href ? 'pointer' : 'default'
-    }}>
-      <div style={{
-        fontSize: '11px',
-        color: 'var(--color-text-secondary)',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        fontWeight: '500'
-      }}>{title}</div>
-      <div style={{
-        fontSize: '28px',
-        fontWeight: '700',
-        color: color
-      }}>{value}</div>
+      <div className={`
+      ${alert ? 'bg-red-500/5 border-red-500' : 'bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm'}
+      shadow-xl rounded-lg p-4 transition-all group
+      ${href ? 'cursor-pointer hover:border-[var(--color-primary)]/30 hover:shadow-2xl' : ''}
+      aspect-video flex flex-col justify-between min-h-[100px]
+    `}>
+      <div className="text-xs text-[var(--color-text-secondary)] mb-2 uppercase tracking-wider font-medium">
+        {title}
+      </div>
+      <div className="flex items-end justify-between">
+        <div className="text-2xl font-bold tabular-nums" style={{ color }}>
+          {value}
+        </div>
+        {href && (
+          <a
+            href={href}
+            className="text-xs text-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity font-medium"
+            onClick={(e) => e.stopPropagation()}
+          >
+            View All →
+          </a>
+        )}
+      </div>
     </div>
   )
   
   if (href) {
-    return <a href={href} style={{ textDecoration: 'none' }}>{content}</a>
+    return <a href={href} className="no-underline">{content}</a>
   }
   return content
 }

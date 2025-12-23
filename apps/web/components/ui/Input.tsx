@@ -3,50 +3,33 @@ import React from 'react'
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
+  className?: string
 }
 
-export function Input({ label, error, ...props }: InputProps) {
+export function Input({ label, error, className = '', ...props }: InputProps) {
   return (
-    <div style={{ width: '100%' }}>
+    <div className="w-full">
       {label && (
-        <label style={{
-          display: 'block',
-          fontSize: '13px',
-          fontWeight: '500',
-          color: 'var(--color-text-primary)',
-          marginBottom: '6px'
-        }}>
+        <label className="block text-xs font-medium text-[var(--color-text-primary)] mb-2">
           {label}
         </label>
       )}
       <input
-        style={{
-          width: '100%',
-          padding: '10px 14px',
-          backgroundColor: 'var(--color-hover)',
-          border: `1px solid ${error ? '#EF5350' : 'var(--color-border)'}`,
-          borderRadius: '8px',
-          color: 'var(--color-text-primary)',
-          fontSize: '14px',
-          outline: 'none',
-          transition: 'all 0.2s'
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = 'var(--color-primary)'
-          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(96, 165, 250, 0.1)'
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = error ? '#EF5350' : 'var(--color-border)'
-          e.currentTarget.style.boxShadow = 'none'
-        }}
+        className={`
+          w-full px-4 py-2.5 text-sm
+          bg-[var(--color-hover)] border
+          ${error ? 'border-red-500' : 'border-[var(--color-border)]'}
+          rounded-lg text-[var(--color-text-primary)]
+          outline-none transition-all
+          focus:ring-2 focus:ring-primary/20 focus:border-[var(--color-primary)]
+          disabled:opacity-50 disabled:cursor-not-allowed
+          min-h-[44px] sm:min-h-[44px]
+          ${className}
+        `}
         {...props}
       />
       {error && (
-        <p style={{
-          marginTop: '6px',
-          fontSize: '12px',
-          color: '#EF5350'
-        }}>{error}</p>
+        <p className="mt-1 text-xs text-red-500">{error}</p>
       )}
     </div>
   )

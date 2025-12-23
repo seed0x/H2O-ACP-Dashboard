@@ -3,57 +3,55 @@ import React from 'react'
 interface StatusBadgeProps {
   status: string
   variant?: 'default' | 'priority' | 'category'
+  className?: string
 }
 
-export function StatusBadge({ status, variant = 'default' }: StatusBadgeProps) {
-  const getStyle = () => {
-    if (variant === 'priority') {
-      const priorityStyles: Record<string, React.CSSProperties> = {
-        'High': { backgroundColor: 'rgba(244, 67, 54, 0.2)', color: '#EF5350' },
-        'Normal': { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' },
-        'Low': { backgroundColor: 'rgba(76, 175, 80, 0.2)', color: '#66BB6A' },
+export function StatusBadge({ status, variant = 'default', className = '' }: StatusBadgeProps) {
+  const getCategoryClasses = () => {
+    // Marketing content categories
+    if (variant === 'category' || status.includes('_')) {
+      const categoryMap: Record<string, string> = {
+        'ad_content': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        'team_post': 'bg-green-500/20 text-green-400 border-green-500/30',
+        'coupon': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+        'diy': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+        'blog_post': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
       }
-      return priorityStyles[status] || priorityStyles['Normal']
-    }
-    
-    if (variant === 'category') {
-      const categoryStyles: Record<string, React.CSSProperties> = {
-        'permit': { backgroundColor: 'rgba(156, 39, 176, 0.15)', color: '#9C27B0' },
-        'inspection': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FF9800' },
-        'utility': { backgroundColor: 'rgba(33, 150, 243, 0.15)', color: '#2196F3' },
-        'vendor': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#4CAF50' },
-        'builder': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
-        'warranty': { backgroundColor: 'rgba(244, 67, 54, 0.15)', color: '#EF5350' },
-        'finance': { backgroundColor: 'rgba(255, 193, 7, 0.15)', color: '#FFC107' },
-        'other': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#9E9E9E' },
-      }
-      return categoryStyles[status.toLowerCase()] || categoryStyles['other']
+      const normalizedStatus = status.toLowerCase().replace(/\s+/g, '_')
+      return categoryMap[normalizedStatus] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
     }
 
-    const statusStyles: Record<string, React.CSSProperties> = {
-      'New': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
-      'Scheduled': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
-      'In Progress': { backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#60A5FA' },
-      'Dispatched': { backgroundColor: 'rgba(255, 152, 0, 0.15)', color: '#FFA726' },
-      'Completed': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
-      'On Hold': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
-      'Draft': { backgroundColor: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' },
-      'Sent': { backgroundColor: 'rgba(96, 165, 250, 0.2)', color: '#60A5FA' },
-      'Won': { backgroundColor: 'rgba(76, 175, 80, 0.15)', color: '#66BB6A' },
-      'Lost': { backgroundColor: 'rgba(158, 158, 158, 0.15)', color: '#BDBDBD' },
+    if (variant === 'priority') {
+      const priorityMap: Record<string, string> = {
+        'High': 'bg-red-500/20 text-red-400 border-red-500/30',
+        'Normal': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+        'Low': 'bg-green-500/20 text-green-400 border-green-500/30',
+      }
+      return priorityMap[status] || priorityMap['Normal']
     }
-    return statusStyles[status] || { backgroundColor: 'rgba(158, 158, 158, 0.2)', color: '#BDBDBD' }
+
+    // Default status styles
+    const statusMap: Record<string, string> = {
+      'New': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      'Scheduled': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      'In Progress': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      'Dispatched': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      'Completed': 'bg-green-500/20 text-green-400 border-green-500/30',
+      'On Hold': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      'Draft': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      'Sent': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      'Won': 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.15)]',
+      'Posted': 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.15)]',
+      'Lost': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      'Planned': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    }
+    return statusMap[status] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
   }
 
+  const hasGlow = status === 'Won' || status === 'Posted'
+
   return (
-    <span style={{
-      padding: '4px 12px',
-      borderRadius: '6px',
-      fontSize: '12px',
-      fontWeight: '500',
-      display: 'inline-block',
-      ...getStyle()
-    }}>
+    <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${getCategoryClasses()} ${hasGlow ? 'shadow-[0_0_10px_rgba(34,197,94,0.15)]' : ''} ${className}`}>
       {status}
     </span>
   )

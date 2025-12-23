@@ -3,11 +3,16 @@ import React from 'react'
 interface CardProps {
   children: React.ReactNode
   className?: string
+  hover?: boolean
 }
 
-export function Card({ children, className = '' }: CardProps) {
+export function Card({ children, className = '', hover = false }: CardProps) {
   return (
-    <div className={`bg-white rounded-lg shadow ${className}`}>
+    <div className={`
+      bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg
+      ${hover ? 'transition-all hover:border-[var(--color-primary)]/30 hover:shadow-2xl' : ''}
+      ${className}
+    `}>
       {children}
     </div>
   )
@@ -15,7 +20,7 @@ export function Card({ children, className = '' }: CardProps) {
 
 export function CardHeader({ children, className = '' }: CardProps) {
   return (
-    <div className={`px-6 py-4 border-b border-gray-200 ${className}`}>
+    <div className={`px-6 py-4 border-b border-white/[0.08] ${className}`}>
       {children}
     </div>
   )
@@ -31,7 +36,7 @@ export function CardBody({ children, className = '' }: CardProps) {
 
 export function CardFooter({ children, className = '' }: CardProps) {
   return (
-    <div className={`px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg ${className}`}>
+    <div className={`px-6 py-4 border-t border-white/[0.08] bg-[var(--color-hover)]/50 rounded-b-lg ${className}`}>
       {children}
     </div>
   )

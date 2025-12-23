@@ -313,25 +313,11 @@ export default function BidsPage(){
                 <a
                   key={b.id}
                   href={`/bids/${b.id}`}
-                  style={{
-                    display: 'block',
-                    backgroundColor: 'var(--color-card)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    textDecoration: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-primary)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--color-border)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
+                  className={`
+                    block bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-5 no-underline transition-all
+                    ${b.status === 'Won' ? 'border-l-2 border-green-500 shadow-[2px_0_10px_rgba(34,197,94,0.15)]' : ''}
+                    hover:border-[var(--color-primary)]/30 hover:shadow-2xl hover:-translate-y-0.5
+                  `}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                     <div style={{ flex: 1 }}>
@@ -422,30 +408,14 @@ function BidPipelinePanel({
   }
 
   return (
-    <div style={{
-      width: '320px',
-      backgroundColor: 'var(--color-card)',
-      border: '1px solid var(--color-border)',
-      borderRadius: '12px',
-      padding: '20px',
-      height: 'fit-content',
-      position: 'sticky',
-      top: '20px',
-      maxHeight: 'calc(100vh - 40px)',
-      overflowY: 'auto'
-    }}>
+    <div className="w-80 bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-5 h-fit sticky top-5 max-h-[calc(100vh-40px)] overflow-y-auto">
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: '20px'
       }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: 'var(--color-text-primary)',
-          margin: 0
-        }}>
+        <h3 className="text-lg font-semibold text-[var(--color-text-primary)] m-0 uppercase tracking-widest text-xs">
           Bid Pipeline
         </h3>
         <button
@@ -479,12 +449,7 @@ function BidPipelinePanel({
               marginBottom: '12px'
             }}>
               <span style={{ fontSize: '16px' }}>📤</span>
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--color-text-primary)',
-                margin: 0
-              }}>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)] m-0 uppercase tracking-widest text-xs">
                 Sent ({sentBids.length})
               </h4>
             </div>
@@ -498,47 +463,42 @@ function BidPipelinePanel({
                 No sent bids
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {sentBids.slice(0, 5).map(bid => (
-                  <button
-                    key={bid.id}
-                    onClick={() => router.push(`/bids/${bid.id}`)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '10px',
-                      backgroundColor: 'var(--color-hover)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--color-primary)'
-                      e.currentTarget.style.backgroundColor = 'rgba(96, 165, 250, 0.1)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--color-border)'
-                      e.currentTarget.style.backgroundColor = 'var(--color-hover)'
-                    }}
-                  >
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--color-text-primary)',
-                      marginBottom: '4px'
-                    }}>
-                      {bid.project_name}
-                    </div>
-                    {bid.sent_date && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: 'var(--color-text-secondary)'
-                      }}>
-                        Sent: {new Date(bid.sent_date).toLocaleDateString()}
+              <div className="flex flex-col gap-4 sm:gap-2">
+                {sentBids.slice(0, 5).map(bid => {
+                  const sentDate = bid.sent_date ? new Date(bid.sent_date) : null
+                  const daysAgo = sentDate ? Math.floor((Date.now() - sentDate.getTime()) / (1000 * 60 * 60 * 24)) : null
+                  const timeAgo = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1 day ago' : daysAgo ? `${daysAgo} days ago` : ''
+                  
+                  return (
+                    <button
+                      key={bid.id}
+                      onClick={() => router.push(`/bids/${bid.id}`)}
+                      className={`
+                        text-left p-3 bg-[var(--color-card)]/50 border-l-2 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]
+                        ${bid.status === 'Won' 
+                          ? 'border-green-500 shadow-[2px_0_10px_rgba(34,197,94,0.15)]' 
+                          : 'border-orange-500'
+                        }
+                      `}
+                    >
+                      <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                        {bid.project_name}
                       </div>
-                    )}
-                  </button>
-                ))}
+                      <div className="flex items-center justify-between gap-2">
+                        {bid.amount_cents && (
+                          <div className="text-xs font-mono text-[var(--color-text-secondary)]">
+                            ${(bid.amount_cents / 100).toFixed(2)}
+                          </div>
+                        )}
+                        {timeAgo && (
+                          <div className="text-xs text-[var(--color-text-secondary)]">
+                            {timeAgo}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
                 {sentBids.length > 5 && (
                   <div style={{
                     fontSize: '11px',
@@ -562,12 +522,7 @@ function BidPipelinePanel({
               marginBottom: '12px'
             }}>
               <span style={{ fontSize: '16px' }}>✅</span>
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--color-text-primary)',
-                margin: 0
-              }}>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)] m-0 uppercase tracking-widest text-xs">
                 Ready to Send ({readyToSendBids.length})
               </h4>
             </div>
@@ -581,42 +536,18 @@ function BidPipelinePanel({
                 No bids ready
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="flex flex-col gap-4 sm:gap-2">
                 {readyToSendBids.map(bid => (
                   <button
                     key={bid.id}
                     onClick={() => router.push(`/bids/${bid.id}`)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '10px',
-                      backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                      border: '1px solid rgba(76, 175, 80, 0.3)',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#4CAF50'
-                      e.currentTarget.style.backgroundColor = 'rgba(76, 175, 80, 0.2)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.3)'
-                      e.currentTarget.style.backgroundColor = 'rgba(76, 175, 80, 0.1)'
-                    }}
+                    className="text-left p-3 bg-[var(--color-card)] border-l-2 border-blue-500 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]"
                   >
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--color-text-primary)',
-                      marginBottom: '4px'
-                    }}>
+                    <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
                       {bid.project_name}
                     </div>
                     {bid.amount_cents && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: 'var(--color-text-secondary)'
-                      }}>
+                      <div className="text-xs font-mono text-[var(--color-text-secondary)]">
                         ${(bid.amount_cents / 100).toFixed(2)}
                       </div>
                     )}
@@ -635,12 +566,7 @@ function BidPipelinePanel({
               marginBottom: '12px'
             }}>
               <span style={{ fontSize: '16px' }}>⚠️</span>
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--color-text-primary)',
-                margin: 0
-              }}>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)] m-0 uppercase tracking-widest text-xs">
                 Needs Price Approval ({needsApprovalBids.length})
               </h4>
             </div>
@@ -654,42 +580,18 @@ function BidPipelinePanel({
                 All prices set
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="flex flex-col gap-4 sm:gap-2">
                 {needsApprovalBids.map(bid => (
                   <button
                     key={bid.id}
                     onClick={() => router.push(`/bids/${bid.id}`)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '10px',
-                      backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                      border: '1px solid rgba(255, 152, 0, 0.3)',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#FF9800'
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 152, 0, 0.2)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(255, 152, 0, 0.3)'
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 152, 0, 0.1)'
-                    }}
+                    className="text-left p-3 bg-[var(--color-card)] border-l-2 border-orange-500 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]"
                   >
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--color-text-primary)',
-                      marginBottom: '4px'
-                    }}>
+                    <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
                       {bid.project_name}
                     </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--color-text-secondary)'
-                    }}>
-                      Missing prices
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      Needs price approval
                     </div>
                   </button>
                 ))}
@@ -706,12 +608,7 @@ function BidPipelinePanel({
               marginBottom: '12px'
             }}>
               <span style={{ fontSize: '16px' }}>📝</span>
-              <h4 style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: 'var(--color-text-primary)',
-                margin: 0
-              }}>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)] m-0 uppercase tracking-widest text-xs">
                 Drafting ({draftingBids.length})
               </h4>
             </div>
@@ -725,42 +622,18 @@ function BidPipelinePanel({
                 No drafts
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="flex flex-col gap-4 sm:gap-2">
                 {draftingBids.slice(0, 3).map(bid => (
                   <button
                     key={bid.id}
                     onClick={() => router.push(`/bids/${bid.id}`)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '10px',
-                      backgroundColor: 'var(--color-hover)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--color-primary)'
-                      e.currentTarget.style.backgroundColor = 'rgba(96, 165, 250, 0.1)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--color-border)'
-                      e.currentTarget.style.backgroundColor = 'var(--color-hover)'
-                    }}
+                    className="text-left p-3 bg-[var(--color-card)] border-l-2 border-gray-500 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]"
                   >
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: 'var(--color-text-primary)',
-                      marginBottom: '4px'
-                    }}>
+                    <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
                       {bid.project_name}
                     </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: 'var(--color-text-secondary)'
-                    }}>
-                      In progress
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      Drafting
                     </div>
                   </button>
                 ))}
