@@ -25,6 +25,14 @@ target_metadata = Base.metadata
 
 # set sqlalchemy.url from env
 db_url = os.getenv('DATABASE_URL')
+if not db_url:
+    # Try to get from settings if DATABASE_URL not set
+    try:
+        from app.core.config import settings
+        db_url = settings.database_url
+    except:
+        pass
+
 if db_url:
     # Convert postgresql:// to postgresql+asyncpg:// for async operations
     if db_url.startswith('postgresql://') and '+asyncpg' not in db_url:
@@ -34,6 +42,10 @@ if db_url:
     if '?sslmode=' in db_url:
         db_url = db_url.split('?')[0]
     config.set_main_option('sqlalchemy.url', db_url)
+else:
+    # Fallback - use a placeholder that won't cause errors during config parsing
+    # This will be overridden when the actual migration runs
+    config.set_main_option('sqlalchemy.url', 'postgresql+asyncpg://user:pass@localhost/dbname')
 
 
 def run_migrations_online() -> None:
