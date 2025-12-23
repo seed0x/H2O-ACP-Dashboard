@@ -6,6 +6,8 @@ import { API_BASE_URL } from '../lib/config'
 import { useMobile } from '../lib/useMobile'
 import { handleApiError } from '../lib/error-handler'
 import { StatSkeleton } from '../components/ui/Skeleton'
+import { StatCard } from '../components/ui/StatCard'
+import { Button } from '../components/ui/Button'
 import { useTenant } from '../contexts/TenantContext'
 import { TodaysSchedule } from '../components/TodaysSchedule'
 import { Dataflow } from '../components/Dataflow'
@@ -295,8 +297,11 @@ export default function Dashboard() {
             <a href="/jobs" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
           </div>
           {openTasks.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-              No open tasks
+            <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+              <p className="text-[var(--color-text-secondary)] mb-4">No open tasks</p>
+              <Button onClick={() => router.push('/jobs')} variant="primary" size="sm">
+                Create New
+              </Button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -350,8 +355,11 @@ export default function Dashboard() {
             <a href="/bids" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
           </div>
           {bidFollowUps.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-              ✓ No bids need follow-up
+            <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+              <p className="text-[var(--color-text-secondary)] mb-4">No bids need follow-up</p>
+              <Button onClick={() => router.push('/bids')} variant="primary" size="sm">
+                Create New Bid
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-4 sm:gap-2">
@@ -428,8 +436,11 @@ export default function Dashboard() {
             </h2>
           </div>
           {overdueItems.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-              ✓ No overdue items
+            <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+              <p className="text-[var(--color-text-secondary)] mb-4">No overdue items</p>
+              <Button onClick={() => router.push('/jobs')} variant="secondary" size="sm">
+                View All Tasks
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-4 sm:gap-2">
@@ -475,42 +486,3 @@ export default function Dashboard() {
   )
 }
 
-function StatCard({ title, value, color, href, alert }: {
-  title: string
-  value: number
-  color: string
-  href?: string
-  alert?: boolean
-}) {
-  const content = (
-      <div className={`
-      ${alert ? 'bg-red-500/5 border-red-500' : 'bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm'}
-      shadow-xl rounded-lg p-4 transition-all group
-      ${href ? 'cursor-pointer hover:border-[var(--color-primary)]/30 hover:shadow-2xl' : ''}
-      aspect-video flex flex-col justify-between min-h-[100px]
-    `}>
-      <div className="text-xs text-[var(--color-text-secondary)] mb-2 uppercase tracking-wider font-medium">
-        {title}
-      </div>
-      <div className="flex items-end justify-between">
-        <div className="text-2xl font-bold tabular-nums" style={{ color }}>
-          {value}
-        </div>
-        {href && (
-          <a
-            href={href}
-            className="text-xs text-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity font-medium"
-            onClick={(e) => e.stopPropagation()}
-          >
-            View All →
-          </a>
-        )}
-      </div>
-    </div>
-  )
-  
-  if (href) {
-    return <a href={href} className="no-underline">{content}</a>
-  }
-  return content
-}

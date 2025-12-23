@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
@@ -108,6 +108,17 @@ export default function ServiceCallsPage() {
     }
   }
 
+  function formatTableCell(value: any): React.ReactNode {
+    if (!value || value === 'null' || value === 'undefined' || value === null || value === '') {
+      return (
+        <div className="flex items-center justify-center text-[var(--color-text-secondary)]/50" style={{ minHeight: '100%' }}>
+          —
+        </div>
+      )
+    }
+    return String(value)
+  }
+
   function getQuickActions(call: ServiceCall): QuickAction[] {
     const actions: QuickAction[] = []
     
@@ -151,34 +162,34 @@ export default function ServiceCallsPage() {
   const columns = [
     {
       header: 'Customer',
-      accessor: 'customer_name' as keyof ServiceCall
+      accessor: (row: ServiceCall) => formatTableCell(row.customer_name)
     },
     {
       header: 'Address',
-      accessor: (row: ServiceCall) => `${row.address_line1}, ${row.city}`
+      accessor: (row: ServiceCall) => formatTableCell(`${row.address_line1 || ''}, ${row.city || ''}`.trim().replace(/^,\s*|,\s*$/g, '') || null)
     },
     {
       header: 'Issue',
-      accessor: (row: ServiceCall) => row.issue_description.substring(0, 50) + '...'
+      accessor: (row: ServiceCall) => formatTableCell(row.issue_description ? row.issue_description.substring(0, 50) + '...' : null)
     },
     {
       header: 'Phone',
-      accessor: 'phone' as keyof ServiceCall,
+      accessor: (row: ServiceCall) => formatTableCell(row.phone),
       width: '140px'
     },
     {
       header: 'Priority',
-      accessor: (row: ServiceCall) => <StatusBadge status={row.priority} variant="priority" />,
+      accessor: (row: ServiceCall) => row.priority ? <StatusBadge status={row.priority} variant="priority" /> : formatTableCell(null),
       width: '120px'
     },
     {
       header: 'Status',
-      accessor: (row: ServiceCall) => <StatusBadge status={row.status} />,
+      accessor: (row: ServiceCall) => row.status ? <StatusBadge status={row.status} /> : formatTableCell(null),
       width: '130px'
     },
     {
       header: 'Created',
-      accessor: (row: ServiceCall) => new Date(row.created_at).toLocaleDateString(),
+      accessor: (row: ServiceCall) => formatTableCell(row.created_at ? new Date(row.created_at).toLocaleDateString() : null),
       width: '120px'
     }
   ]

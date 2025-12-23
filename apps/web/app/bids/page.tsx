@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { BidCard } from '../../components/ui/BidCard'
 import { useMobile } from '../../lib/useMobile'
 import { handleApiError } from '../../lib/error-handler'
 
@@ -454,51 +455,22 @@ function BidPipelinePanel({
               </h4>
             </div>
             {sentBids.length === 0 ? (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                padding: '8px',
-                fontStyle: 'italic'
-              }}>
-                No sent bids
+              <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+                <p className="text-[var(--color-text-secondary)] mb-4">No sent bids</p>
+                <Button onClick={() => router.push('/bids')} variant="primary" size="sm">
+                  Create New Bid
+                </Button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4 sm:gap-2">
-                {sentBids.slice(0, 5).map(bid => {
-                  const sentDate = bid.sent_date ? new Date(bid.sent_date) : null
-                  const daysAgo = sentDate ? Math.floor((Date.now() - sentDate.getTime()) / (1000 * 60 * 60 * 24)) : null
-                  const timeAgo = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1 day ago' : daysAgo ? `${daysAgo} days ago` : ''
-                  
-                  return (
-                    <button
-                      key={bid.id}
-                      onClick={() => router.push(`/bids/${bid.id}`)}
-                      className={`
-                        text-left p-3 bg-[var(--color-card)]/50 border-l-2 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]
-                        ${bid.status === 'Won' 
-                          ? 'border-green-500 shadow-[2px_0_10px_rgba(34,197,94,0.15)]' 
-                          : 'border-orange-500'
-                        }
-                      `}
-                    >
-                      <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                        {bid.project_name}
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        {bid.amount_cents && (
-                          <div className="text-xs font-mono text-[var(--color-text-secondary)]">
-                            ${(bid.amount_cents / 100).toFixed(2)}
-                          </div>
-                        )}
-                        {timeAgo && (
-                          <div className="text-xs text-[var(--color-text-secondary)]">
-                            {timeAgo}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {sentBids.slice(0, 5).map(bid => (
+                  <BidCard
+                    key={bid.id}
+                    bid={bid}
+                    statusColor={bid.status === 'Won' ? '#4CAF50' : '#FF9800'}
+                    onClick={() => router.push(`/bids/${bid.id}`)}
+                  />
+                ))}
                 {sentBids.length > 5 && (
                   <div style={{
                     fontSize: '11px',
@@ -527,31 +499,21 @@ function BidPipelinePanel({
               </h4>
             </div>
             {readyToSendBids.length === 0 ? (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                padding: '8px',
-                fontStyle: 'italic'
-              }}>
-                No bids ready
+              <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+                <p className="text-[var(--color-text-secondary)] mb-4">No bids ready</p>
+                <Button onClick={() => router.push('/bids')} variant="primary" size="sm">
+                  Create New Bid
+                </Button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4 sm:gap-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {readyToSendBids.map(bid => (
-                  <button
+                  <BidCard
                     key={bid.id}
+                    bid={bid}
+                    statusColor="#60A5FA"
                     onClick={() => router.push(`/bids/${bid.id}`)}
-                    className="text-left p-3 bg-[var(--color-card)] border-l-2 border-blue-500 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]"
-                  >
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                      {bid.project_name}
-                    </div>
-                    {bid.amount_cents && (
-                      <div className="text-xs font-mono text-[var(--color-text-secondary)]">
-                        ${(bid.amount_cents / 100).toFixed(2)}
-                      </div>
-                    )}
-                  </button>
+                  />
                 ))}
               </div>
             )}
@@ -571,29 +533,21 @@ function BidPipelinePanel({
               </h4>
             </div>
             {needsApprovalBids.length === 0 ? (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                padding: '8px',
-                fontStyle: 'italic'
-              }}>
-                All prices set
+              <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+                <p className="text-[var(--color-text-secondary)] mb-4">All prices set</p>
+                <Button onClick={() => router.push('/bids')} variant="secondary" size="sm">
+                  Create New Bid
+                </Button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4 sm:gap-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {needsApprovalBids.map(bid => (
-                  <button
+                  <BidCard
                     key={bid.id}
+                    bid={bid}
+                    statusColor="#FF9800"
                     onClick={() => router.push(`/bids/${bid.id}`)}
-                    className="text-left p-3 bg-[var(--color-card)] border-l-2 border-orange-500 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]"
-                  >
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                      {bid.project_name}
-                    </div>
-                    <div className="text-xs text-[var(--color-text-secondary)]">
-                      Needs price approval
-                    </div>
-                  </button>
+                  />
                 ))}
               </div>
             )}
@@ -613,29 +567,21 @@ function BidPipelinePanel({
               </h4>
             </div>
             {draftingBids.length === 0 ? (
-              <div style={{
-                fontSize: '12px',
-                color: 'var(--color-text-secondary)',
-                padding: '8px',
-                fontStyle: 'italic'
-              }}>
-                No drafts
+              <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
+                <p className="text-[var(--color-text-secondary)] mb-4">No drafts</p>
+                <Button onClick={() => router.push('/bids')} variant="primary" size="sm">
+                  Create New Bid
+                </Button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4 sm:gap-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {draftingBids.slice(0, 3).map(bid => (
-                  <button
+                  <BidCard
                     key={bid.id}
+                    bid={bid}
+                    statusColor="#9E9E9E"
                     onClick={() => router.push(`/bids/${bid.id}`)}
-                    className="text-left p-3 bg-[var(--color-card)] border-l-2 border-gray-500 rounded-md cursor-pointer transition-all hover:bg-[var(--color-hover)] min-h-[44px]"
-                  >
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                      {bid.project_name}
-                    </div>
-                    <div className="text-xs text-[var(--color-text-secondary)]">
-                      Drafting
-                    </div>
-                  </button>
+                  />
                 ))}
                 {draftingBids.length > 3 && (
                   <div style={{

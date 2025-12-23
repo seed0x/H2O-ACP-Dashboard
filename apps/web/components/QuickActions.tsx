@@ -130,7 +130,7 @@ export function QuickActions({ actions, isMobile = false }: QuickActionsProps) {
         <Button
           key={idx}
           variant={action.variant || 'secondary'}
-          size={action.size || 'sm'}
+          size={action.size || 'md'}
           onClick={action.onClick}
           disabled={action.disabled}
         >
