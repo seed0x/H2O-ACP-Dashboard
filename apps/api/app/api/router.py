@@ -95,6 +95,12 @@ try:
 except ImportError:
     service_call_workflow_router = None
 
+# Import tech stats routes
+try:
+    from .tech_stats import router as tech_stats_router
+except ImportError:
+    tech_stats_router = None
+
 # Import analytics routes
 try:
     from .analytics import router as analytics_router
@@ -159,6 +165,10 @@ if job_tasks_router:
 # Include service call workflow routes if available
 if service_call_workflow_router:
     router.include_router(service_call_workflow_router)
+
+# Include tech stats routes if available
+if tech_stats_router:
+    router.include_router(tech_stats_router)
 
 # Include analytics routes if available
 if analytics_router:

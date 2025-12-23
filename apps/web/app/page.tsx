@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button'
 import { useTenant } from '../contexts/TenantContext'
 import { TodaysSchedule } from '../components/TodaysSchedule'
 import { Dataflow } from '../components/Dataflow'
+import { TechPerformance } from '../components/TechPerformance'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -281,6 +282,11 @@ export default function Dashboard() {
       {/* Dataflow - Dispatch Signals */}
       <div style={{ marginBottom: '24px' }}>
         <Dataflow />
+      </div>
+
+      {/* Tech Performance */}
+      <div style={{ marginBottom: '24px' }}>
+        <TechPerformance />
       </div>
 
       {/* Three Column Layout */}
