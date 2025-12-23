@@ -48,7 +48,7 @@ export function TenantIndicator({
           cursor: 'default'
         }}
       >
-        {config.icon || ''}
+        {config.label || config.icon || ''}
       </span>
     )
   }
@@ -69,7 +69,7 @@ export function TenantIndicator({
         whiteSpace: 'nowrap'
       }}
     >
-      <span>{config.icon || ''}</span>
+      <span>{config.label || config.icon || ''}</span>
       <span>{variant === 'full' ? (config.name || '') : (config.shortName || '')}</span>
     </span>
   )

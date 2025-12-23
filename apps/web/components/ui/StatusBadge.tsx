@@ -2,69 +2,199 @@ import React from 'react'
 
 interface StatusBadgeProps {
   status: string
-  variant?: 'default' | 'priority' | 'category' | 'success' | 'error' | 'info'
+  variant?: 'default' | 'priority' | 'category' | 'success' | 'error' | 'info' | 'warning'
   className?: string
 }
 
 export function StatusBadge({ status, variant = 'default', className = '' }: StatusBadgeProps) {
-  const getCategoryClasses = () => {
-    // Marketing content categories
-    if (variant === 'category' || status.includes('_')) {
-      const categoryMap: Record<string, string> = {
-        'ad_content': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-        'team_post': 'bg-green-500/20 text-green-400 border-green-500/30',
-        'coupon': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-        'diy': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-        'blog_post': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+  const getStatusStyles = () => {
+    // Variant-based styles (explicit variants take priority)
+    if (variant === 'success') {
+      return {
+        bg: 'var(--color-success-bg)',
+        text: 'var(--color-success)',
+        border: 'var(--color-success)',
       }
-      const normalizedStatus = status.toLowerCase().replace(/\s+/g, '_')
-      return categoryMap[normalizedStatus] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+    }
+    if (variant === 'error') {
+      return {
+        bg: 'var(--color-error-bg)',
+        text: 'var(--color-error)',
+        border: 'var(--color-error)',
+      }
+    }
+    if (variant === 'warning') {
+      return {
+        bg: 'var(--color-warning-bg)',
+        text: 'var(--color-warning)',
+        border: 'var(--color-warning)',
+      }
+    }
+    if (variant === 'info') {
+      return {
+        bg: 'var(--color-info-bg)',
+        text: 'var(--color-info)',
+        border: 'var(--color-info)',
+      }
     }
 
+    // Priority variant
     if (variant === 'priority') {
-      const priorityMap: Record<string, string> = {
-        'High': 'bg-red-500/20 text-red-400 border-red-500/30',
-        'Normal': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-        'Low': 'bg-green-500/20 text-green-400 border-green-500/30',
+      const priorityMap: Record<string, { bg: string; text: string; border: string }> = {
+        'High': {
+          bg: 'var(--color-error-bg)',
+          text: 'var(--color-error)',
+          border: 'var(--color-error)',
+        },
+        'Normal': {
+          bg: 'var(--color-neutral-bg)',
+          text: 'var(--color-neutral)',
+          border: 'var(--color-neutral)',
+        },
+        'Low': {
+          bg: 'var(--color-success-bg)',
+          text: 'var(--color-success)',
+          border: 'var(--color-success)',
+        },
+        'Emergency': {
+          bg: 'var(--color-error-bg)',
+          text: 'var(--color-error)',
+          border: 'var(--color-error)',
+        },
       }
       return priorityMap[status] || priorityMap['Normal']
     }
 
-    // Variant-based styles
-    if (variant === 'success') {
-      return 'bg-green-500/20 text-green-400 border-green-500/30'
-    }
-    if (variant === 'error') {
-      return 'bg-red-500/20 text-red-400 border-red-500/30'
-    }
-    if (variant === 'info') {
-      return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    // Category variant (marketing content categories)
+    if (variant === 'category' || status.includes('_')) {
+      const categoryMap: Record<string, { bg: string; text: string; border: string }> = {
+        'ad_content': {
+          bg: 'var(--color-info-bg)',
+          text: 'var(--color-info)',
+          border: 'var(--color-info)',
+        },
+        'team_post': {
+          bg: 'var(--color-success-bg)',
+          text: 'var(--color-success)',
+          border: 'var(--color-success)',
+        },
+        'coupon': {
+          bg: 'var(--color-warning-bg)',
+          text: 'var(--color-warning)',
+          border: 'var(--color-warning)',
+        },
+        'diy': {
+          bg: 'var(--color-primary-light)',
+          text: 'var(--color-primary)',
+          border: 'var(--color-primary)',
+        },
+        'blog_post': {
+          bg: 'var(--color-info-bg)',
+          text: 'var(--color-info)',
+          border: 'var(--color-info)',
+        },
+      }
+      const normalizedStatus = status.toLowerCase().replace(/\s+/g, '_')
+      return categoryMap[normalizedStatus] || {
+        bg: 'var(--color-neutral-bg)',
+        text: 'var(--color-neutral)',
+        border: 'var(--color-neutral)',
+      }
     }
 
-    // Default status styles
-    const statusMap: Record<string, string> = {
-      'New': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'Scheduled': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      'In Progress': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'Dispatched': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      'Completed': 'bg-green-500/20 text-green-400 border-green-500/30',
-      'On Hold': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-      'Draft': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'Sent': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'Won': 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.15)]',
-      'Posted': 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.15)]',
-      'Lost': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-      'Planned': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-      'Active': 'bg-green-500/20 text-green-400 border-green-500/30',
-      'Expired': 'bg-red-500/20 text-red-400 border-red-500/30',
+    // Default status mapping
+    const statusMap: Record<string, { bg: string; text: string; border: string }> = {
+      'New': {
+        bg: 'var(--color-info-bg)',
+        text: 'var(--color-info)',
+        border: 'var(--color-info)',
+      },
+      'Scheduled': {
+        bg: 'var(--color-warning-bg)',
+        text: 'var(--color-warning)',
+        border: 'var(--color-warning)',
+      },
+      'In Progress': {
+        bg: 'var(--color-primary-light)',
+        text: 'var(--color-primary)',
+        border: 'var(--color-primary)',
+      },
+      'Dispatched': {
+        bg: 'var(--color-warning-bg)',
+        text: 'var(--color-warning)',
+        border: 'var(--color-warning)',
+      },
+      'Completed': {
+        bg: 'var(--color-success-bg)',
+        text: 'var(--color-success)',
+        border: 'var(--color-success)',
+      },
+      'On Hold': {
+        bg: 'var(--color-neutral-bg)',
+        text: 'var(--color-neutral)',
+        border: 'var(--color-neutral)',
+      },
+      'Draft': {
+        bg: 'var(--color-neutral-bg)',
+        text: 'var(--color-neutral)',
+        border: 'var(--color-neutral)',
+      },
+      'Sent': {
+        bg: 'var(--color-info-bg)',
+        text: 'var(--color-info)',
+        border: 'var(--color-info)',
+      },
+      'Won': {
+        bg: 'var(--color-success-bg)',
+        text: 'var(--color-success)',
+        border: 'var(--color-success)',
+      },
+      'Posted': {
+        bg: 'var(--color-success-bg)',
+        text: 'var(--color-success)',
+        border: 'var(--color-success)',
+      },
+      'Lost': {
+        bg: 'var(--color-neutral-bg)',
+        text: 'var(--color-neutral)',
+        border: 'var(--color-neutral)',
+      },
+      'Planned': {
+        bg: 'var(--color-neutral-bg)',
+        text: 'var(--color-neutral)',
+        border: 'var(--color-neutral)',
+      },
+      'Active': {
+        bg: 'var(--color-success-bg)',
+        text: 'var(--color-success)',
+        border: 'var(--color-success)',
+      },
+      'Expired': {
+        bg: 'var(--color-error-bg)',
+        text: 'var(--color-error)',
+        border: 'var(--color-error)',
+      },
     }
-    return statusMap[status] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+    
+    return statusMap[status] || {
+      bg: 'var(--color-neutral-bg)',
+      text: 'var(--color-neutral)',
+      border: 'var(--color-neutral)',
+    }
   }
 
-  const hasGlow = status === 'Won' || status === 'Posted'
+  const styles = getStatusStyles()
 
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${getCategoryClasses()} ${hasGlow ? 'shadow-[0_0_10px_rgba(34,197,94,0.15)]' : ''} ${className}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${className}`}
+      style={{
+        backgroundColor: styles.bg,
+        color: styles.text,
+        borderColor: `${styles.border}40`, // 40 = 25% opacity in hex
+        height: '24px',
+      }}
+    >
       {status}
     </span>
   )

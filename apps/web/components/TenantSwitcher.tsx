@@ -43,7 +43,7 @@ export function TenantSwitcher({ compact = false, className = '' }: TenantSwitch
           border: `1px solid ${currentConfig.borderColor}`
         }}
       >
-        <span>{currentConfig.icon}</span>
+        <span style={{ fontSize: '13px', fontWeight: 600 }}>{currentConfig.label || currentConfig.icon}</span>
         {!compact && (
           <span style={{ fontSize: '13px', fontWeight: 500, color: currentConfig.color }}>
             {currentConfig.name}
@@ -70,7 +70,7 @@ export function TenantSwitcher({ compact = false, className = '' }: TenantSwitch
           minWidth: compact ? 'auto' : '140px'
         }}
       >
-        <span style={{ fontSize: '16px' }}>{currentConfig.icon}</span>
+        <span style={{ fontSize: '13px', fontWeight: 600 }}>{currentConfig.label || currentConfig.icon}</span>
         {!compact && (
           <>
             <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', fontWeight: 500, color: currentConfig.color }}>
@@ -118,7 +118,7 @@ export function TenantSwitcher({ compact = false, className = '' }: TenantSwitch
                   transition: 'background-color 0.15s'
                 }}
               >
-                <span style={{ fontSize: '16px' }}>{config.icon}</span>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>{config.label || config.icon}</span>
                 <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', fontWeight: isSelected ? 600 : 400, color: isSelected ? config.color : 'var(--color-text-primary)' }}>
                   {config.name}
                 </span>
@@ -165,7 +165,7 @@ export function TenantFilter() {
               transition: 'all 0.2s'
             }}
           >
-            <span style={{ fontSize: '14px' }}>{config.icon}</span>
+            <span style={{ fontSize: '13px', fontWeight: 600 }}>{config.label || config.icon}</span>
             <span style={{ fontSize: '12px', fontWeight: isSelected ? 600 : 400, color: isSelected ? config.color : 'var(--color-text-secondary)' }}>
               {config.shortName}
             </span>

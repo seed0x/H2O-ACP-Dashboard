@@ -19,34 +19,39 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined)
 export const TENANT_CONFIG: Record<TenantId, { 
   name: string
   shortName: string
-  icon: string 
+  label: string
   color: string
   bgColor: string
   borderColor: string
+  // Legacy icon property for backwards compatibility (maps to label)
+  icon?: string
 }> = {
   all_county: {
     name: 'All County',
     shortName: 'AC',
-    icon: '🏗️',
-    color: '#2563eb',
-    bgColor: 'rgba(37, 99, 235, 0.1)',
-    borderColor: 'rgba(37, 99, 235, 0.3)'
+    label: 'AC',
+    icon: 'AC', // Legacy compatibility
+    color: '#4F9CF9',
+    bgColor: 'rgba(79, 156, 249, 0.1)',
+    borderColor: 'rgba(79, 156, 249, 0.3)'
   },
   h2o: {
     name: 'H2O',
     shortName: 'H2O',
-    icon: '💧',
-    color: '#0d9488',
-    bgColor: 'rgba(13, 148, 136, 0.1)',
-    borderColor: 'rgba(13, 148, 136, 0.3)'
+    label: 'H2O',
+    icon: 'H2O', // Legacy compatibility
+    color: '#10B981',
+    bgColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.3)'
   },
   both: {
     name: 'Both Tenants',
     shortName: 'All',
-    icon: '👥',
-    color: '#7c3aed',
-    bgColor: 'rgba(124, 58, 237, 0.1)',
-    borderColor: 'rgba(124, 58, 237, 0.3)'
+    label: 'All',
+    icon: 'All', // Legacy compatibility
+    color: '#6366F1',
+    bgColor: 'rgba(99, 102, 241, 0.1)',
+    borderColor: 'rgba(99, 102, 241, 0.3)'
   }
 }
 
