@@ -24,11 +24,15 @@ async def list_job_tasks(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """List all tasks for a job"""
-    # Verify job exists
+    # Verify job exists and user has access
     result = await db.execute(select(models.Job).where(models.Job.id == job_id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Verify tenant access (if user has tenant_id, ensure it matches)
+    if current_user.tenant_id and job.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this job")
     
     # Get tasks
     result = await db.execute(
@@ -48,11 +52,19 @@ async def create_job_task(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Create a new task for a job"""
-    # Verify job exists
+    # Verify job exists and user has access
     result = await db.execute(select(models.Job).where(models.Job.id == job_id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and job.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this job")
+    
+    # Validate task input
+    if not task_in.title or not task_in.title.strip():
+        raise HTTPException(status_code=400, detail="Task title is required")
     
     task = models.JobTask(
         job_id=job_id,
@@ -80,11 +92,15 @@ async def update_job_task(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Update a job task"""
-    # Verify job exists
+    # Verify job exists and user has access
     result = await db.execute(select(models.Job).where(models.Job.id == job_id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and job.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this job")
     
     # Get task
     result = await db.execute(
@@ -99,16 +115,25 @@ async def update_job_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
+    # Validate status if provided
+    valid_statuses = ['pending', 'in_progress', 'completed', 'cancelled']
+    if task_in.status and task_in.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Status must be one of: {', '.join(valid_statuses)}")
+    
     # Update task
     old_status = task.status
+    status_updated = False
     for field, value in task_in.model_dump(exclude_unset=True).items():
+        if field == 'status':
+            status_updated = True
         setattr(task, field, value)
     
-    # Set completed_at if status changed to completed
-    if task_in.status == 'completed' and old_status != 'completed':
-        task.completed_at = datetime.now(timezone.utc)
-    elif task_in.status and task_in.status != 'completed' and old_status == 'completed':
-        task.completed_at = None
+    # Set completed_at if status changed to completed (only if status field was updated)
+    if status_updated:
+        if task.status == 'completed' and old_status != 'completed':
+            task.completed_at = datetime.now(timezone.utc)
+        elif task.status != 'completed' and old_status == 'completed':
+            task.completed_at = None
     
     await db.commit()
     await db.refresh(task)
@@ -130,11 +155,15 @@ async def delete_job_task(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Delete a job task"""
-    # Verify job exists
+    # Verify job exists and user has access
     result = await db.execute(select(models.Job).where(models.Job.id == job_id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and job.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this job")
     
     # Get task
     result = await db.execute(

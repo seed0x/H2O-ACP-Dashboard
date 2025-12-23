@@ -23,6 +23,14 @@ async def get_all_tech_stats(
 ):
     """Get stats for all tech users"""
     
+    # Verify tenant access if user has tenant_id
+    if current_user.tenant_id and tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this tenant's data")
+    
+    # Validate tenant_id
+    if not tenant_id or tenant_id.strip() == '':
+        raise HTTPException(status_code=400, detail="tenant_id is required")
+    
     # Calculate date range
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
@@ -96,11 +104,15 @@ async def get_all_tech_stats(
         lost_result = await db.execute(lost_query)
         lost = lost_result.scalar() or 0
         
-        # Calculate conversion rate
+        # Calculate conversion rate (handle division by zero)
         conversion_rate = None
         total_outcomes = sold + lost
         if total_outcomes > 0:
             conversion_rate = round((sold / total_outcomes) * 100, 1)
+        elif sold > 0 and lost == 0:
+            conversion_rate = 100.0  # All outcomes were wins
+        elif lost > 0 and sold == 0:
+            conversion_rate = 0.0  # All outcomes were losses
         
         stats_list.append({
             "username": username,
@@ -126,6 +138,17 @@ async def get_tech_stats(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Get stats for a specific tech user"""
+    
+    # Verify tenant access if user has tenant_id
+    if current_user.tenant_id and tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this tenant's data")
+    
+    # Validate inputs
+    if not username or username.strip() == '':
+        raise HTTPException(status_code=400, detail="username is required")
+    
+    if not tenant_id or tenant_id.strip() == '':
+        raise HTTPException(status_code=400, detail="tenant_id is required")
     
     # Calculate date range
     end_date = datetime.now()
@@ -183,11 +206,15 @@ async def get_tech_stats(
     lost_result = await db.execute(lost_query)
     lost = lost_result.scalar() or 0
     
-    # Calculate conversion rate
+    # Calculate conversion rate (handle division by zero)
     conversion_rate = None
     total_outcomes = sold + lost
     if total_outcomes > 0:
         conversion_rate = round((sold / total_outcomes) * 100, 1)
+    elif sold > 0 and lost == 0:
+        conversion_rate = 100.0  # All outcomes were wins
+    elif lost > 0 and sold == 0:
+        conversion_rate = 0.0  # All outcomes were losses
     
     return {
         "username": username,

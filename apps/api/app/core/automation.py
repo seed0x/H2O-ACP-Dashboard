@@ -293,41 +293,59 @@ async def create_phase_tasks(
     created_by: str
 ):
     """Create tasks based on phase type"""
-    task_templates = {
-        'post_and_beam': [
-            {'title': 'Highlight Plans', 'description': 'Review and highlight plans for post and beam phase'},
-            {'title': 'Job Account', 'description': 'Set up job account for post and beam work'}
-        ],
-        'top_out': [
-            {'title': 'Open Order', 'description': 'Open order for top out materials and supplies'}
-        ]
-    }
-    
-    tasks = task_templates.get(phase_type, [])
-    
-    for task_data in tasks:
-        # Check if task already exists (not completed)
-        existing_query = select(models.JobTask).where(
-            and_(
-                models.JobTask.job_id == job.id,
-                models.JobTask.title == task_data['title'],
-                models.JobTask.status != 'completed'
-            )
-        )
-        result = await db.execute(existing_query)
-        if result.scalar_one_or_none():
-            continue  # Skip if already exists
+    try:
+        task_templates = {
+            'post_and_beam': [
+                {'title': 'Highlight Plans', 'description': 'Review and highlight plans for post and beam phase'},
+                {'title': 'Job Account', 'description': 'Set up job account for post and beam work'}
+            ],
+            'top_out': [
+                {'title': 'Open Order', 'description': 'Open order for top out materials and supplies'}
+            ]
+        }
         
-        task = models.JobTask(
-            job_id=job.id,
-            tenant_id=job.tenant_id,
-            title=task_data['title'],
-            description=task_data['description'],
-            status='pending',
-            assigned_to=job.assigned_to  # Inherit from job
-        )
-        db.add(task)
-    
-    await db.commit()
+        tasks = task_templates.get(phase_type, [])
+        
+        if not tasks:
+            logger.warning(f"No task templates found for phase_type: {phase_type}")
+            return
+        
+        created_count = 0
+        for task_data in tasks:
+            # Validate task data
+            if not task_data.get('title') or not task_data['title'].strip():
+                logger.warning(f"Skipping task with empty title for phase_type: {phase_type}")
+                continue
+            
+            # Check if task already exists (not completed)
+            existing_query = select(models.JobTask).where(
+                and_(
+                    models.JobTask.job_id == job.id,
+                    models.JobTask.title == task_data['title'],
+                    models.JobTask.status != 'completed'
+                )
+            )
+            result = await db.execute(existing_query)
+            if result.scalar_one_or_none():
+                continue  # Skip if already exists
+            
+            task = models.JobTask(
+                job_id=job.id,
+                tenant_id=job.tenant_id,
+                title=task_data['title'].strip(),
+                description=task_data.get('description', '').strip() or None,
+                status='pending',
+                assigned_to=job.assigned_to  # Inherit from job
+            )
+            db.add(task)
+            created_count += 1
+        
+        if created_count > 0:
+            await db.commit()
+            logger.info(f"Created {created_count} tasks for job {job.id} phase {phase_type}")
+    except Exception as e:
+        logger.error(f"Error creating phase tasks for job {job.id}: {e}", exc_info=True)
+        await db.rollback()
+        raise  # Re-raise to let caller handle
 
 

@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../lib/config'
 import { StatCard } from './ui/StatCard'
 import { Button } from './ui/Button'
 import { handleApiError } from '../lib/error-handler'
+import { useTenant } from '../contexts/TenantContext'
 
 interface TechStats {
   username: string
@@ -18,15 +19,26 @@ interface TechStats {
 
 export function TechPerformance() {
   const router = useRouter()
+  const { currentTenant, isTenantSelected } = useTenant()
   const [techStats, setTechStats] = useState<TechStats[]>([])
   const [loading, setLoading] = useState(true)
   const [periodDays, setPeriodDays] = useState(30)
 
   useEffect(() => {
-    loadTechStats()
-  }, [periodDays])
+    // Only load if H2O tenant is selected (tech stats are H2O-specific)
+    if (isTenantSelected('h2o')) {
+      loadTechStats()
+    } else {
+      setTechStats([])
+      setLoading(false)
+    }
+  }, [periodDays, currentTenant])
 
   async function loadTechStats() {
+    if (!isTenantSelected('h2o')) {
+      return // Only show for H2O tenant
+    }
+    
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
@@ -54,6 +66,11 @@ export function TechPerformance() {
         </div>
       </div>
     )
+  }
+
+  // Don't show component if not H2O tenant
+  if (!isTenantSelected('h2o')) {
+    return null
   }
 
   if (techStats.length === 0) {

@@ -24,11 +24,15 @@ async def get_workflow(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Get workflow for a service call, create if doesn't exist"""
-    # Verify service call exists
+    # Verify service call exists and user has access
     result = await db.execute(select(models.ServiceCall).where(models.ServiceCall.id == service_call_id))
     service_call = result.scalar_one_or_none()
     if not service_call:
         raise HTTPException(status_code=404, detail="Service call not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and service_call.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this service call")
     
     # Get or create workflow
     result = await db.execute(
@@ -60,11 +64,15 @@ async def update_workflow(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Update workflow for a service call"""
-    # Verify service call exists
+    # Verify service call exists and user has access
     result = await db.execute(select(models.ServiceCall).where(models.ServiceCall.id == service_call_id))
     service_call = result.scalar_one_or_none()
     if not service_call:
         raise HTTPException(status_code=404, detail="Service call not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and service_call.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this service call")
     
     # Get or create workflow
     result = await db.execute(
@@ -82,15 +90,22 @@ async def update_workflow(
         )
         db.add(workflow)
     
+    # Validate current_step if provided
+    if workflow_in.current_step is not None:
+        if workflow_in.current_step < 0 or workflow_in.current_step > 6:
+            raise HTTPException(status_code=400, detail="current_step must be between 0 and 6")
+    
     # Update workflow fields
+    old_completed = workflow.completed
     for field, value in workflow_in.model_dump(exclude_unset=True).items():
         setattr(workflow, field, value)
     
     # Set completed_at if workflow is being marked as completed
-    if workflow_in.completed and not workflow.completed:
-        workflow.completed_at = datetime.now(timezone.utc)
-    elif workflow_in.completed is False and workflow.completed:
-        workflow.completed_at = None
+    if workflow_in.completed is not None:
+        if workflow_in.completed and not old_completed:
+            workflow.completed_at = datetime.now(timezone.utc)
+        elif not workflow_in.completed and old_completed:
+            workflow.completed_at = None
     
     await db.commit()
     await db.refresh(workflow)
@@ -111,11 +126,19 @@ async def complete_step(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Mark a workflow step as complete and advance to next step"""
-    # Verify service call exists
+    # Verify service call exists and user has access
     result = await db.execute(select(models.ServiceCall).where(models.ServiceCall.id == service_call_id))
     service_call = result.scalar_one_or_none()
     if not service_call:
         raise HTTPException(status_code=404, detail="Service call not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and service_call.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this service call")
+    
+    # Validate step parameter
+    if step < 0 or step > 6:
+        raise HTTPException(status_code=400, detail="Step must be between 0 and 6")
     
     # Get or create workflow
     result = await db.execute(
@@ -133,17 +156,26 @@ async def complete_step(
         )
         db.add(workflow)
     
-    # Advance to next step (max 6, which is step 7)
-    if step >= 0 and step <= 6:
-        workflow.current_step = min(step + 1, 6)
-        
-        # If we've completed all steps, mark as completed
-        if workflow.current_step >= 6:
-            workflow.completed = True
-            workflow.completed_at = datetime.now(timezone.utc)
+    # Validate step progression (can't go backwards unless resetting)
+    if step < workflow.current_step:
+        raise HTTPException(status_code=400, detail=f"Cannot go backwards from step {workflow.current_step} to step {step}")
+    
+    # Advance to next step (step + 1, max 6)
+    workflow.current_step = min(step + 1, 6)
+    
+    # If we've completed all steps (step 6 completed means we're at step 7, which is completion)
+    if workflow.current_step >= 6:
+        workflow.completed = True
+        workflow.completed_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(workflow)
+    
+    # Audit log
+    await crud.write_audit(
+        db, service_call.tenant_id, 'service_call_workflow', workflow.id, 'update', current_user.username,
+        'current_step', str(step), str(workflow.current_step)
+    )
     
     return workflow
 
