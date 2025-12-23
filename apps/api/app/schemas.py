@@ -246,10 +246,63 @@ class ServiceCallUpdate(BaseModel):
     notes: Optional[str]
     assigned_to: Optional[str] = None
 
+class ServiceCallWorkflowBase(BaseModel):
+    current_step: int = 0
+    completed: bool = False
+    paperwork_photo_urls: Optional[List[str]] = None
+    needs_permit: Optional[bool] = None
+    permit_notes: Optional[str] = None
+    needs_reschedule: Optional[bool] = None
+    reschedule_date: Optional[date] = None
+    reschedule_notes: Optional[str] = None
+    needs_parts_order: Optional[bool] = None
+    parts_order_notes: Optional[str] = None
+    needs_bid: Optional[bool] = None
+    bid_id: Optional[UUID] = None
+    needs_pricing: Optional[bool] = None
+    estimated_price: Optional[float] = None
+    needs_price_approval: Optional[bool] = None
+    price_approval_notes: Optional[str] = None
+    workflow_data: Optional[dict] = None
+
+class ServiceCallWorkflowCreate(ServiceCallWorkflowBase):
+    pass
+
+class ServiceCallWorkflowUpdate(BaseModel):
+    current_step: Optional[int] = None
+    completed: Optional[bool] = None
+    paperwork_photo_urls: Optional[List[str]] = None
+    needs_permit: Optional[bool] = None
+    permit_notes: Optional[str] = None
+    needs_reschedule: Optional[bool] = None
+    reschedule_date: Optional[date] = None
+    reschedule_notes: Optional[str] = None
+    needs_parts_order: Optional[bool] = None
+    parts_order_notes: Optional[str] = None
+    needs_bid: Optional[bool] = None
+    bid_id: Optional[UUID] = None
+    needs_pricing: Optional[bool] = None
+    estimated_price: Optional[float] = None
+    needs_price_approval: Optional[bool] = None
+    price_approval_notes: Optional[str] = None
+    workflow_data: Optional[dict] = None
+
+class ServiceCallWorkflow(ServiceCallWorkflowBase):
+    id: UUID
+    service_call_id: UUID
+    tenant_id: str
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class ServiceCallOut(ServiceCallBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    workflow: Optional[ServiceCallWorkflow] = None
 
     class Config:
         from_attributes = True

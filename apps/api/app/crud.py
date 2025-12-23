@@ -364,7 +364,11 @@ async def create_service_call(db: AsyncSession, sc_in: schemas.ServiceCallCreate
     return sc
 
 async def get_service_call(db: AsyncSession, sc_id: UUID) -> models.ServiceCall | None:
-    res = await db.execute(select(models.ServiceCall).where(models.ServiceCall.id == sc_id))
+    res = await db.execute(
+        select(models.ServiceCall)
+        .where(models.ServiceCall.id == sc_id)
+        .options(selectinload(models.ServiceCall.workflow))
+    )
     return res.scalar_one_or_none()
 
 async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, search: str | None, assigned_to: str | None = None, scheduled_date: str | None = None, limit: int = 25, offset: int = 0):

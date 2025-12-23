@@ -89,6 +89,12 @@ try:
 except ImportError:
     job_tasks_router = None
 
+# Import service call workflow routes
+try:
+    from .service_call_workflow import router as service_call_workflow_router
+except ImportError:
+    service_call_workflow_router = None
+
 # Import analytics routes
 try:
     from .analytics import router as analytics_router
@@ -149,6 +155,10 @@ if overdue_router:
 # Include job tasks routes if available
 if job_tasks_router:
     router.include_router(job_tasks_router)
+
+# Include service call workflow routes if available
+if service_call_workflow_router:
+    router.include_router(service_call_workflow_router)
 
 # Include analytics routes if available
 if analytics_router:

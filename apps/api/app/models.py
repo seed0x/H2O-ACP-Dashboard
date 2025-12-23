@@ -173,6 +173,55 @@ class ServiceCall(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    workflow = relationship("ServiceCallWorkflow", back_populates="service_call", uselist=False, cascade="all, delete-orphan")
+
+class ServiceCallWorkflow(Base):
+    __tablename__ = "service_call_workflows"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    service_call_id = Column(UUID(as_uuid=True), ForeignKey("service_calls.id", ondelete="CASCADE"), nullable=False, unique=True)
+    tenant_id = Column(Text, nullable=False)
+    current_step = Column(Integer, nullable=False, default=0)  # 0-6 for the 7 steps
+    completed = Column(Boolean, nullable=False, default=False)
+    
+    # Step 1: Upload paperwork photos
+    paperwork_photo_urls = Column(ARRAY(Text), nullable=True)
+    
+    # Step 2: Permit check
+    needs_permit = Column(Boolean, nullable=True)
+    permit_notes = Column(Text, nullable=True)
+    
+    # Step 3: Reschedule/come back
+    needs_reschedule = Column(Boolean, nullable=True)
+    reschedule_date = Column(Date, nullable=True)
+    reschedule_notes = Column(Text, nullable=True)
+    
+    # Step 4: Parts order
+    needs_parts_order = Column(Boolean, nullable=True)
+    parts_order_notes = Column(Text, nullable=True)
+    
+    # Step 5: Send bid
+    needs_bid = Column(Boolean, nullable=True)
+    bid_id = Column(UUID(as_uuid=True), ForeignKey("bids.id", ondelete="SET NULL"), nullable=True)
+    
+    # Step 6: Price it
+    needs_pricing = Column(Boolean, nullable=True)
+    estimated_price = Column(Numeric(10, 2), nullable=True)
+    
+    # Step 7: Price approval
+    needs_price_approval = Column(Boolean, nullable=True)
+    price_approval_notes = Column(Text, nullable=True)
+    
+    # Flexible JSON field for additional data
+    workflow_data = Column(JSON, nullable=True)
+    
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    service_call = relationship("ServiceCall", back_populates="workflow")
+    bid = relationship("Bid", foreign_keys=[bid_id])
 
 class JobContact(Base):
     __tablename__ = "job_contacts"

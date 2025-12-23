@@ -9,6 +9,7 @@ import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { Input } from '../../../components/ui/Input'
 import { Select } from '../../../components/ui/Select'
 import { Textarea } from '../../../components/ui/Textarea'
+import { WorkflowStepper } from '../../../components/ui/WorkflowStepper'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
 
@@ -535,6 +536,19 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
           rows={6}
         />
       </div>
+
+      {/* Completion Workflow */}
+      {(sc.status === 'In Progress' || sc.status === 'Completed') && (
+        <div style={{ marginBottom: '24px' }}>
+          <WorkflowStepper 
+            serviceCallId={id}
+            onComplete={() => {
+              showToast('Workflow completed! Consider updating service call status.', 'success')
+              loadData()
+            }}
+          />
+        </div>
+      )}
 
       {/* Suggested Portals */}
       <div style={{
