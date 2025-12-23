@@ -130,6 +130,25 @@ class Job(Base):
     __table_args__ = (
         UniqueConstraint('builder_id', 'community', 'lot_number', 'phase', 'tenant_id', name='uq_job_per_lot_phase'),
     )
+    
+    tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
+
+class JobTask(Base):
+    __tablename__ = "job_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(Text, nullable=False)
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default='pending')  # 'pending', 'in_progress', 'completed', 'cancelled'
+    assigned_to = Column(String, nullable=True)
+    due_date = Column(Date, nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    job = relationship("Job", back_populates="tasks")
 
 class ServiceCall(Base):
     __tablename__ = "service_calls"

@@ -180,10 +180,40 @@ class JobUpdate(BaseModel):
     warranty_notes: Optional[str] = None
     completion_date: Optional[date] = None
 
+class JobTaskBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    status: str = 'pending'
+    assigned_to: Optional[str] = None
+    due_date: Optional[date] = None
+
+class JobTaskCreate(JobTaskBase):
+    pass
+
+class JobTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[date] = None
+    completed_at: Optional[datetime] = None
+
+class JobTask(JobTaskBase):
+    id: UUID
+    job_id: UUID
+    tenant_id: str
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class JobOut(JobBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    tasks: Optional[List[JobTask]] = None
 
     class Config:
         from_attributes = True

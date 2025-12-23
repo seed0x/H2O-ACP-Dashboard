@@ -2,7 +2,7 @@ import React from 'react'
 
 interface StatusBadgeProps {
   status: string
-  variant?: 'default' | 'priority' | 'category'
+  variant?: 'default' | 'priority' | 'category' | 'success' | 'error' | 'info'
   className?: string
 }
 
@@ -30,6 +30,17 @@ export function StatusBadge({ status, variant = 'default', className = '' }: Sta
       return priorityMap[status] || priorityMap['Normal']
     }
 
+    // Variant-based styles
+    if (variant === 'success') {
+      return 'bg-green-500/20 text-green-400 border-green-500/30'
+    }
+    if (variant === 'error') {
+      return 'bg-red-500/20 text-red-400 border-red-500/30'
+    }
+    if (variant === 'info') {
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    }
+
     // Default status styles
     const statusMap: Record<string, string> = {
       'New': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -44,6 +55,8 @@ export function StatusBadge({ status, variant = 'default', className = '' }: Sta
       'Posted': 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.15)]',
       'Lost': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
       'Planned': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      'Active': 'bg-green-500/20 text-green-400 border-green-500/30',
+      'Expired': 'bg-red-500/20 text-red-400 border-red-500/30',
     }
     return statusMap[status] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
   }

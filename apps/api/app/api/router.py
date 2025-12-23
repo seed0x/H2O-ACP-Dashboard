@@ -83,6 +83,12 @@ try:
 except ImportError:
     overdue_router = None
 
+# Import job tasks routes
+try:
+    from .job_tasks import router as job_tasks_router
+except ImportError:
+    job_tasks_router = None
+
 # Import analytics routes
 try:
     from .analytics import router as analytics_router
@@ -139,6 +145,10 @@ if recovery_tickets_router:
 # Include overdue tracking routes if available
 if overdue_router:
     router.include_router(overdue_router)
+
+# Include job tasks routes if available
+if job_tasks_router:
+    router.include_router(job_tasks_router)
 
 # Include analytics routes if available
 if analytics_router:

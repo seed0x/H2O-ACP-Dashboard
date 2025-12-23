@@ -10,6 +10,7 @@ import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { Input } from '../../../components/ui/Input'
 import { Select } from '../../../components/ui/Select'
 import { Textarea } from '../../../components/ui/Textarea'
+import { TasksPanel } from '../../../components/ui/TasksPanel'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
 
@@ -37,6 +38,15 @@ interface Job {
   completion_date?: string
   created_at: string
   updated_at: string
+  tasks?: Array<{
+    id: string
+    title: string
+    description?: string
+    status: string
+    assigned_to?: string
+    due_date?: string
+    completed_at?: string
+  }>
 }
 
 interface Builder {
@@ -113,6 +123,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
   
   // Form state
   const [status, setStatus] = useState('')
+  const [phase, setPhase] = useState('')
   const [techName, setTechName] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
   const [scheduledStartDate, setScheduledStartDate] = useState('')
@@ -126,6 +137,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
   const [completionDate, setCompletionDate] = useState('')
   const [suggestedPortals, setSuggestedPortals] = useState<any[]>([])
   const [loadingPortals, setLoadingPortals] = useState(false)
+  const [tasks, setTasks] = useState<any[]>([])
   
   // UI state
   const [warrantyExpanded, setWarrantyExpanded] = useState(false)
@@ -161,8 +173,10 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
       
       // Set form state
       setStatus(jobData.status || '')
+      setPhase(jobData.phase || '')
       setTechName(jobData.tech_name || '')
       setAssignedTo(jobData.assigned_to || '')
+      setTasks(jobData.tasks || [])
       
       // Parse scheduled dates with times
       const startDT = formatDateTime(jobData.scheduled_start)
@@ -273,6 +287,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
       
       const updateData: any = {
         status,
+        phase,
         notes,
         tech_name: techName || null,
         assigned_to: assignedTo || null,
@@ -596,81 +611,97 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
             </div>
           </div>
 
-          {/* Collapsible Warranty Section */}
-          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: warrantyExpanded ? '20px' : '0' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                🔧 Warranty
+          {/* Enhanced Warranty Section */}
+          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6" style={{
+            border: warrantyStart ? '2px solid #10b981' : '1px solid var(--color-border)',
+            backgroundColor: warrantyStart ? 'rgba(16, 185, 129, 0.05)' : 'var(--color-card)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)', margin: 0 }}>
+                🔧 Warranty Period
               </h2>
-              <Button
-                variant="secondary"
-                onClick={() => setWarrantyExpanded(!warrantyExpanded)}
-                style={{ fontSize: '12px', padding: '4px 12px' }}
-              >
-                {warrantyExpanded ? '▲' : '▼'}
-              </Button>
+              {warrantyStart && warrantyEnd && (
+                <StatusBadge 
+                  status={new Date(warrantyEnd) >= new Date() ? 'Active' : 'Expired'}
+                  variant={new Date(warrantyEnd) >= new Date() ? 'success' : 'error'}
+                />
+              )}
             </div>
-            
-            {warrantyExpanded ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {!hasWarranty ? (
-                  <div style={{
-                    padding: '24px',
-                    textAlign: 'center',
-                    backgroundColor: 'var(--color-hover)',
-                    borderRadius: '8px',
-                    border: '2px dashed var(--color-border)'
-                  }}>
-                    <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '12px' }}>
-                      ⚠️ No warranty information set
-                    </div>
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        const today = new Date().toISOString().split('T')[0]
-                        const oneYearLater = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
-                        setWarrantyStart(today)
-                        setWarrantyEnd(oneYearLater)
-                      }}
-                    >
-                      + Add Warranty Coverage
-                    </Button>
+
+            {warrantyStart && warrantyEnd ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      Start Date
+                    </label>
+                    <Input 
+                      type="date" 
+                      value={warrantyStart} 
+                      onChange={(e) => setWarrantyStart(e.target.value)}
+                    />
                   </div>
-                ) : (
-                  <>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
-                        Coverage Period
-                      </label>
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <Input
-                          type="date"
-                          value={warrantyStart}
-                          onChange={(e) => setWarrantyStart(e.target.value)}
-                        />
-                        <span style={{ color: 'var(--color-text-secondary)' }}>→</span>
-                        <Input
-                          type="date"
-                          value={warrantyEnd}
-                          onChange={(e) => setWarrantyEnd(e.target.value)}
-                        />
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                      End Date
+                    </label>
+                    <Input 
+                      type="date" 
+                      value={warrantyEnd} 
+                      onChange={(e) => setWarrantyEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {(() => {
+                  const endDate = new Date(warrantyEnd)
+                  const today = new Date()
+                  const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                  const isActive = daysRemaining > 0
+                  
+                  return (
+                    <div style={{ 
+                      marginTop: '12px', 
+                      padding: '12px', 
+                      backgroundColor: isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+                      borderRadius: '6px' 
+                    }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: isActive ? '#10b981' : '#ef4444' }}>
+                        {isActive ? `${daysRemaining} days remaining` : `Expired ${Math.abs(daysRemaining)} days ago`}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        Warranty expires {endDate.toLocaleDateString()}
                       </div>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
-                        Warranty Notes
-                      </label>
-                      <Textarea
-                        value={warrantyNotes}
-                        onChange={(e) => setWarrantyNotes(e.target.value)}
-                        placeholder="Warranty information..."
-                        rows={4}
-                      />
-                    </div>
-                  </>
-                )}
+                  )
+                })()}
+                
+                <div style={{ marginTop: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                    Warranty Notes
+                  </label>
+                  <Textarea
+                    value={warrantyNotes}
+                    onChange={(e) => setWarrantyNotes(e.target.value)}
+                    placeholder="Additional warranty information..."
+                    rows={3}
+                  />
+                </div>
+              </>
+            ) : (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '24px', 
+                color: 'var(--color-text-secondary)',
+                fontSize: '14px'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '8px' }}>📋</div>
+                <div style={{ fontWeight: '500', marginBottom: '4px' }}>No warranty period set</div>
+                <div style={{ fontSize: '12px' }}>
+                  Warranty will auto-start when job completes in Trim/Final phase
+                </div>
               </div>
-            ) : null}
+            )}
           </div>
 
           {/* Improved Notes Section */}
@@ -828,6 +859,13 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
               </div>
             </div>
           )}
+
+          {/* Tasks Panel */}
+          <TasksPanel 
+            jobId={id} 
+            tasks={tasks} 
+            onUpdate={loadData}
+          />
 
           {/* Suggested Portals - Only show if has portals */}
           {hasPortals && (

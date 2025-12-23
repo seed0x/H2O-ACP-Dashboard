@@ -2,10 +2,11 @@
 Automation triggers for workflow events
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from datetime import datetime, timezone
 from typing import Optional
 import logging
+from dateutil.relativedelta import relativedelta
 
 from .. import models
 
@@ -52,6 +53,23 @@ async def on_job_status_changed(
             # Auto-update completion_date if not set
             if not job.completion_date:
                 job.completion_date = datetime.now(timezone.utc).date()
+            
+            # AUTO-START WARRANTY for trim/final phases
+            phase_lower = (job.phase or '').lower().strip()
+            if phase_lower in ['trim', 'final'] and not job.warranty_start_date:
+                job.warranty_start_date = job.completion_date
+                job.warranty_end_date = job.completion_date + relativedelta(years=1)
+                job.warranty_notes = f"Auto-started warranty period on completion (phase: {job.phase})"
+                
+                await create_notification(
+                    db,
+                    job.tenant_id,
+                    'warranty_started',
+                    f'Warranty Started: {job.community} - Lot {job.lot_number}',
+                    f'1-year warranty period started automatically. Ends: {job.warranty_end_date}',
+                    'job',
+                    str(job.id)
+                )
             
             # Create notification for assigned user
             if job.assigned_to:
@@ -222,5 +240,94 @@ async def on_review_received(
                     
     except Exception as e:
         logger.error(f"Error in on_review_received: {e}", exc_info=True)
+
+
+async def on_job_phase_changed(
+    db: AsyncSession,
+    job: models.Job,
+    old_phase: str,
+    new_phase: str,
+    changed_by: str
+):
+    """Triggered when job phase changes - creates phase-specific tasks and checks warranty"""
+    try:
+        # Normalize phase names
+        phase_lower = (new_phase or '').lower().strip()
+        old_phase_lower = (old_phase or '').lower().strip()
+        
+        # Skip if phase didn't actually change
+        if phase_lower == old_phase_lower:
+            return
+        
+        # Create phase-specific tasks
+        if phase_lower in ['pb', 'post and beam', 'post & beam', 'post&beam']:
+            await create_phase_tasks(db, job, 'post_and_beam', changed_by)
+        elif phase_lower in ['to', 'top out', 'top-out', 'topout', 'rough', 'rough in', 'rough-in']:
+            await create_phase_tasks(db, job, 'top_out', changed_by)
+        
+        # Check if warranty should start (trim/final phase + completed status)
+        if phase_lower in ['trim', 'final'] and job.status == 'Completed':
+            if not job.warranty_start_date:
+                completion = job.completion_date or datetime.now(timezone.utc).date()
+                job.warranty_start_date = completion
+                job.warranty_end_date = completion + relativedelta(years=1)
+                job.warranty_notes = f"Auto-started warranty on phase change to {new_phase}"
+                
+                await create_notification(
+                    db,
+                    job.tenant_id,
+                    'warranty_started',
+                    f'Warranty Started: {job.community} - Lot {job.lot_number}',
+                    f'1-year warranty period started automatically. Ends: {job.warranty_end_date}',
+                    'job',
+                    str(job.id)
+                )
+    except Exception as e:
+        logger.error(f"Error in phase change automation: {e}", exc_info=True)
+
+
+async def create_phase_tasks(
+    db: AsyncSession,
+    job: models.Job,
+    phase_type: str,
+    created_by: str
+):
+    """Create tasks based on phase type"""
+    task_templates = {
+        'post_and_beam': [
+            {'title': 'Highlight Plans', 'description': 'Review and highlight plans for post and beam phase'},
+            {'title': 'Job Account', 'description': 'Set up job account for post and beam work'}
+        ],
+        'top_out': [
+            {'title': 'Open Order', 'description': 'Open order for top out materials and supplies'}
+        ]
+    }
+    
+    tasks = task_templates.get(phase_type, [])
+    
+    for task_data in tasks:
+        # Check if task already exists (not completed)
+        existing_query = select(models.JobTask).where(
+            and_(
+                models.JobTask.job_id == job.id,
+                models.JobTask.title == task_data['title'],
+                models.JobTask.status != 'completed'
+            )
+        )
+        result = await db.execute(existing_query)
+        if result.scalar_one_or_none():
+            continue  # Skip if already exists
+        
+        task = models.JobTask(
+            job_id=job.id,
+            tenant_id=job.tenant_id,
+            title=task_data['title'],
+            description=task_data['description'],
+            status='pending',
+            assigned_to=job.assigned_to  # Inherit from job
+        )
+        db.add(task)
+    
+    await db.commit()
 
 

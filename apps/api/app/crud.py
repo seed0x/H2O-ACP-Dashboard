@@ -265,7 +265,12 @@ async def create_job(db: AsyncSession, job_in: schemas.JobCreate, changed_by: st
     return job
 
 async def get_job(db: AsyncSession, job_id: UUID) -> models.Job | None:
-    res = await db.execute(select(models.Job).where(models.Job.id == job_id))
+    from sqlalchemy.orm import selectinload
+    res = await db.execute(
+        select(models.Job)
+        .where(models.Job.id == job_id)
+        .options(selectinload(models.Job.tasks))
+    )
     return res.scalar_one_or_none()
 
 async def list_jobs(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, community: str | None, lot: str | None, search: str | None, limit: int = 25, offset: int = 0):
@@ -288,6 +293,7 @@ async def list_jobs(db: AsyncSession, tenant_id: str | None, status: str | None,
 
 async def update_job(db: AsyncSession, job: models.Job, job_in: schemas.JobUpdate, changed_by: str) -> models.Job:
     old_status = job.status
+    old_phase = job.phase  # Track phase change
     for field, value in job_in.dict(exclude_unset=True).items():
         old = getattr(job, field)
         setattr(job, field, value)
@@ -304,6 +310,15 @@ async def update_job(db: AsyncSession, job: models.Job, job_in: schemas.JobUpdat
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error triggering job automation: {e}", exc_info=True)
+    
+    # Trigger automation if phase changed
+    if job_in.phase is not None and old_phase != job.phase:
+        try:
+            from ..core.automation import on_job_phase_changed
+            await on_job_phase_changed(db, job, old_phase, job.phase, changed_by)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error triggering phase automation: {e}", exc_info=True)
     
     return job
 
