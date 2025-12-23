@@ -58,10 +58,20 @@ class Settings(BaseSettings):
         if required_origin not in origins_list:
             origins_list.append(required_origin)
         
-        return ",".join(origins_list)
+        result = ",".join(origins_list)
+        # #region agent log
+        import logging
+        logging.getLogger(__name__).info(f"CORS origins computed: raw={self._cors_origins_raw}, final={result}, list={origins_list}")
+        # #endregion
+        return result
     
     @property
     def cors_origins_list(self):
-        return [origin.strip() for origin in self.cors_origins.split(",")]
+        result = [origin.strip() for origin in self.cors_origins.split(",")]
+        # #region agent log
+        import logging
+        logging.getLogger(__name__).info(f"CORS origins_list: {result}")
+        # #endregion
+        return result
 
 settings = Settings()

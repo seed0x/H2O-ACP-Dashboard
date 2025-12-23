@@ -203,6 +203,9 @@ app = FastAPI(title="Plumbing Ops Platform API", version="1.0.0", lifespan=lifes
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# #region agent log
+logger.info(f"CORS Configuration: allow_origins={settings.cors_origins_list}, cors_origins_raw={settings._cors_origins_raw}")
+# #endregion
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
