@@ -350,7 +350,41 @@ async def remove_job_contact(db: AsyncSession, job_id: UUID, contact_id: UUID, c
 
 ### Service Calls
 async def create_service_call(db: AsyncSession, sc_in: schemas.ServiceCallCreate, changed_by: str, commit: bool = True) -> models.ServiceCall:
-    sc = models.ServiceCall(**sc_in.dict())
+    # Auto-link to customer if possible
+    customer_id = None
+    if sc_in.customer_name and sc_in.customer_name.strip() and (sc_in.phone or sc_in.email):
+        try:
+            # Get email from sc_in if it exists (EmailStr from pydantic needs to be converted to string)
+            email_value = None
+            if hasattr(sc_in, 'email') and sc_in.email:
+                email_value = str(sc_in.email).strip() if sc_in.email else None
+                if email_value == '':
+                    email_value = None
+            
+            # Normalize phone
+            phone_value = sc_in.phone.strip() if sc_in.phone else None
+            if phone_value == '':
+                phone_value = None
+            
+            customer = await find_or_create_customer_by_contact(
+                db, 
+                sc_in.tenant_id, 
+                sc_in.customer_name.strip(), 
+                phone_value, 
+                email_value,
+                changed_by
+            )
+            customer_id = customer.id if customer else None
+        except Exception as e:
+            # If customer linking fails, log but don't fail service call creation
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to auto-link customer for service call: {e}", exc_info=True)
+    
+    sc_dict = sc_in.dict()
+    if customer_id:
+        sc_dict['customer_id'] = customer_id
+    
+    sc = models.ServiceCall(**sc_dict)
     db.add(sc)
     await db.flush()
     await write_audit(db, sc.tenant_id, 'service_call', sc.id, 'create', changed_by)
@@ -371,7 +405,7 @@ async def get_service_call(db: AsyncSession, sc_id: UUID) -> models.ServiceCall 
     )
     return res.scalar_one_or_none()
 
-async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, search: str | None, assigned_to: str | None = None, scheduled_date: str | None = None, limit: int = 25, offset: int = 0):
+async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: str | None, builder_id: UUID | None, search: str | None, assigned_to: str | None = None, scheduled_date: str | None = None, customer_id: UUID | None = None, limit: int = 25, offset: int = 0):
     from datetime import datetime, timezone
     q = select(models.ServiceCall)
     if tenant_id:
@@ -380,6 +414,8 @@ async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: st
         q = q.where(models.ServiceCall.status == status)
     if builder_id:
         q = q.where(models.ServiceCall.builder_id == builder_id)
+    if customer_id:
+        q = q.where(models.ServiceCall.customer_id == customer_id)
     if search:
         q = q.where(models.ServiceCall.customer_name.ilike(f"%{search}%") | models.ServiceCall.address_line1.ilike(f"%{search}%"))
     if assigned_to:

@@ -162,7 +162,24 @@ export default function ServiceCallsPage() {
   const columns = [
     {
       header: 'Customer',
-      accessor: (row: ServiceCall) => formatTableCell(row.customer_name)
+      accessor: (row: ServiceCall) => row.customer_name ? (
+        <a
+          href={`/customers?search=${encodeURIComponent(row.customer_name)}`}
+          style={{ 
+            color: 'var(--color-primary)', 
+            textDecoration: 'none',
+            fontWeight: 500
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/customers?search=${encodeURIComponent(row.customer_name)}`)
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+        >
+          {row.customer_name}
+        </a>
+      ) : formatTableCell(null)
     },
     {
       header: 'Address',

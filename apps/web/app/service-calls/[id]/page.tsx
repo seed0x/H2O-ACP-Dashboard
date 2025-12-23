@@ -440,9 +440,23 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
               <div style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
                 Name
               </div>
-              <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+              <a
+                href={`/customers?search=${encodeURIComponent(sc.customer_name)}`}
+                style={{ 
+                  fontSize: 'var(--text-base)', 
+                  fontWeight: 500, 
+                  color: 'var(--color-primary)',
+                  textDecoration: 'none'
+                }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  router.push(`/customers?search=${encodeURIComponent(sc.customer_name)}`)
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
                 {sc.customer_name}
-              </div>
+              </a>
             </div>
             {sc.phone && (
               <div>

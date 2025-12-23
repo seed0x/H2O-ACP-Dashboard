@@ -298,6 +298,45 @@ class ServiceCallWorkflow(ServiceCallWorkflowBase):
     class Config:
         from_attributes = True
 
+# Customer Schemas
+class CustomerBase(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address_line1: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[str] = None
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class CustomerCreate(CustomerBase):
+    tenant_id: str
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address_line1: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[str] = None
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class CustomerOut(CustomerBase):
+    id: UUID
+    tenant_id: str
+    created_at: datetime
+    updated_at: datetime
+    service_calls_count: Optional[int] = None  # Computed field for list views
+
+    class Config:
+        from_attributes = True
+
+class CustomerWithServiceCalls(CustomerOut):
+    service_calls: Optional[List[ServiceCallOut]] = None
+
 class ServiceCallOut(ServiceCallBase):
     id: UUID
     created_at: datetime

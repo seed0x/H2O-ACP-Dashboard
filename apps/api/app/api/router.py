@@ -125,6 +125,12 @@ try:
 except ImportError:
     portals_router = None
 
+# Import customers routes
+try:
+    from .customers import router as customers_router
+except ImportError:
+    customers_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -185,6 +191,10 @@ if signals_router:
 # Include portals directory routes if available
 if portals_router:
     router.include_router(portals_router)
+
+# Include customers routes if available
+if customers_router:
+    router.include_router(customers_router)
 
 class LoginRequest(BaseModel):
     username: str

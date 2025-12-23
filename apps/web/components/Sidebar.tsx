@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: UilDashboard },
   { name: 'All County Jobs', href: '/jobs', icon: UilBuilding },
   { name: 'H2O Service Calls', href: '/service-calls', icon: UilWrench },
+  { name: 'Customers', href: '/customers', icon: UilUserCircle },
   { name: 'Reviews', href: '/reviews', icon: UilStar, badgeCategory: 'reviews' },
   { name: 'Analytics', href: '/analytics', icon: UilChart },
   { name: 'Marketing', href: '/marketing', icon: UilCalendarAlt, badgeCategory: 'marketing' },
@@ -204,7 +205,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
         gap: '8px',
       }}>
         {displayNavItems.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
           const Icon = item.icon
           return (
             <Link

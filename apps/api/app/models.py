@@ -150,13 +150,38 @@ class JobTask(Base):
 
     job = relationship("Job", back_populates="tasks")
 
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    name = Column(Text, nullable=False)
+    phone = Column(Text, nullable=True)
+    email = Column(Text, nullable=True)
+    address_line1 = Column(Text, nullable=True)
+    city = Column(Text, nullable=True)
+    state = Column(Text, nullable=True, default='WA')
+    zip = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)  # Internal notes about the customer
+    tags = Column(ARRAY(Text), nullable=True)  # For categorization (e.g., 'VIP', 'Warranty', 'Commercial')
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    service_calls = relationship("ServiceCall", back_populates="customer", cascade="all, delete-orphan")
+
 class ServiceCall(Base):
     __tablename__ = "service_calls"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(Text, nullable=False)
     builder_id = Column(UUID(as_uuid=True), ForeignKey("builders.id"), nullable=True)
-    customer_name = Column(Text, nullable=False)
+    
+    # Customer relationship - links to Customer table
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    
+    # Keep these for backward compatibility and as overrides for address variations per call
+    customer_name = Column(Text, nullable=False)  # Keep for now, can be derived from customer
     phone = Column(Text, nullable=True)
     email = Column(Text, nullable=True)
     address_line1 = Column(Text, nullable=False)
@@ -174,6 +199,8 @@ class ServiceCall(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
+    # Relationships
+    customer = relationship("Customer", back_populates="service_calls")
     workflow = relationship("ServiceCallWorkflow", back_populates="service_call", uselist=False, cascade="all, delete-orphan")
 
 class ServiceCallWorkflow(Base):
