@@ -2,6 +2,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { useTenant } from '../contexts/TenantContext'
 import UilDashboard from '@iconscout/react-unicons/icons/uil-dashboard'
@@ -34,6 +35,11 @@ const navItems: NavItem[] = [
   { name: 'Directory', href: '/directory', icon: UilFolder },
 ]
 
+// Admin-only nav items
+const adminNavItems: NavItem[] = [
+  { name: 'Users', href: '/users', icon: UilUser },
+]
+
 // Tech users only see their schedule
 const techNavItems: NavItem[] = [
   { name: 'My Schedule', href: '/tech-schedule', icon: UilCalendarAlt },
@@ -47,10 +53,11 @@ interface SidebarProps {
 
 export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
   const [isTechUser, setIsTechUser] = useState(false)
   
   useEffect(() => {
-    // Get user role from JWT token
+    // Get user info from JWT token
     try {
       const token = localStorage.getItem('token')
       if (token) {
@@ -58,10 +65,11 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
         if (parts.length === 3) {
           const payload = JSON.parse(atob(parts[1]))
           const role = payload.role || null
-          const username = payload.username || null
+          const usernameFromToken = payload.username || null
           setUserRole(role)
+          setUsername(usernameFromToken)
           // Check if user is a tech user (max or northwynd)
-          setIsTechUser(username === 'max' || username === 'northwynd')
+          setIsTechUser(usernameFromToken === 'max' || usernameFromToken === 'northwynd')
         }
       }
     } catch (error) {
@@ -69,8 +77,12 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
     }
   }, [])
   
-  // Use tech nav items for tech users, otherwise use full nav
-  const displayNavItems = isTechUser ? techNavItems : navItems
+  // Use tech nav items for tech users, otherwise use full nav + admin items if admin
+  const displayNavItems = isTechUser 
+    ? techNavItems 
+    : userRole === 'admin' 
+      ? [...navItems, ...adminNavItems]
+      : navItems
   const pathname = usePathname()
   const { currentTenant } = useTenant()
   const [signalCounts, setSignalCounts] = useState<{ reviews: number; marketing: number; dispatch: number }>({
@@ -248,12 +260,25 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
         padding: '16px',
         borderTop: '1px solid var(--color-border)',
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '12px 16px',
-        }}>
+        <Link
+          href="/profile"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            transition: 'all 0.2s',
+            marginBottom: '8px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }}
+        >
           <div style={{
             width: '40px',
             height: '40px',
@@ -262,21 +287,80 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0
           }}>
             <UilUser size="20" color="#ffffff" />
           </div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: '14px',
               fontWeight: '500',
               color: 'var(--color-text-primary)',
-            }}>Admin User</div>
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {username || 'User'}
+            </div>
             <div style={{
               fontSize: '12px',
               color: 'var(--color-text-secondary)',
-            }}>Operations Manager</div>
+              textTransform: 'capitalize'
+            }}>
+              {userRole || 'User'}
+            </div>
           </div>
-        </div>
+        </Link>
+        <button
+          onClick={async () => {
+            try {
+              const token = localStorage.getItem('token')
+              if (token) {
+                const headers = { 'Authorization': `Bearer ${token}` }
+                await axios.post(`${API_BASE_URL}/logout`, {}, {
+                  headers,
+                  withCredentials: true
+                })
+              }
+            } catch (err) {
+              // Ignore logout errors
+            } finally {
+              localStorage.removeItem('token')
+              window.location.href = '/login'
+            }
+          }}
+          style={{
+            width: '100%',
+            padding: '8px 16px',
+            backgroundColor: 'transparent',
+            border: '1px solid var(--color-border)',
+            borderRadius: '8px',
+            color: 'var(--color-text-secondary)',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+            e.currentTarget.style.color = 'var(--color-text-primary)'
+            e.currentTarget.style.borderColor = 'var(--color-primary)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+            e.currentTarget.style.color = 'var(--color-text-secondary)'
+            e.currentTarget.style.borderColor = 'var(--color-border)'
+          }}
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Log Out
+        </button>
       </div>
     </aside>
     </>

@@ -265,6 +265,18 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
             detail=error_message
         )
 
+@router.post('/logout')
+async def logout(response: Response, current_user: CurrentUser = Depends(get_current_user)):
+    """Logout endpoint - clears authentication cookie"""
+    # Clear the httpOnly cookie
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="lax"
+    )
+    return {"message": "Logged out successfully"}
+
 @router.get('/health')
 async def health():
     return {"status":"ok"}
@@ -551,12 +563,31 @@ async def create_user(
     if current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can create users")
     
+    # Validate password strength
+    from ..core.password import validate_password_strength
+    is_valid, error_msg = validate_password_strength(user_in.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
     # Check if username already exists
     result = await db.execute(
         select(models.User).where(models.User.username == user_in.username)
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Username already exists")
+    
+    # Check if email already exists (if provided)
+    if user_in.email:
+        email_result = await db.execute(
+            select(models.User).where(models.User.email == user_in.email)
+        )
+        if email_result.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Email already exists")
+    
+    # Validate role
+    valid_roles = ['admin', 'user', 'viewer']
+    if user_in.role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Role must be one of: {', '.join(valid_roles)}")
     
     # Create user
     user = models.User(
@@ -648,6 +679,11 @@ async def update_user(
     
     # Handle password update
     if "password" in update_data:
+        # Validate password strength
+        from ..core.password import validate_password_strength
+        is_valid, error_msg = validate_password_strength(update_data["password"])
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
         update_data["hashed_password"] = hash_password(update_data.pop("password"))
     
     for field, value in update_data.items():
