@@ -149,15 +149,15 @@ async def get_overdue_recovery_tickets(
     """Get recovery tickets that are open/in_progress and older than 7 days"""
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
     
-    query = select(models.RecoveryTicket).where(
-        and_(
-            models.RecoveryTicket.status.in_(['open', 'in_progress']),
-            models.RecoveryTicket.created_at < seven_days_ago
-        )
-    )
+    conditions = [
+        models.RecoveryTicket.status.in_(['open', 'in_progress']),
+        models.RecoveryTicket.created_at < seven_days_ago
+    ]
     
     if tenant_id:
-        query = query.where(models.RecoveryTicket.tenant_id == tenant_id)
+        conditions.append(models.RecoveryTicket.tenant_id == tenant_id)
+    
+    query = select(models.RecoveryTicket).where(and_(*conditions))
     
     result = await db.execute(query)
     tickets = result.scalars().all()
