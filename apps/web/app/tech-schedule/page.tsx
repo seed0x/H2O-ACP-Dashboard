@@ -7,6 +7,8 @@ import { API_BASE_URL } from '../../lib/config'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { WorkflowStepper } from '../../components/ui/WorkflowStepper'
+import { Card } from '../../components/ui/Card'
 import { showToast } from '../../components/Toast'
 import { handleApiError, logError } from '../../lib/error-handler'
 
@@ -42,6 +44,7 @@ export default function TechSchedulePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [techUsername, setTechUsername] = useState<string>('')
+  const [expandedCallId, setExpandedCallId] = useState<string | null>(null)
   const isInitialLoad = useRef(true)
 
   // Get username from JWT token
@@ -223,27 +226,23 @@ export default function TechSchedulePage() {
 
       {/* Schedule Items */}
       {scheduleItems.length === 0 ? (
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '48px',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              fontSize: '18px',
-              color: 'var(--color-text-secondary)',
-              marginBottom: '8px'
-            }}>
-              No appointments scheduled for today
+          <Card>
+            <div style={{ padding: '48px', textAlign: 'center' }}>
+              <div style={{
+                fontSize: '18px',
+                color: 'var(--color-text-secondary)',
+                marginBottom: '8px'
+              }}>
+                No appointments scheduled for today
+              </div>
+              <div style={{
+                fontSize: '14px',
+                color: 'var(--color-text-tertiary)'
+              }}>
+                All clear! 🎉
+              </div>
             </div>
-            <div style={{
-              fontSize: '14px',
-              color: 'var(--color-text-tertiary)'
-            }}>
-              All clear! 🎉
-            </div>
-          </div>
+          </Card>
         ) : (
           <div style={{
             display: 'flex',
@@ -251,105 +250,139 @@ export default function TechSchedulePage() {
             gap: '16px'
           }}>
             {scheduleItems.map((item) => (
-              <div
+              <Card
                 key={item.id}
-                onClick={() => router.push(`/service-calls/${item.id}`)}
                 style={{
-                  backgroundColor: 'var(--color-card)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  cursor: 'pointer',
+                  cursor: 'default',
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-border)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
               >
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '80px 1fr auto',
-                  gap: '20px',
-                  alignItems: 'start'
-                }}>
-                  {/* Time */}
+                <div
+                  onClick={() => {
+                    // Toggle workflow expansion, or navigate if not starting workflow
+                    if (item.status === 'Scheduled' || item.status === 'In Progress') {
+                      setExpandedCallId(expandedCallId === item.id ? null : item.id)
+                    } else {
+                      router.push(`/service-calls/${item.id}`)
+                    }
+                  }}
+                  style={{
+                    cursor: 'pointer'
+                  }}
+                >
                   <div style={{
-                    textAlign: 'center',
-                    padding: '12px',
-                    backgroundColor: 'var(--color-hover)',
-                    borderRadius: '8px'
+                    display: 'grid',
+                    gridTemplateColumns: '80px 1fr auto',
+                    gap: '20px',
+                    alignItems: 'start'
                   }}>
+                    {/* Time */}
                     <div style={{
-                      fontSize: '20px',
-                      fontWeight: '700',
-                      color: 'var(--color-primary)'
+                      textAlign: 'center',
+                      padding: '12px',
+                      backgroundColor: 'var(--color-hover)',
+                      borderRadius: '8px'
                     }}>
-                      {formatTime(item.scheduled_start)}
+                      <div style={{
+                        fontSize: '20px',
+                        fontWeight: '700',
+                        color: 'var(--color-primary)'
+                      }}>
+                        {formatTime(item.scheduled_start)}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Customer Info */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      fontSize: '18px',
-                      fontWeight: '600',
-                      color: 'var(--color-text-primary)',
-                      marginBottom: '8px'
-                    }}>
-                      {item.customer_name}
-                    </div>
-                    <div style={{
-                      fontSize: '14px',
-                      color: 'var(--color-text-secondary)',
-                      marginBottom: '4px'
-                    }}>
-                      📍 {item.address_line1}, {item.city}
-                    </div>
-                    {item.phone && (
+                    {/* Customer Info */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: 'var(--color-text-primary)',
+                        marginBottom: '8px'
+                      }}>
+                        {item.customer_name}
+                      </div>
                       <div style={{
                         fontSize: '14px',
                         color: 'var(--color-text-secondary)',
-                        marginBottom: '8px'
+                        marginBottom: '4px'
                       }}>
-                        📞 {item.phone}
+                        📍 {item.address_line1}, {item.city}
                       </div>
-                    )}
-                    <div style={{
-                      fontSize: '14px',
-                      color: 'var(--color-text-tertiary)',
-                      marginTop: '8px',
-                      lineHeight: '1.5'
-                    }}>
-                      {item.issue_description}
+                      {item.phone && (
+                        <div style={{
+                          fontSize: '14px',
+                          color: 'var(--color-text-secondary)',
+                          marginBottom: '8px'
+                        }}>
+                          📞 {item.phone}
+                        </div>
+                      )}
+                      <div style={{
+                        fontSize: '14px',
+                        color: 'var(--color-text-tertiary)',
+                        marginTop: '8px',
+                        lineHeight: '1.5'
+                      }}>
+                        {item.issue_description}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Status & Priority */}
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    alignItems: 'flex-end'
-                  }}>
-                    <StatusBadge status={item.status} />
+                    {/* Status & Priority */}
                     <div style={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      backgroundColor: item.priority === 'High' ? '#ef444420' : item.priority === 'Normal' ? '#f59e0b20' : '#10b98120',
-                      color: item.priority === 'High' ? '#ef4444' : item.priority === 'Normal' ? '#f59e0b' : '#10b981'
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      alignItems: 'flex-end'
                     }}>
-                      {item.priority} Priority
+                      <StatusBadge status={item.status} />
+                      <div style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        backgroundColor: item.priority === 'High' ? '#ef444420' : item.priority === 'Normal' ? '#f59e0b20' : '#10b98120',
+                        color: item.priority === 'High' ? '#ef4444' : item.priority === 'Normal' ? '#f59e0b' : '#10b981'
+                      }}>
+                        {item.priority} Priority
+                      </div>
+                      {(item.status === 'Scheduled' || item.status === 'In Progress') && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExpandedCallId(expandedCallId === item.id ? null : item.id)
+                          }}
+                        >
+                          {expandedCallId === item.id ? 'Hide Workflow' : 'Start Workflow'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
-              </div>
+
+                {/* Expanded Workflow Section */}
+                {expandedCallId === item.id && (item.status === 'Scheduled' || item.status === 'In Progress') && (
+                  <div 
+                    style={{
+                      marginTop: '24px',
+                      paddingTop: '24px',
+                      borderTop: '1px solid var(--color-border)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <WorkflowStepper 
+                      serviceCallId={item.id}
+                      onComplete={() => {
+                        showToast('Workflow completed!', 'success')
+                        setExpandedCallId(null)
+                        loadTodaysSchedule(true) // Refresh schedule silently
+                      }}
+                    />
+                  </div>
+                )}
+              </Card>
             ))}
           </div>
         )}
