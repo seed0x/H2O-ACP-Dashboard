@@ -23,6 +23,7 @@ export default function Dashboard() {
   })
   const [overdueItems, setOverdueItems] = useState<any[]>([])
   const [openTasks, setOpenTasks] = useState<any[]>([])
+  const [bidFollowUps, setBidFollowUps] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -84,18 +85,86 @@ export default function Dashboard() {
         } catch (e) { console.error('Failed to load overdue tickets:', e) }
       }
       
-      // Load bids for "sold this week"
+      // Load bids for "sold this week" and follow-ups
       try {
-        const res = await axios.get(`${API_BASE_URL}/bids`, { headers, withCredentials: true })
+        const res = await axios.get(`${API_BASE_URL}/bids`, { 
+          headers, 
+          params: { limit: 100 },
+          withCredentials: true 
+        })
         bids = res.data || []
       } catch (e) { console.error('Failed to load bids:', e) }
       
-      // Calculate sold this week (bids with status 'Accepted' updated this week)
+      // Calculate sold this week (bids with status 'Won' updated this week)
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
       const soldThisWeek = bids.filter((b: any) => 
-        b.status === 'Accepted' && new Date(b.updated_at) >= weekAgo
+        b.status === 'Won' && new Date(b.updated_at) >= weekAgo
       ).length
+      
+      // Find bids that need follow-up
+      const now = new Date()
+      const followUpBids: any[] = []
+      
+      for (const bid of bids) {
+        // Overdue bids (due_date passed, not Won/Lost)
+        if (bid.due_date && bid.status !== 'Won' && bid.status !== 'Lost') {
+          const dueDate = new Date(bid.due_date)
+          if (dueDate < now) {
+            const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+            followUpBids.push({
+              ...bid,
+              followUpReason: 'overdue',
+              daysOverdue,
+              priority: 'high'
+            })
+            continue
+          }
+        }
+        
+        // Sent bids that haven't been updated in 7+ days (need follow-up)
+        if (bid.status === 'Sent' && bid.sent_date) {
+          const sentDate = new Date(bid.sent_date)
+          const daysSinceSent = Math.floor((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24))
+          if (daysSinceSent >= 7) {
+            followUpBids.push({
+              ...bid,
+              followUpReason: 'sent_no_response',
+              daysSinceSent,
+              priority: 'medium'
+            })
+            continue
+          }
+        }
+        
+        // Draft bids approaching due date (within 3 days)
+        if (bid.status === 'Draft' && bid.due_date) {
+          const dueDate = new Date(bid.due_date)
+          const daysUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          if (daysUntilDue >= 0 && daysUntilDue <= 3) {
+            followUpBids.push({
+              ...bid,
+              followUpReason: 'approaching_due',
+              daysUntilDue,
+              priority: 'medium'
+            })
+            continue
+          }
+        }
+      }
+      
+      // Sort by priority (high first) then by days
+      followUpBids.sort((a, b) => {
+        const priorityOrder = { high: 0, medium: 1, low: 2 }
+        if (priorityOrder[a.priority as keyof typeof priorityOrder] !== priorityOrder[b.priority as keyof typeof priorityOrder]) {
+          return priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder]
+        }
+        const aDays = a.daysOverdue || a.daysSinceSent || a.daysUntilDue || 0
+        const bDays = b.daysOverdue || b.daysSinceSent || b.daysUntilDue || 0
+        return bDays - aDays
+      })
+      
+      setBidFollowUps(followUpBids.slice(0, 5))
       
       // Open tasks = jobs not completed + service calls not completed
       const openJobTasks = jobs.filter((j: any) => j.status !== 'Completed')
@@ -212,11 +281,12 @@ export default function Dashboard() {
         <Dataflow />
       </div>
 
-      {/* Two Column Layout */}
+      {/* Three Column Layout */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-        gap: '24px'
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+        gap: '24px',
+        marginBottom: '24px'
       }}>
         {/* Left Column - Open Tasks */}
         <div style={{
@@ -270,6 +340,95 @@ export default function Dashboard() {
                   </span>
                 </a>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Middle Column - Bids Pipeline */}
+        <div style={{
+          backgroundColor: bidFollowUps.length > 0 ? 'rgba(96, 165, 250, 0.05)' : 'var(--color-card)',
+          border: `1px solid ${bidFollowUps.length > 0 ? '#60A5FA' : 'var(--color-border)'}`,
+          borderRadius: '12px',
+          padding: '20px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              📋 Bids Pipeline
+            </h2>
+            <a href="/bids" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
+          </div>
+          {bidFollowUps.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+              ✓ No bids need follow-up
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {bidFollowUps.map((bid: any) => {
+                let reasonText = ''
+                let reasonColor = 'var(--color-text-secondary)'
+                let borderColor = '#60A5FA'
+                
+                if (bid.followUpReason === 'overdue') {
+                  reasonText = `${bid.daysOverdue} day${bid.daysOverdue !== 1 ? 's' : ''} overdue`
+                  reasonColor = '#EF5350'
+                  borderColor = '#EF5350'
+                } else if (bid.followUpReason === 'sent_no_response') {
+                  reasonText = `Sent ${bid.daysSinceSent} day${bid.daysSinceSent !== 1 ? 's' : ''} ago`
+                  reasonColor = '#FF9800'
+                  borderColor = '#FF9800'
+                } else if (bid.followUpReason === 'approaching_due') {
+                  reasonText = `Due in ${bid.daysUntilDue} day${bid.daysUntilDue !== 1 ? 's' : ''}`
+                  reasonColor = '#FF9800'
+                  borderColor = '#FF9800'
+                }
+                
+                return (
+                  <a
+                    key={bid.id}
+                    href={`/bids/${bid.id}`}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      padding: '12px',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      textDecoration: 'none',
+                      borderLeft: `3px solid ${borderColor}`,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateX(4px)'
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateX(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', fontSize: '14px', marginBottom: '4px' }}>
+                      {bid.project_name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: reasonColor, marginBottom: '2px' }}>
+                      {reasonText}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: '500',
+                        backgroundColor: bid.status === 'Sent' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(158, 158, 158, 0.15)',
+                        color: bid.status === 'Sent' ? '#4CAF50' : '#9E9E9E'
+                      }}>
+                        {bid.status}
+                      </span>
+                      {bid.amount_cents && (
+                        <span>• ${(bid.amount_cents / 100).toFixed(2)}</span>
+                      )}
+                    </div>
+                  </a>
+                )
+              })}
             </div>
           )}
         </div>
