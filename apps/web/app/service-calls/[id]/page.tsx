@@ -10,8 +10,22 @@ import { Input } from '../../../components/ui/Input'
 import { Select } from '../../../components/ui/Select'
 import { Textarea } from '../../../components/ui/Textarea'
 import { WorkflowStepper } from '../../../components/ui/WorkflowStepper'
+import { Card, CardHeader, CardSection } from '../../../components/ui/Card'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
+import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
+import UilUser from '@iconscout/react-unicons/icons/uil-user'
+import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
+import UilPhone from '@iconscout/react-unicons/icons/uil-phone'
+import UilEnvelope from '@iconscout/react-unicons/icons/uil-envelope'
+import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
+import UilClock from '@iconscout/react-unicons/icons/uil-clock'
+import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+
+// Icon component wrapper for consistent sizing
+function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
+  return <Icon size={size} color={color} />
+}
 
 interface ServiceCall {
   id: string
@@ -272,42 +286,84 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
 
       {/* Overdue Alert */}
       {isOverdue && (
-        <div style={{
-          padding: '16px',
-          backgroundColor: 'rgba(239, 83, 80, 0.1)',
-          border: '1px solid #EF5350',
-          borderRadius: '8px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
+        <Card padding="md" className="mb-6" style={{ 
+          backgroundColor: 'var(--color-error-bg)', 
+          borderColor: 'var(--color-error)',
+          borderWidth: '1px',
+          borderStyle: 'solid'
         }}>
-          <span style={{ fontSize: '24px' }}>⚠️</span>
-          <div>
-            <div style={{ fontWeight: '600', color: '#EF5350', marginBottom: '4px' }}>
-              Overdue by {daysOverdue} day{daysOverdue !== 1 ? 's' : ''}
-            </div>
-            <div style={{ fontSize: '14px', color: '#EF5350' }}>
-              Scheduled end: {sc.scheduled_end ? new Date(sc.scheduled_end).toLocaleDateString() : 'Not set'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <IconWrapper Icon={UilExclamationTriangle} size={24} color="var(--color-error)" />
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--color-error)', marginBottom: '4px' }}>
+                Overdue by {daysOverdue} day{daysOverdue !== 1 ? 's' : ''}
+              </div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-error)' }}>
+                Scheduled end: {sc.scheduled_end ? new Date(sc.scheduled_end).toLocaleDateString() : 'Not set'}
+              </div>
             </div>
           </div>
-        </div>
+        </Card>
       )}
+
+      {/* Key Info Cards */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        <Card padding="sm">
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+            Status
+          </div>
+          <StatusBadge status={status || sc.status} />
+        </Card>
+        
+        <Card padding="sm">
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+            Priority
+          </div>
+          <StatusBadge status={priority || sc.priority} variant="priority" />
+        </Card>
+        
+        {assignedTo && (
+          <Card padding="sm">
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+              Assigned To
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconWrapper Icon={UilUser} size={18} />
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                {assignedTo}
+              </span>
+            </div>
+          </Card>
+        )}
+        
+        {scheduledStartDate && (
+          <Card padding="sm">
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+              Scheduled
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconWrapper Icon={UilCalendarAlt} size={18} />
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                {new Date(scheduledStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {scheduledStartTime && ` • ${scheduledStartTime}`}
+              </span>
+            </div>
+          </Card>
+        )}
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
         {/* Status & Priority */}
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
-          padding: '24px'
-        }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-            Status & Priority
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <Card>
+          <CardHeader title="Status & Priority" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Status
               </label>
               <Select
@@ -324,7 +380,7 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Priority
               </label>
               <Select
@@ -332,14 +388,14 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
                 onChange={(e) => setPriority(e.target.value)}
                 options={[
                   { value: 'Low', label: 'Low' },
-                  { value: 'Medium', label: 'Medium' },
+                  { value: 'Normal', label: 'Normal' },
                   { value: 'High', label: 'High' },
                   { value: 'Emergency', label: 'Emergency' }
                 ]}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Assigned To (Owner)
               </label>
               <Input
@@ -348,100 +404,106 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
                 placeholder="Owner/assignee name"
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Current Status
-              </label>
-              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <StatusBadge status={sc.status} />
-                <StatusBadge status={sc.priority} variant="priority" />
-              </div>
-            </div>
-            {sc.assigned_to && (
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Current Owner
-                </div>
-                <div style={{ fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
-                  {sc.assigned_to}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+        </Card>
 
         {/* Customer Information */}
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
-          padding: '24px'
-        }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-            Customer Information
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <Card>
+          <CardHeader title="Customer Information" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
                 Name
               </div>
-              <div style={{ fontSize: '16px', fontWeight: '500', color: 'var(--color-text-primary)' }}>
+              <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
                 {sc.customer_name}
               </div>
             </div>
             {sc.phone && (
               <div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
                   Phone
                 </div>
-                <a href={`tel:${sc.phone}`} style={{ fontSize: '16px', color: 'var(--color-primary)', textDecoration: 'none' }}>
-                  📞 {sc.phone}
+                <a 
+                  href={`tel:${sc.phone}`} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px',
+                    fontSize: 'var(--text-base)', 
+                    color: 'var(--color-primary)', 
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  <IconWrapper Icon={UilPhone} size={16} color="var(--color-primary)" />
+                  {sc.phone}
                 </a>
               </div>
             )}
             {sc.email && (
               <div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
                   Email
                 </div>
-                <a href={`mailto:${sc.email}`} style={{ fontSize: '16px', color: 'var(--color-primary)', textDecoration: 'none' }}>
-                  ✉️ {sc.email}
+                <a 
+                  href={`mailto:${sc.email}`} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px',
+                    fontSize: 'var(--text-base)', 
+                    color: 'var(--color-primary)', 
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  <IconWrapper Icon={UilEnvelope} size={16} color="var(--color-primary)" />
+                  {sc.email}
                 </a>
               </div>
             )}
             <div>
-              <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
                 Address
               </div>
-              <div style={{ fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
-                {sc.address_line1}<br />
-                {sc.city}, {sc.state} {sc.zip}
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'start', gap: '6px' }}>
+                <IconWrapper Icon={UilMapMarker} size={16} />
+                <span>
+                  {sc.address_line1}<br />
+                  {sc.city}, {sc.state} {sc.zip}
+                </span>
               </div>
               <a 
                 href={`https://www.google.com/maps/search/${encodeURIComponent(sc.address_line1 + ' ' + sc.city + ' ' + sc.state)}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: '14px', color: 'var(--color-primary)', textDecoration: 'none' }}
+                style={{ 
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: 'var(--text-sm)', 
+                  color: 'var(--color-primary)', 
+                  textDecoration: 'none'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
               >
-                🗺️ Open in Google Maps
+                <IconWrapper Icon={UilMapMarker} size={14} color="var(--color-primary)" />
+                Open in Google Maps
               </a>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Scheduling */}
-        <div style={{
-          backgroundColor: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
-          padding: '24px'
-        }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-            Scheduling
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
+        <Card>
+          <CardHeader title="Scheduling" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <CardSection>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Scheduled Start
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
@@ -456,9 +518,9 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
                   onChange={(e) => setScheduledStartTime(e.target.value)}
                 />
               </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
+            </CardSection>
+            <CardSection>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Scheduled End
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
@@ -473,69 +535,50 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
                   onChange={(e) => setScheduledEndTime(e.target.value)}
                 />
               </div>
-            </div>
+            </CardSection>
           </div>
-        </div>
+        </Card>
 
         {/* Builder Information */}
         {builder && (
-          <div style={{
-            backgroundColor: 'var(--color-card)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-              Builder
-            </h2>
-            <div style={{ fontSize: '16px', fontWeight: '500', color: 'var(--color-text-primary)' }}>
-              {builder.name}
+          <Card>
+            <CardHeader title="Builder" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconWrapper Icon={UilFileAlt} size={18} />
+              <div style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                {builder.name}
+              </div>
             </div>
-          </div>
+          </Card>
         )}
       </div>
 
       {/* Issue Description */}
-      <div style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px'
-      }}>
-        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
-          Issue Description
-        </h2>
+      <Card className="mb-6">
+        <CardHeader title="Issue Description" />
         <div style={{ 
           padding: '16px', 
-          backgroundColor: 'var(--color-hover)', 
-          borderRadius: '8px',
-          fontSize: '14px',
+          backgroundColor: 'var(--color-surface-elevated)', 
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--text-sm)',
           color: 'var(--color-text-primary)',
-          whiteSpace: 'pre-wrap'
+          whiteSpace: 'pre-wrap',
+          lineHeight: 1.6
         }}>
           {sc.issue_description}
         </div>
-      </div>
+      </Card>
 
       {/* Notes Section */}
-      <div style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px'
-      }}>
-        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
-          Notes
-        </h2>
+      <Card className="mb-6">
+        <CardHeader title="Notes" />
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Service call notes and updates..."
           rows={6}
         />
-      </div>
+      </Card>
 
       {/* Completion Workflow */}
       {(sc.status === 'In Progress' || sc.status === 'Completed') && (
@@ -551,119 +594,101 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       )}
 
       {/* Suggested Portals */}
-      <div style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-            Suggested Portals
-          </h2>
-          <Button
-            variant="secondary"
-            onClick={() => router.push('/directory')}
-            style={{ fontSize: '13px', padding: '6px 12px' }}
-          >
-            View All
-          </Button>
-        </div>
-        {loadingPortals ? (
-          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
-            Loading portals...
-          </div>
-        ) : suggestedPortals.length === 0 ? (
-          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
-            No portals suggested for this service call
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {suggestedPortals.slice(0, 3).map(portal => (
-              <div key={portal.id} style={{
-                padding: '16px',
-                backgroundColor: 'var(--color-background)',
-                borderRadius: '8px',
-                border: '1px solid var(--color-border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '500', marginBottom: '4px', color: 'var(--color-text-primary)' }}>
-                    {portal.portal_definition.name}
+      {suggestedPortals.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader 
+            title="Suggested Portals"
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push('/directory')}
+              >
+                View All
+              </Button>
+            }
+          />
+          {loadingPortals ? (
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: '32px' }}>
+              Loading portals...
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {suggestedPortals.slice(0, 3).map(portal => (
+                <div key={portal.id} style={{
+                  padding: '12px',
+                  backgroundColor: 'var(--color-surface-elevated)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500, marginBottom: '4px', color: 'var(--color-text-primary)' }}>
+                      {portal.portal_definition.name}
+                    </div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {portal.portal_definition.jurisdiction && <span>{portal.portal_definition.jurisdiction}</span>}
+                      <StatusBadge status={portal.portal_definition.category} variant="category" />
+                      {portal.login_identifier && <span>{portal.login_identifier}</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                    {portal.portal_definition.jurisdiction && `${portal.portal_definition.jurisdiction} • `}
-                    <StatusBadge status={portal.portal_definition.category} variant="category" />
-                    {' • '}
-                    {portal.login_identifier}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
                   <Button
                     variant="primary"
+                    size="sm"
                     onClick={() => window.open(portal.portal_definition.base_url, '_blank', 'noopener,noreferrer')}
-                    style={{ fontSize: '12px', padding: '6px 12px' }}
                   >
                     Open
                   </Button>
                 </div>
-              </div>
-            ))}
-            {suggestedPortals.length > 3 && (
-              <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                <Button
-                  variant="secondary"
-                  onClick={() => router.push('/directory')}
-                  style={{ fontSize: '13px' }}
-                >
-                  View all {suggestedPortals.length} matching portals
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              ))}
+              {suggestedPortals.length > 3 && (
+                <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => router.push('/directory')}
+                  >
+                    View all {suggestedPortals.length} matching portals
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Timeline / Audit */}
-      <div style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '24px'
-      }}>
-        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-          Activity Timeline
-        </h2>
+      <Card>
+        <CardHeader title="Activity Timeline" />
         {audit.length === 0 ? (
-          <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
+          <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: '32px' }}>
             No activity recorded
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {audit.map((log, index) => (
+            {audit.map((log) => (
               <div key={log.id} style={{
-                padding: '16px',
-                backgroundColor: index % 2 === 0 ? 'transparent' : 'var(--color-hover)',
-                borderRadius: '6px',
+                padding: '12px',
+                backgroundColor: 'var(--color-surface-elevated)',
+                borderRadius: 'var(--radius-md)',
                 borderLeft: '3px solid var(--color-primary)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                  <div style={{ fontWeight: '500', color: 'var(--color-text-primary)' }}>
+                  <div style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>
                     {log.action} {log.field ? `(${log.field})` : ''}
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
                     {new Date(log.changed_at).toLocaleString()}
                   </div>
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
                   by {log.changed_by}
                 </div>
                 {log.old_value && log.new_value && (
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
                     {log.old_value} → {log.new_value}
                   </div>
                 )}
@@ -671,7 +696,7 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
