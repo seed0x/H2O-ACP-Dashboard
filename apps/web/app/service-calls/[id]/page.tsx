@@ -249,16 +249,41 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <div style={{ color: 'var(--color-text-secondary)' }}>Loading service call...</div>
+      <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div 
+          className="animate-spin rounded-full border-4 border-t-transparent"
+          style={{
+            width: '40px',
+            height: '40px',
+            borderColor: 'var(--color-border)',
+            borderTopColor: 'var(--color-primary)',
+            margin: '0 auto 16px'
+          }}
+        />
+        <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+          Loading service call...
+        </p>
       </div>
     )
   }
 
   if (!sc) {
     return (
-      <div style={{ padding: '32px' }}>
-        <div style={{ color: '#EF5350', marginBottom: '16px' }}>Service call not found</div>
+      <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ 
+          padding: '24px',
+          backgroundColor: 'var(--color-error-bg)',
+          border: '1px solid var(--color-error)',
+          borderRadius: 'var(--radius-lg)',
+          marginBottom: '16px'
+        }}>
+          <p style={{ color: 'var(--color-error)', fontSize: 'var(--text-base)', fontWeight: 500, marginBottom: '8px' }}>
+            Service call not found
+          </p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+            The service call you're looking for doesn't exist or may have been deleted.
+          </p>
+        </div>
         <Button onClick={() => router.push('/service-calls')}>Back to Service Calls</Button>
       </div>
     )

@@ -222,9 +222,16 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div style={{ padding: isMobile ? '16px' : '32px' }}>
+      <div style={{ padding: isMobile ? '16px' : '32px', maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ width: '300px', height: '36px', backgroundColor: 'var(--color-hover)', borderRadius: '8px', marginBottom: '8px', animation: 'skeleton-pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ 
+            width: '300px', 
+            height: '36px', 
+            backgroundColor: 'var(--color-surface-elevated)', 
+            borderRadius: 'var(--radius-md)', 
+            marginBottom: '8px', 
+            animation: 'skeleton-pulse 1.5s ease-in-out infinite' 
+          }} />
         </div>
         <StatSkeleton count={5} />
       </div>

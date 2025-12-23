@@ -27,12 +27,13 @@ export function Table<T extends { id: string | number }>({
   if (data.length === 0) {
     return (
       <div style={{
-        backgroundColor: 'var(--color-card)',
+        backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-lg)',
         padding: '48px',
         textAlign: 'center',
-        color: 'var(--color-text-secondary)'
+        color: 'var(--color-text-secondary)',
+        fontSize: 'var(--text-sm)'
       }}>
         {emptyMessage}
       </div>

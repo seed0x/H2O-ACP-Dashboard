@@ -17,8 +17,8 @@ export function Skeleton({
       style={{
         width,
         height,
-        backgroundColor: 'var(--color-hover)',
-        borderRadius: '4px',
+        backgroundColor: 'var(--color-surface-elevated)',
+        borderRadius: 'var(--radius-sm)',
         animation: 'skeleton-pulse 1.5s ease-in-out infinite',
         ...style
       }}

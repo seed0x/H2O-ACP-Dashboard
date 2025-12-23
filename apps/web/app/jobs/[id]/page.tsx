@@ -329,16 +329,41 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <div style={{ color: 'var(--color-text-secondary)' }}>Loading job...</div>
+      <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div 
+          className="animate-spin rounded-full border-4 border-t-transparent"
+          style={{
+            width: '40px',
+            height: '40px',
+            borderColor: 'var(--color-border)',
+            borderTopColor: 'var(--color-primary)',
+            margin: '0 auto 16px'
+          }}
+        />
+        <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+          Loading job...
+        </p>
       </div>
     )
   }
 
   if (!job) {
     return (
-      <div style={{ padding: '32px' }}>
-        <div style={{ color: '#EF5350', marginBottom: '16px' }}>Job not found</div>
+      <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ 
+          padding: '24px',
+          backgroundColor: 'var(--color-error-bg)',
+          border: '1px solid var(--color-error)',
+          borderRadius: 'var(--radius-lg)',
+          marginBottom: '16px'
+        }}>
+          <p style={{ color: 'var(--color-error)', fontSize: 'var(--text-base)', fontWeight: 500, marginBottom: '8px' }}>
+            Job not found
+          </p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+            The job you're looking for doesn't exist or may have been deleted.
+          </p>
+        </div>
         <Button onClick={() => router.push('/jobs')}>Back to Jobs</Button>
       </div>
     )

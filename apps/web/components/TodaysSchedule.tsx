@@ -147,27 +147,19 @@ export function TodaysSchedule() {
   if (loading) {
     return (
       <div style={{
-        backgroundColor: 'var(--color-card)',
+        backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-lg)',
         padding: '24px'
       }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px',
+        <h2 style={{
+          fontSize: 'var(--text-lg)',
+          fontWeight: 600,
+          color: 'var(--color-text-primary)',
           marginBottom: '20px'
         }}>
-          <span style={{ fontSize: '20px' }}>📅</span>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: 'var(--color-text-primary)',
-            margin: 0
-          }}>
-            Today's Schedule
-          </h2>
-        </div>
+          Today's Schedule
+        </h2>
         <div style={{ 
           display: 'flex', 
           flexDirection: 'column', 
@@ -178,8 +170,8 @@ export function TodaysSchedule() {
               key={i}
               style={{
                 height: '80px',
-                backgroundColor: 'var(--color-hover)',
-                borderRadius: '8px',
+                backgroundColor: 'var(--color-surface-elevated)',
+                borderRadius: 'var(--radius-md)',
                 animation: 'skeleton-pulse 1.5s ease-in-out infinite'
               }}
             />
@@ -198,7 +190,6 @@ export function TodaysSchedule() {
         padding: '48px',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
         <div style={{ 
           fontSize: '18px', 
           fontWeight: '600', 
@@ -326,7 +317,7 @@ export function TodaysSchedule() {
                 color: '#EF5350',
                 fontSize: '18px'
               }}>
-                ⚠️
+                <span style={{ color: 'var(--color-warning)' }}>!</span>
               </div>
               <div>
                 <div style={{

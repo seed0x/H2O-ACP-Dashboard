@@ -16,9 +16,10 @@ export function StatSkeleton({ count = 4 }: StatSkeletonProps) {
         <div
           key={index}
           style={{
-            backgroundColor: 'var(--color-card)',
+            backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
-            borderRadius: '12px',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-sm)',
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',

@@ -184,12 +184,19 @@ export default function TechSchedulePage() {
           action={<Button onClick={() => router.push('/')}>← Back</Button>}
         />
         <div style={{
-          backgroundColor: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '12px',
+          backgroundColor: 'var(--color-error-bg)',
+          border: '1px solid var(--color-error)',
+          borderRadius: 'var(--radius-lg)',
           padding: '24px'
         }}>
-          <div style={{ color: '#ef4444', marginBottom: '16px' }}>Error: {error}</div>
+          <div style={{ 
+            color: 'var(--color-error)', 
+            fontSize: 'var(--text-base)', 
+            fontWeight: 500,
+            marginBottom: '16px' 
+          }}>
+            Error: {error}
+          </div>
           <Button onClick={() => loadTodaysSchedule()}>Retry</Button>
         </div>
       </div>
@@ -205,12 +212,9 @@ export default function TechSchedulePage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button 
               onClick={() => loadTodaysSchedule()}
-              style={{ 
-                backgroundColor: 'var(--color-hover)',
-                color: 'var(--color-text-primary)'
-              }}
+              variant="secondary"
             >
-              🔄 Refresh
+              Refresh
             </Button>
             <Button onClick={() => router.push('/')}>← Back to Dashboard</Button>
           </div>

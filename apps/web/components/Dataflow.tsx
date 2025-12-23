@@ -109,8 +109,26 @@ export function Dataflow() {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
-        Loading signals...
+      <div style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '48px',
+        textAlign: 'center'
+      }}>
+        <div 
+          className="animate-spin rounded-full border-4 border-t-transparent"
+          style={{
+            width: '40px',
+            height: '40px',
+            borderColor: 'var(--color-border)',
+            borderTopColor: 'var(--color-primary)',
+            margin: '0 auto 16px'
+          }}
+        />
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+          Loading signals...
+        </p>
       </div>
     )
   }
@@ -118,18 +136,23 @@ export function Dataflow() {
   if (signals.length === 0) {
     return (
       <div style={{
-        backgroundColor: 'var(--color-card)',
+        backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-lg)',
         padding: '48px',
-        textAlign: 'center',
-        color: 'var(--color-text-secondary)'
+        textAlign: 'center'
       }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-        <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+        <div style={{ 
+          fontSize: 'var(--text-2xl)', 
+          fontWeight: 600, 
+          color: 'var(--color-success)', 
+          marginBottom: '12px' 
+        }}>
           All Clear
         </div>
-        <div>No items require attention at this time.</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+          No items require attention at this time.
+        </div>
       </div>
     )
   }

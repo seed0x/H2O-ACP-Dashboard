@@ -17,13 +17,14 @@ export function CardSkeleton({ count = 3, variant = 'default' }: CardSkeletonPro
         <div
           key={index}
           style={{
-            backgroundColor: 'var(--color-card)',
+            backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
-            borderRadius: '12px',
+            borderRadius: 'var(--radius-lg)',
             padding: variant === 'compact' ? '16px' : '24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: variant === 'compact' ? '12px' : '16px'
+            gap: variant === 'compact' ? '12px' : '16px',
+            boxShadow: 'var(--shadow-sm)'
           }}
         >
           {/* Title */}
