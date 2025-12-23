@@ -427,8 +427,13 @@ function PostsView() {
     scheduled_for: '',
     channel_account_ids: [] as string[],
     status: 'Idea',
-    owner: 'admin'
+    owner: 'admin',
+    content_category: '',
+    media_urls: [] as string[],
+    cta_type: '',
+    cta_url: ''
   })
+  const [mediaUrlInput, setMediaUrlInput] = useState('')
 
   useEffect(() => {
     loadPostInstances()
@@ -593,7 +598,8 @@ function PostsView() {
       }
       
       setShowNewPostModal(false)
-      setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin' })
+      setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin', content_category: '', media_urls: [], cta_type: '', cta_url: '' })
+      setMediaUrlInput('')
       await loadPostInstances()
     } catch (error: any) {
       console.error('Failed to create post:', error)
