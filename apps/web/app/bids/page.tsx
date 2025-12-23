@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useMobile } from '../../lib/useMobile'
+import { handleApiError } from '../../lib/error-handler'
 
 interface Bid {
   id: string
@@ -172,7 +173,7 @@ export default function BidsPage(){
       await loadPipeline()
     } catch (err: any) {
       console.error('Failed to search bids:', err)
-      setError(err.response?.data?.detail || 'Failed to search bids')
+      setError(handleApiError(err))
       setBids([])
     }
   }
@@ -199,7 +200,7 @@ export default function BidsPage(){
       await loadPipeline()
     } catch (err: any){
       console.error('Failed to create bid:', err)
-      setError(err?.response?.data?.detail || err.message || 'Failed to create bid')
+      setError(handleApiError(err))
     }
   }
 
