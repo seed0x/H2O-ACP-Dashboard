@@ -9,6 +9,7 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 import pytz
+import random
 
 from ..db.session import get_session
 from .. import models
@@ -16,6 +17,60 @@ from ..core.auth import get_current_user, CurrentUser
 from .. import crud
 
 router = APIRouter(prefix="/marketing/scheduler", tags=["marketing-scheduler"])
+
+# Content templates for planned slots
+CONTENT_TEMPLATES = {
+    "team_post": {
+        "title_templates": [
+            "Meet the Team: Spotlight",
+            "Behind the Scenes at {company_name}",
+            "Team Tuesday: Our Experts",
+            "Get to Know Our Team",
+            "Team Member Feature"
+        ],
+        "caption_template": "🌟 Team spotlight time! #MeetTheTeam #OurTeam"
+    },
+    "diy": {
+        "title_templates": [
+            "DIY Tip: Quick Home Fix",
+            "Pro Tip Tuesday",
+            "DIY Guide: Common Issue",
+            "Homeowner Tip: Easy Fix",
+            "Quick Fix: DIY Solution"
+        ],
+        "caption_template": "💡 Quick tip from our pros! #DIY #HomeTips #HomeMaintenance"
+    },
+    "coupon": {
+        "title_templates": [
+            "Special Offer: Limited Time",
+            "Save Today: Exclusive Deal",
+            "Customer Appreciation Special",
+            "Limited Time Discount",
+            "Special Promotion"
+        ],
+        "caption_template": "🎉 Limited time offer! #SpecialDeal #Discount #SaveMoney"
+    },
+    "blog_post": {
+        "title_templates": [
+            "Latest Blog: Industry Insights",
+            "New Post: Expert Advice",
+            "Read Now: Helpful Guide",
+            "Blog Update: Tips & Tricks",
+            "New Article: Expert Tips"
+        ],
+        "caption_template": "📖 New blog post! Link in bio. #Blog #ExpertAdvice #Tips"
+    },
+    "ad_content": {
+        "title_templates": [
+            "Why Choose Us?",
+            "Our Services",
+            "Professional Service",
+            "Quality You Can Trust",
+            "Expert Service"
+        ],
+        "caption_template": "Professional service you can trust! #Quality #Professional #Service"
+    }
+}
 
 
 def compute_schedule_datetimes(
@@ -216,18 +271,48 @@ async def topoff_scheduler_logic(
         channel = channel_result.scalar_one_or_none()
         is_google_my_business = channel and ('google' in channel.name.lower() or 'gmb' in channel.name.lower() or channel.key == 'google_my_business')
         
-        # Content categories
-        categories = ['ad_content', 'team_post', 'coupon', 'diy', 'blog_post']
-        
-        # For Google My Business: distribute 3 posts across categories (rotate through)
-        # For other accounts: use all categories evenly
-        if is_google_my_business and len(target_datetimes) >= 3:
-            # For GMB, use 3 categories: ad_content, team_post, coupon
-            gmb_categories = ['ad_content', 'team_post', 'coupon']
-            category_rotation = gmb_categories
-        else:
-            # For other accounts, use all categories
-            category_rotation = categories
+        # Get weighted category selection function
+        def get_weighted_category(account: models.ChannelAccount) -> str:
+            """Select category based on brand diet configuration"""
+            diet = account.brand_diet or {
+                "team_post": 0.40,
+                "diy": 0.20,
+                "coupon": 0.20,
+                "blog_post": 0.20
+            }
+            
+            # Default categories if diet is empty or invalid
+            if not diet or not isinstance(diet, dict):
+                diet = {
+                    "team_post": 0.40,
+                    "diy": 0.20,
+                    "coupon": 0.20,
+                    "blog_post": 0.20
+                }
+            
+            # For Google My Business, limit to specific categories if configured
+            if is_google_my_business:
+                gmb_categories = ['ad_content', 'team_post', 'coupon']
+                # Filter diet to only GMB categories
+                filtered_diet = {k: v for k, v in diet.items() if k in gmb_categories}
+                if filtered_diet:
+                    diet = filtered_diet
+                else:
+                    # Default GMB distribution
+                    diet = {"ad_content": 0.33, "team_post": 0.33, "coupon": 0.34}
+            
+            categories = list(diet.keys())
+            weights = list(diet.values())
+            
+            # Normalize weights to sum to 1.0
+            total_weight = sum(weights)
+            if total_weight > 0:
+                normalized_weights = [w / total_weight for w in weights]
+            else:
+                # Equal weights if all zero
+                normalized_weights = [1.0 / len(categories)] * len(categories)
+            
+            return random.choices(categories, weights=normalized_weights, k=1)[0]
         
         # Create missing instances using upsert pattern
         instances_to_create = []
@@ -250,17 +335,26 @@ async def topoff_scheduler_logic(
                 total_skipped += 1
                 continue
             
-            # Assign category (rotate through available categories)
-            suggested_category = category_rotation[idx % len(category_rotation)] if category_rotation else None
+            # Assign category using weighted selection based on brand diet
+            suggested_category = get_weighted_category(account)
             
-            # Create new planned instance with null content_item_id and suggested category
+            # Get template for this category
+            template = CONTENT_TEMPLATES.get(suggested_category, CONTENT_TEMPLATES.get("team_post", {}))
+            template_hint = None
+            if template and template.get("title_templates"):
+                # Select a random title template
+                title_template = random.choice(template["title_templates"])
+                template_hint = f"Template: {title_template}"
+            
+            # Create new planned instance with null content_item_id, suggested category, and template hint
             instance = models.PostInstance(
                 tenant_id=tenant_id,
                 content_item_id=None,  # Null for planned slots
                 channel_account_id=account.id,
                 scheduled_for=target_dt,
                 status='Planned',
-                suggested_category=suggested_category
+                suggested_category=suggested_category,
+                notes=template_hint  # Store template hint in notes field
             )
             instances_to_create.append(instance)
         

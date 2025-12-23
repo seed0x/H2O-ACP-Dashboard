@@ -1115,6 +1115,362 @@ function getStatusColor(status: string) {
   return colors[status] || colors['Idea']
 }
 
+function SystemHealthPanel() {
+  const [health, setHealth] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          return
+        }
+
+        const response = await fetch(
+          `${API_BASE_URL}/marketing/system-health?tenant_id=h2o`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+          }
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          setHealth(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch system health:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    checkHealth()
+    const interval = setInterval(checkHealth, 30000) // Refresh every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
+  
+  if (loading || !health) {
+    return null
+  }
+  
+  const MetricCard = ({ title, value, icon, color }: { title: string, value: number, icon: string, color: string }) => {
+    const colorMap: Record<string, { bg: string, text: string, border: string }> = {
+      blue: { bg: 'rgba(59, 130, 246, 0.1)', text: 'rgb(59, 130, 246)', border: 'rgba(59, 130, 246, 0.3)' },
+      green: { bg: 'rgba(34, 197, 94, 0.1)', text: 'rgb(34, 197, 94)', border: 'rgba(34, 197, 94, 0.3)' },
+      red: { bg: 'rgba(239, 68, 68, 0.1)', text: 'rgb(239, 68, 68)', border: 'rgba(239, 68, 68, 0.3)' },
+      yellow: { bg: 'rgba(234, 179, 8, 0.1)', text: 'rgb(234, 179, 8)', border: 'rgba(234, 179, 8, 0.3)' }
+    }
+    
+    const colors = colorMap[color] || colorMap.blue
+    
+    return (
+      <div style={{
+        backgroundColor: colors.bg,
+        border: `1px solid ${colors.border}`,
+        borderRadius: '8px',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          color: 'var(--color-text-secondary)'
+        }}>
+          <span>{icon}</span>
+          <span>{title}</span>
+        </div>
+        <div style={{
+          fontSize: '24px',
+          fontWeight: '700',
+          color: colors.text
+        }}>
+          {value}
+        </div>
+      </div>
+    )
+  }
+  
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '16px',
+      marginBottom: '24px'
+    }}>
+      <MetricCard
+        title="Scheduled Posts"
+        value={health.scheduled_count}
+        icon="📅"
+        color="blue"
+      />
+      <MetricCard
+        title="Published (30d)"
+        value={health.published_count}
+        icon="✅"
+        color="green"
+      />
+      <MetricCard
+        title="Failed Posts"
+        value={health.failed_count}
+        icon="⚠️"
+        color="red"
+      />
+      <MetricCard
+        title="Empty Slots"
+        value={health.empty_slots}
+        icon="📝"
+        color="yellow"
+      />
+    </div>
+  )
+}
+
+function AutoGeneratePanel({ onContentAdded }: { onContentAdded: () => void }) {
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string>('')
+
+  const fetchSuggestions = async () => {
+    setGenerating(true)
+    setError('')
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/marketing/content-suggestions?tenant_id=h2o`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch suggestions' }))
+        throw new Error(errorData.detail || 'Failed to fetch suggestions')
+      }
+
+      const data = await response.json()
+      setSuggestions(data.suggestions || [])
+    } catch (error: any) {
+      console.error('Failed to fetch suggestions:', error)
+      setError(error.message || 'Failed to fetch suggestions')
+      setSuggestions([])
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const applyToCalendar = async (suggestion: any) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Create ContentItem from suggestion
+      const contentResponse = await fetch(
+        `${API_BASE_URL}/marketing/content-items`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            tenant_id: 'h2o',
+            title: suggestion.suggested_title,
+            base_caption: suggestion.suggested_caption,
+            content_category: suggestion.suggested_category,
+            status: 'Draft',
+            owner: 'admin'
+          })
+        }
+      )
+
+      if (!contentResponse.ok) {
+        const errorData = await contentResponse.json().catch(() => ({ detail: 'Failed to create content' }))
+        throw new Error(errorData.detail || 'Failed to create content')
+      }
+
+      const newContent = await contentResponse.json()
+
+      showToast(`Content "${suggestion.suggested_title}" created successfully!`, 'success')
+      
+      // Refresh calendar to show new content
+      onContentAdded()
+      
+      // Remove suggestion from list
+      setSuggestions(prev => prev.filter(s => s.keyword !== suggestion.keyword))
+    } catch (error: any) {
+      console.error('Failed to apply suggestion:', error)
+      showToast(error.message || 'Failed to add content to calendar', 'error')
+    }
+  }
+
+  if (suggestions.length === 0 && !generating && !error) {
+    return null // Don't show panel if no suggestions and not loading
+  }
+
+  return (
+    <div style={{
+      background: 'linear-gradient(to bottom right, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))',
+      padding: '20px',
+      borderRadius: '12px',
+      border: '1px solid rgba(59, 130, 246, 0.2)',
+      marginBottom: '24px'
+    }}>
+      <h3 style={{
+        margin: '0 0 16px 0',
+        fontSize: '16px',
+        fontWeight: '600',
+        color: 'var(--color-text-primary)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}>
+        <span>✨</span>
+        AI Content Suggestions
+      </h3>
+
+      <button
+        onClick={fetchSuggestions}
+        disabled={generating}
+        style={{
+          width: '100%',
+          marginBottom: '16px',
+          padding: '12px 20px',
+          backgroundColor: generating ? 'var(--color-hover)' : 'rgb(37, 99, 235)',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          cursor: generating ? 'not-allowed' : 'pointer',
+          opacity: generating ? 0.6 : 1,
+          transition: 'all 0.2s'
+        }}
+      >
+        {generating ? 'Analyzing demand signals...' : '✨ Generate Suggestions'}
+      </button>
+
+      {error && (
+        <div style={{
+          padding: '12px',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '8px',
+          color: 'rgb(239, 68, 68)',
+          fontSize: '14px',
+          marginBottom: '16px'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {suggestions.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {suggestions.map((sug, idx) => (
+            <div
+              key={idx}
+              style={{
+                backgroundColor: 'var(--color-card)',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <StatusBadge
+                      status={sug.priority === 'high' ? 'High Priority' : 'Medium Priority'}
+                      variant="priority"
+                      className="text-xs"
+                    />
+                    {sug.change_pct && (
+                      <span style={{
+                        fontSize: '12px',
+                        color: 'var(--color-text-secondary)',
+                        fontWeight: '500'
+                      }}>
+                        +{sug.change_pct.toFixed(1)}% demand
+                      </span>
+                    )}
+                  </div>
+                  <p style={{
+                    margin: '0 0 4px 0',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: 'var(--color-text-primary)'
+                  }}>
+                    {sug.suggested_title}
+                  </p>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '12px',
+                    color: 'var(--color-text-secondary)'
+                  }}>
+                    Keyword: {sug.keyword}
+                  </p>
+                  <p style={{
+                    margin: '8px 0 0 0',
+                    fontSize: '12px',
+                    color: 'var(--color-text-secondary)',
+                    fontStyle: 'italic'
+                  }}>
+                    Category: {sug.suggested_category.replace(/_/g, ' ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => applyToCalendar(sug)}
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: 'rgb(22, 163, 74)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgb(21, 128, 61)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgb(22, 163, 74)'
+                }}
+              >
+                Add to Calendar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CalendarView() {
   const [calendarData, setCalendarData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -1146,11 +1502,22 @@ function CalendarView() {
   const [error, setError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [topoffLoading, setTopoffLoading] = useState(false)
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
   
   // Save view mode preference
   const handleViewModeChange = (mode: 'week' | 'month') => {
     setViewMode(mode)
     localStorage.setItem('calendarViewMode', mode)
+  }
+  
+  const toggleDayExpansion = (dateStr: string) => {
+    const newExpanded = new Set(expandedDays)
+    if (newExpanded.has(dateStr)) {
+      newExpanded.delete(dateStr)
+    } else {
+      newExpanded.add(dateStr)
+    }
+    setExpandedDays(newExpanded)
   }
 
   useEffect(() => {
@@ -1223,11 +1590,11 @@ function CalendarView() {
         const endDay = end.getDay()
         end.setDate(end.getDate() + (6 - endDay)) // End on Saturday of the week containing the last day
       } else {
-        // For week view, keep existing logic
+        // For week view, extend to 60 days ahead
         start = new Date(currentDate)
         start.setDate(start.getDate() - 7)
         end = new Date(currentDate)
-        end.setDate(end.getDate() + 30)
+        end.setDate(end.getDate() + 60)
       }
 
       const headers: HeadersInit = {
@@ -1623,6 +1990,12 @@ function CalendarView() {
         </div>
       </div>
 
+      {/* System Health Dashboard */}
+      <SystemHealthPanel />
+
+      {/* Auto-Generate Content Panel */}
+      <AutoGeneratePanel onContentAdded={loadCalendar} />
+
       {/* Calendar Grid */}
       <div className="marketing-calendar-grid" style={{
         backgroundColor: 'var(--color-card)',
@@ -1683,113 +2056,153 @@ function CalendarView() {
                   {day.getDate()}
                 </div>
                 
-                {instances.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {instances.slice(0, viewMode === 'month' ? 2 : 3).map((instance: any) => {
-                      const contentItem = instance.content_item
-                      const channelAccount = instance.channel_account
-                      const accountName = channelAccount?.name || 'Unknown Account'
-                      const isPlanned = instance.status === 'Planned' || !instance.content_item_id
-                      
-                      return (
-                        <div
-                          key={instance.id}
-                          onClick={() => setSelectedPost(instance)}
-                          className={`
-                            ${viewMode === 'month' ? 'p-1.5 text-[10px]' : 'p-2 text-xs'}
-                            rounded-md cursor-pointer transition-all
-                            ${isPlanned 
-                              ? 'bg-[var(--color-hover)]/50 border-2 border-dashed border-white/[0.08] opacity-50 hover:opacity-75' 
-                              : instance.status === 'Posted'
-                              ? 'bg-[var(--color-hover)]/50 border-l-2 border-green-500 border-solid border-white/[0.08] shadow-[2px_0_10px_rgba(34,197,94,0.15)] hover:border-[var(--color-primary)]/50'
-                              : 'bg-[var(--color-hover)]/50 border-2 border-solid border-white/[0.08] hover:border-[var(--color-primary)]/50'
-                            }
-                          `}
-                          title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}${contentItem?.media_assets && contentItem.media_assets.length > 0 ? ` (${contentItem.media_assets.length} media)` : ''}`}
-                        >
-                          <div className="font-semibold text-[var(--color-text-primary)] mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {isPlanned ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="italic text-[var(--color-text-secondary)] text-xs">
-                                  Needs content
-                                </span>
-                                {instance.suggested_category && (
-                                  <StatusBadge 
-                                    status={instance.suggested_category.replace(/_/g, ' ')} 
-                                    variant="category"
-                                    className="text-[9px] px-1 py-0"
-                                  />
-                                )}
+                {instances.length > 0 && (() => {
+                  const MAX_VISIBLE = 4
+                  const dateStr = day.toISOString().split('T')[0]
+                  const isExpanded = expandedDays.has(dateStr)
+                  const visibleInstances = isExpanded 
+                    ? instances 
+                    : instances.slice(0, MAX_VISIBLE)
+                  const hiddenCount = Math.max(0, instances.length - MAX_VISIBLE)
+                  
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {visibleInstances.map((instance: any) => {
+                        const contentItem = instance.content_item
+                        const channelAccount = instance.channel_account
+                        const accountName = channelAccount?.name || 'Unknown Account'
+                        const isPlanned = instance.status === 'Planned' || !instance.content_item_id
+                        
+                        return (
+                          <div
+                            key={instance.id}
+                            onClick={() => setSelectedPost(instance)}
+                            className={`
+                              ${viewMode === 'month' ? 'p-1.5 text-[10px]' : 'p-2 text-xs'}
+                              rounded-md cursor-pointer transition-all
+                              ${isPlanned 
+                                ? 'bg-[var(--color-hover)]/50 border-2 border-dashed border-white/[0.08] opacity-50 hover:opacity-75' 
+                                : instance.status === 'Posted'
+                                ? 'bg-[var(--color-hover)]/50 border-l-2 border-green-500 border-solid border-white/[0.08] shadow-[2px_0_10px_rgba(34,197,94,0.15)] hover:border-[var(--color-primary)]/50'
+                                : 'bg-[var(--color-hover)]/50 border-2 border-solid border-white/[0.08] hover:border-[var(--color-primary)]/50'
+                              }
+                            `}
+                            title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}${contentItem?.media_assets && contentItem.media_assets.length > 0 ? ` (${contentItem.media_assets.length} media)` : ''}`}
+                          >
+                            <div className="font-semibold text-[var(--color-text-primary)] mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                              {isPlanned ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="italic text-[var(--color-text-secondary)] text-xs">
+                                    Needs content
+                                  </span>
+                                  {instance.suggested_category && (
+                                    <StatusBadge 
+                                      status={instance.suggested_category.replace(/_/g, ' ')} 
+                                      variant="category"
+                                      className="text-[9px] px-1 py-0"
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                contentItem?.title || 'Untitled'
+                              )}
+                            </div>
+                            {contentItem?.media_assets && contentItem.media_assets.length > 0 && (
+                              <div style={{
+                                fontSize: '9px',
+                                color: 'var(--color-text-secondary)',
+                                marginTop: '2px'
+                              }}>
+                                📷 {contentItem.media_assets.length}
                               </div>
-                            ) : (
-                              contentItem?.title || 'Untitled'
+                            )}
+                            {viewMode === 'week' && (
+                              <>
+                                <div style={{
+                                  fontSize: '10px',
+                                  color: 'var(--color-text-secondary)',
+                                  marginBottom: '4px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  📍 {accountName}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{
+                                    fontSize: '10px',
+                                    color: 'var(--color-text-secondary)'
+                                  }}>
+                                    👤 {contentItem?.owner || 'Unknown'}
+                                  </span>
+                                  <span style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '9px',
+                                    fontWeight: '500',
+                                    ...getStatusColor(instance.status)
+                                  }}>
+                                    {instance.status}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                            {viewMode === 'month' && (
+                              <span style={{
+                                padding: '2px 4px',
+                                borderRadius: '4px',
+                                fontSize: '8px',
+                                fontWeight: '500',
+                                ...getStatusColor(instance.status)
+                              }}>
+                                {instance.status}
+                              </span>
                             )}
                           </div>
-                          {contentItem?.media_assets && contentItem.media_assets.length > 0 && (
-                            <div style={{
-                              fontSize: '9px',
-                              color: 'var(--color-text-secondary)',
-                              marginTop: '2px'
-                            }}>
-                              📷 {contentItem.media_assets.length}
-                            </div>
-                          )}
-                          {viewMode === 'week' && (
-                            <>
-                              <div style={{
-                                fontSize: '10px',
-                                color: 'var(--color-text-secondary)',
-                                marginBottom: '4px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                📍 {accountName}
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                                <span style={{
-                                  fontSize: '10px',
-                                  color: 'var(--color-text-secondary)'
-                                }}>
-                                  👤 {contentItem?.owner || 'Unknown'}
-                                </span>
-                                <span style={{
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontSize: '9px',
-                                  fontWeight: '500',
-                                  ...getStatusColor(instance.status)
-                                }}>
-                                  {instance.status}
-                                </span>
-                              </div>
-                            </>
-                          )}
-                          {viewMode === 'month' && (
-                            <span style={{
-                              padding: '2px 4px',
-                              borderRadius: '4px',
-                              fontSize: '8px',
-                              fontWeight: '500',
-                              ...getStatusColor(instance.status)
-                            }}>
-                              {instance.status}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })}
-                    {instances.length > (viewMode === 'month' ? 2 : 3) && (
-                      <div style={{
-                        fontSize: '10px',
-                        color: 'var(--color-text-secondary)',
-                        paddingLeft: '8px'
-                      }}>
-                        +{instances.length - (viewMode === 'month' ? 2 : 3)} more
-                      </div>
-                    )}
-                  </div>
-                )}
+                        )
+                      })}
+                      {hiddenCount > 0 && !isExpanded && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleDayExpansion(dateStr)
+                          }}
+                          className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 font-medium mt-1 flex items-center gap-1 transition-colors"
+                          style={{ 
+                            fontSize: '10px',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <span>+</span>
+                          {hiddenCount} more post{hiddenCount > 1 ? 's' : ''}
+                        </button>
+                      )}
+                      {isExpanded && hiddenCount > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleDayExpansion(dateStr)
+                          }}
+                          className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium mt-1 flex items-center gap-1 transition-colors"
+                          style={{ 
+                            fontSize: '10px',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Show less
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             )
           })}

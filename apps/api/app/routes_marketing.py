@@ -1,3 +1,15 @@
+"""
+DEPRECATED - DO NOT USE
+
+This file contains legacy ContentPost routes that are no longer used.
+The new marketing system uses PostInstance and ContentItem models.
+
+New routes are in: apps/api/app/api/marketing.py
+Scheduled for removal: 2025-02-01
+
+If you need marketing functionality, use the endpoints in api/marketing.py instead.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_

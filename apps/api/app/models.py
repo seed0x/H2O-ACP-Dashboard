@@ -12,7 +12,7 @@ from sqlalchemy import (
     Table,
     Boolean,
 )
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSON
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 import uuid
@@ -210,6 +210,7 @@ class ChannelAccount(Base):
     posts_per_week = Column(Integer, nullable=True, default=3)  # Number of posts per week
     schedule_timezone = Column(String, nullable=True, default='America/Los_Angeles')  # IANA timezone
     schedule_times = Column(ARRAY(String), nullable=True)  # Array of times like ["09:00", "14:00"]
+    brand_diet = Column(JSON, nullable=True)  # Brand diet configuration: {"team_post": 0.40, "diy": 0.20, "coupon": 0.20, "blog_post": 0.20}
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -290,6 +291,7 @@ class PostInstance(Base):
     
     # Content categorization
     suggested_category = Column(String, nullable=True)  # Hint for what category of content should fill this slot: 'ad_content', 'team_post', 'coupon', 'diy', 'blog_post'
+    notes = Column(Text, nullable=True)  # Template hints and other notes for planned slots
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

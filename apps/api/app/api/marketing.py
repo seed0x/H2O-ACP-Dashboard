@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import selectinload, joinedload
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 
 from ..db.session import get_session
@@ -17,6 +17,115 @@ from ..core.auth import get_current_user, CurrentUser
 from .. import crud
 
 router = APIRouter(prefix="/marketing", tags=["marketing"])
+
+
+class DemandSignalProcessor:
+    """Process demand signals and suggest content based on search trends"""
+    
+    HIGH_DEMAND_THRESHOLD = 1.5  # 50% increase in search volume (change_pct >= 50)
+    
+    def map_keyword_to_category(self, keyword: str) -> str:
+        """Map search keywords to content categories"""
+        keyword_lower = keyword.lower()
+        
+        if any(word in keyword_lower for word in ['diy', 'how to', 'fix', 'repair', 'tip', 'guide']):
+            return 'diy'
+        elif any(word in keyword_lower for word in ['coupon', 'deal', 'discount', 'special', 'offer', 'promotion']):
+            return 'coupon'
+        elif any(word in keyword_lower for word in ['blog', 'article', 'read', 'learn', 'guide', 'tips']):
+            return 'blog_post'
+        elif any(word in keyword_lower for word in ['team', 'meet', 'staff', 'employee', 'about us']):
+            return 'team_post'
+        else:
+            return 'ad_content'  # Default to ad content for general queries
+    
+    def generate_caption(self, keyword: str, category: str) -> str:
+        """Generate SEO-friendly caption based on keyword and category"""
+        keyword_clean = keyword.replace(' ', '')
+        
+        if category == 'diy':
+            return f"🔧 Need help with {keyword}? Our experts share their top tips! #DIY #HomeTips #LocalExperts #{keyword_clean}"
+        elif category == 'coupon':
+            return f"🎉 Special offer on {keyword} services! Limited time only. #SpecialDeal #Discount #SaveMoney #{keyword_clean}"
+        elif category == 'blog_post':
+            return f"📖 New blog post: Everything you need to know about {keyword}. Link in bio! #Blog #ExpertAdvice #Tips #{keyword_clean}"
+        elif category == 'team_post':
+            return f"🌟 Meet our team of {keyword} experts! We're here to help. #MeetTheTeam #OurTeam #LocalExperts"
+        else:
+            return f"🔧 Professional {keyword} services you can trust! #Quality #Professional #Service #{keyword_clean}"
+    
+    async def analyze_signals(
+        self,
+        tenant_id: str,
+        db: AsyncSession
+    ) -> List[Dict[str, Any]]:
+        """Analyze recent demand signals and suggest content"""
+        try:
+            # Import demand signals router function
+            from .demand_signals import get_demand_signals
+            
+            # Fetch demand signals (last 7 days)
+            # We'll use a mock CurrentUser for the internal call
+            class MockUser:
+                def __init__(self):
+                    self.username = "system"
+                    self.tenant_id = tenant_id
+            
+            mock_user = MockUser()
+            
+            # Call the demand signals endpoint logic directly
+            # Since we can't easily call the endpoint, we'll import and use the fetch function
+            from .demand_signals import fetch_google_search_console_data, calculate_trends, categorize_query
+            import os
+            
+            site_url = os.getenv("GOOGLE_SEARCH_CONSOLE_SITE_URL")
+            if not site_url:
+                return []  # No suggestions if Search Console not configured
+            
+            # Fetch current and previous period data
+            current_data = await fetch_google_search_console_data(site_url, 7, start_date_offset=0)
+            previous_data = await fetch_google_search_console_data(site_url, 7, start_date_offset=7)
+            
+            # Calculate trends
+            trends = calculate_trends(current_data, previous_data)
+            
+            suggestions = []
+            for item in current_data:
+                query = item.get('query', '')
+                if not query:
+                    continue
+                
+                trend = trends.get(query, {})
+                change_pct = trend.get('change_pct', 0)
+                
+                # Only suggest if demand increased significantly
+                if change_pct >= 50:  # 50% increase threshold
+                    category = self.map_keyword_to_category(query)
+                    
+                    suggestion = {
+                        "trigger": "high_demand",
+                        "keyword": query,
+                        "location": None,  # Could be extracted from query or tenant config
+                        "suggested_category": category,
+                        "suggested_title": f"Expert Tips: {query.title()}",
+                        "suggested_caption": self.generate_caption(query, category),
+                        "priority": "high" if change_pct > 100 else "medium",  # >100% = high priority
+                        "target_date": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
+                        "change_pct": change_pct,
+                        "current_clicks": trend.get('current_clicks', item.get('clicks', 0))
+                    }
+                    suggestions.append(suggestion)
+            
+            # Sort by priority and change percentage
+            suggestions.sort(key=lambda x: (x['priority'] == 'high', x['change_pct']), reverse=True)
+            
+            return suggestions[:10]  # Return top 10 suggestions
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error analyzing demand signals: {e}", exc_info=True)
+            return []
 
 
 # Marketing Channels
@@ -649,23 +758,50 @@ async def get_calendar_view(
     tenant_id: str = Query(..., description="Tenant ID"),
     start_date: Optional[datetime] = Query(None, description="Start date for calendar view"),
     end_date: Optional[datetime] = Query(None, description="End date for calendar view"),
+    include_unscheduled: bool = Query(False, description="Include unscheduled posts (scheduled_for is NULL)"),
     db: AsyncSession = Depends(get_session),
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Get calendar view of scheduled posts grouped by date"""
+    """Get calendar view of scheduled posts grouped by date, optionally including unscheduled posts"""
+    from sqlalchemy import or_
+    from sqlalchemy.orm import joinedload
+    
     query = select(models.PostInstance).where(models.PostInstance.tenant_id == tenant_id)
     
-    if start_date:
-        query = query.where(models.PostInstance.scheduled_for >= start_date)
-    if end_date:
-        query = query.where(models.PostInstance.scheduled_for <= end_date)
+    # Handle date filtering and unscheduled posts
+    if include_unscheduled:
+        # Include both scheduled and unscheduled posts
+        if start_date or end_date:
+            # For scheduled posts, apply date filters
+            # For unscheduled posts, include them regardless of date filters
+            date_conditions = []
+            if start_date:
+                date_conditions.append(models.PostInstance.scheduled_for >= start_date)
+            if end_date:
+                date_conditions.append(models.PostInstance.scheduled_for <= end_date)
+            
+            if date_conditions:
+                # Include posts that match date filters OR are unscheduled
+                query = query.where(
+                    or_(
+                        *date_conditions,
+                        models.PostInstance.scheduled_for.is_(None)
+                    )
+                )
+        # If no date filters, include all posts (scheduled and unscheduled)
+    else:
+        # Only include scheduled posts
+        if start_date:
+            query = query.where(models.PostInstance.scheduled_for >= start_date)
+        if end_date:
+            query = query.where(models.PostInstance.scheduled_for <= end_date)
+        query = query.where(models.PostInstance.scheduled_for.isnot(None))
     
-    query = query.where(models.PostInstance.scheduled_for.isnot(None))
-    query = query.order_by(models.PostInstance.scheduled_for)
+    # Order by scheduled_for (NULLs last for unscheduled)
+    query = query.order_by(models.PostInstance.scheduled_for.nulls_last())
     
     # Use joinedload to ensure relationships are loaded in the same query (avoids lazy loading issues)
     # Use outerjoin for content_item since it can be null for planned slots
-    from sqlalchemy.orm import joinedload
     result = await db.execute(
         query.options(
             joinedload(models.PostInstance.content_item).selectinload(models.ContentItem.media_assets),  # This will be None for planned slots
@@ -674,10 +810,13 @@ async def get_calendar_view(
     )
     instances = result.unique().scalars().all()
     
-    # Group by date - serialize while still in async session context
+    # Group scheduled by date, unscheduled in separate array
     calendar = {}
+    unscheduled = []
+    
     for instance in instances:
         if instance.scheduled_for:
+            # Scheduled post - group by date
             date_key = instance.scheduled_for.date().isoformat()
             if date_key not in calendar:
                 calendar[date_key] = []
@@ -691,8 +830,111 @@ async def get_calendar_view(
                 import logging
                 logging.warning(f"Failed to serialize PostInstance {instance.id}: {e}")
                 continue
+        else:
+            # Unscheduled post - add to unscheduled array
+            try:
+                serialized = schemas_marketing.PostInstance.model_validate(instance)
+                unscheduled.append(serialized)
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to serialize PostInstance {instance.id}: {e}")
+                continue
     
-    return calendar
+    # Return format: if include_unscheduled, return both scheduled and unscheduled
+    if include_unscheduled:
+        return {
+            "scheduled": calendar,
+            "unscheduled": unscheduled
+        }
+    else:
+        # Backward compatibility: return just calendar dict if unscheduled not requested
+        return calendar
+
+
+# Content Suggestions
+
+@router.get("/content-suggestions")
+async def get_content_suggestions(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get AI-suggested content based on demand signals"""
+    processor = DemandSignalProcessor()
+    suggestions = await processor.analyze_signals(tenant_id, db)
+    return {"suggestions": suggestions}
+
+
+# System Health
+
+@router.get("/system-health")
+async def get_system_health(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get marketing system health metrics"""
+    from sqlalchemy import func, and_
+    from datetime import datetime, timedelta, timezone
+    
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    thirty_days_ago = now - timedelta(days=30)
+    
+    # Scheduled posts (upcoming)
+    scheduled_count_result = await db.execute(
+        select(func.count(models.PostInstance.id)).where(
+            and_(
+                models.PostInstance.tenant_id == tenant_id,
+                models.PostInstance.status == 'Scheduled',
+                models.PostInstance.scheduled_for >= now
+            )
+        )
+    )
+    scheduled_count = scheduled_count_result.scalar() or 0
+    
+    # Published posts (last 30 days)
+    published_count_result = await db.execute(
+        select(func.count(models.PostInstance.id)).where(
+            and_(
+                models.PostInstance.tenant_id == tenant_id,
+                models.PostInstance.status == 'Posted',
+                models.PostInstance.posted_at >= thirty_days_ago
+            )
+        )
+    )
+    published_count = published_count_result.scalar() or 0
+    
+    # Failed posts (need attention)
+    failed_count_result = await db.execute(
+        select(func.count(models.PostInstance.id)).where(
+            and_(
+                models.PostInstance.tenant_id == tenant_id,
+                models.PostInstance.status == 'Failed'
+            )
+        )
+    )
+    failed_count = failed_count_result.scalar() or 0
+    
+    # Empty slots (planned slots without content)
+    empty_slots_result = await db.execute(
+        select(func.count(models.PostInstance.id)).where(
+            and_(
+                models.PostInstance.tenant_id == tenant_id,
+                models.PostInstance.status == 'Planned',
+                models.PostInstance.content_item_id.is_(None),
+                models.PostInstance.scheduled_for >= now
+            )
+        )
+    )
+    empty_slots = empty_slots_result.scalar() or 0
+    
+    return {
+        "scheduled_count": scheduled_count,
+        "published_count": published_count,
+        "failed_count": failed_count,
+        "empty_slots": empty_slots,
+        "timestamp": now.isoformat()
+    }
 
 
 # Media Assets
