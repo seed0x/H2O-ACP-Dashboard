@@ -1,7 +1,7 @@
 """Add brand diet and notes fields
 
 Revision ID: 0018_add_brand_diet_and_notes
-Revises: 0017
+Revises: 0017_add_content_categories
 Create Date: 2025-01-XX XX:XX:XX.XXXXXX
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '0018_add_brand_diet_and_notes'
-down_revision = '0017'
+down_revision = '0017_add_content_categories'
 branch_labels = None
 depends_on = None
 
