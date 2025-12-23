@@ -1,7 +1,7 @@
 """Add content categories to post instances
 
 Revision ID: 0017_add_content_categories
-Revises: 0016_add_media_assets
+Revises: 0016
 Create Date: 2025-01-XX XX:XX:XX.XXXXXX
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '0017_add_content_categories'
-down_revision = '0016_add_media_assets'
+down_revision = '0016'
 branch_labels = None
 depends_on = None
 
