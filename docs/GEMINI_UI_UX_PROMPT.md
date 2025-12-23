@@ -128,12 +128,25 @@ I'm building a B2B operations dashboard for a plumbing and construction company 
 
 ## TECHNICAL CONSTRAINTS
 
-- Must use inline styles (no CSS framework)
+**Styling Approach:**
+- Currently using inline styles (React style objects)
+- Tailwind CSS is installed but underutilized - CAN use Tailwind utility classes
 - CSS variables for theming (--color-primary, --color-text-primary, etc.)
+- Prefer utility-first (Tailwind) over component libraries
+- Can add lightweight libraries if recommended (e.g., Radix UI primitives, Headless UI)
+- Avoid heavy component libraries (Material UI, Ant Design, Chakra UI)
+- Framer Motion is installed - can use for animations
+
+**Framework Requirements:**
 - Must work in Next.js 14
 - Must be responsive (mobile, tablet, desktop)
-- No external design libraries (Material UI, Tailwind, etc.)
+- TypeScript support required
 - Must maintain existing component patterns where possible
+
+**Library Preferences:**
+- ✅ **Allowed**: Tailwind utilities, lightweight headless UI libraries, animation libraries
+- ✅ **Preferred**: Utility-first approach, composable components
+- ❌ **Avoid**: Full component libraries, heavy dependencies, opinionated frameworks
 
 ## REQUEST
 
@@ -172,9 +185,16 @@ Please provide:
    - Screen reader considerations
 
 7. **Specific Code Examples**
-   - CSS variable definitions
-   - Component style patterns
+   - CSS variable definitions (or Tailwind config)
+   - Component style patterns (inline styles OR Tailwind classes)
    - Responsive breakpoint examples
+   - Library recommendations (if any) with justification
+
+8. **Library Recommendations** (Optional)
+   - If you recommend libraries, explain why they're worth adding
+   - Focus on lightweight, composable solutions
+   - Consider bundle size impact
+   - Provide migration path from current inline styles
 
 Please provide actionable, implementable recommendations with specific CSS/design patterns I can apply immediately. Focus on practical improvements that will make the biggest impact on user experience.
 
@@ -255,7 +275,42 @@ I like the clean, professional look of:
 - GitHub (for its information density)
 - But I need to build this with inline styles, not frameworks
 
-Please provide specific, implementable CSS code that I can use immediately.
+Please provide specific, implementable CSS code (or Tailwind classes) that I can use immediately. If you recommend libraries, explain the trade-offs and provide a clear migration path.
+```
+
+---
+
+## Alternative: Library-Friendly Version
+
+If you want Gemini to be more open to library recommendations, use this version of the constraints section instead:
+
+```
+## TECHNICAL CONSTRAINTS
+
+**Current Setup:**
+- Next.js 14 with TypeScript
+- Tailwind CSS installed (currently underutilized)
+- Framer Motion installed
+- Currently using inline styles but open to better approaches
+
+**Styling Preferences:**
+- Prefer utility-first (Tailwind) over component libraries
+- Open to lightweight, composable libraries
+- CSS variables for theming (--color-primary, etc.)
+- Must be responsive (mobile, tablet, desktop)
+
+**Library Policy:**
+- ✅ **Welcome**: Tailwind utilities, Radix UI, Headless UI, lightweight animation libraries
+- ✅ **Consider**: Well-designed component libraries if they significantly improve UX
+- ❌ **Avoid**: Heavy, opinionated frameworks that require major refactoring
+
+**Recommendation Approach:**
+- If you suggest libraries, explain:
+  - Why it's worth the dependency
+  - Bundle size impact
+  - Migration complexity
+  - Alternative approaches if we want to stay library-free
+- Provide both library-based AND library-free solutions when possible
 ```
 
 ---
