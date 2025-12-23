@@ -228,6 +228,7 @@ class ContentItem(Base):
     tags = Column(ARRAY(String), nullable=True)
     target_city = Column(String, nullable=True)
     template_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to template (future)
+    content_category = Column(String, nullable=True)  # Category of content: 'ad_content', 'team_post', 'coupon', 'diy', 'blog_post'
     status = Column(String, nullable=False, default='Idea')  # Idea → Draft → Needs Approval → Scheduled → Posted
     owner = Column(String, nullable=False)
     reviewer = Column(String, nullable=True)
@@ -286,6 +287,9 @@ class PostInstance(Base):
     
     # Error tracking
     last_error = Column(Text, nullable=True)
+    
+    # Content categorization
+    suggested_category = Column(String, nullable=True)  # Hint for what category of content should fill this slot: 'ad_content', 'team_post', 'coupon', 'diy', 'blog_post'
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

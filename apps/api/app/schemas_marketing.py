@@ -97,6 +97,7 @@ class ContentItemBase(BaseModel):
     tags: Optional[List[str]] = None
     target_city: Optional[str] = None
     template_id: Optional[UUID] = None
+    content_category: Optional[str] = None  # Category: 'ad_content', 'team_post', 'coupon', 'diy', 'blog_post'
     status: str = 'Idea'
     owner: str
     reviewer: Optional[str] = None
@@ -132,6 +133,7 @@ class ContentItemUpdate(BaseModel):
     tags: Optional[List[str]] = None
     target_city: Optional[str] = None
     template_id: Optional[UUID] = None
+    content_category: Optional[str] = None
     status: Optional[str] = None
     owner: Optional[str] = None
     reviewer: Optional[str] = None
@@ -177,6 +179,7 @@ class PostInstanceBase(BaseModel):
     caption_override: Optional[str] = None
     scheduled_for: Optional[datetime] = None
     status: str = 'Draft'
+    suggested_category: Optional[str] = None  # Category hint: 'ad_content', 'team_post', 'coupon', 'diy', 'blog_post'
     posted_at: Optional[datetime] = None
     post_url: Optional[str] = None
     posted_manually: bool = False

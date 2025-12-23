@@ -137,7 +137,7 @@ async def topoff_scheduler_logic(
     
     # Get all active channel accounts for tenant
     # Include accounts with status='active' or null status (legacy accounts)
-    from sqlalchemy import or_
+    from sqlalchemy import or_, case
     accounts_result = await db.execute(
         select(models.ChannelAccount)
         .where(
@@ -145,7 +145,7 @@ async def topoff_scheduler_logic(
                 models.ChannelAccount.tenant_id == tenant_id,
                 or_(
                     models.ChannelAccount.status == 'active',
-                    models.ChannelAccount.status == None  # Include legacy accounts with null status
+                    models.ChannelAccount.status.is_(None)  # Include legacy accounts with null status
                 )
             )
         )
@@ -207,9 +207,31 @@ async def topoff_scheduler_logic(
                 rounded_dt = inst.scheduled_for.replace(second=0, microsecond=0)
                 existing_instances[rounded_dt] = inst
         
+        # Determine content categories for this account
+        # Check if this is a Google My Business account (or similar that needs category distribution)
+        channel_result = await db.execute(
+            select(models.MarketingChannel)
+            .where(models.MarketingChannel.id == account.channel_id)
+        )
+        channel = channel_result.scalar_one_or_none()
+        is_google_my_business = channel and ('google' in channel.name.lower() or 'gmb' in channel.name.lower() or channel.key == 'google_my_business')
+        
+        # Content categories
+        categories = ['ad_content', 'team_post', 'coupon', 'diy', 'blog_post']
+        
+        # For Google My Business: distribute 3 posts across categories (rotate through)
+        # For other accounts: use all categories evenly
+        if is_google_my_business and len(target_datetimes) >= 3:
+            # For GMB, use 3 categories: ad_content, team_post, coupon
+            gmb_categories = ['ad_content', 'team_post', 'coupon']
+            category_rotation = gmb_categories
+        else:
+            # For other accounts, use all categories
+            category_rotation = categories
+        
         # Create missing instances using upsert pattern
         instances_to_create = []
-        for target_dt in target_datetimes:
+        for idx, target_dt in enumerate(target_datetimes):
             # Round target_dt to minute precision for matching
             rounded_target_dt = target_dt.replace(second=0, microsecond=0)
             existing_instance = existing_instances.get(rounded_target_dt)
@@ -228,13 +250,17 @@ async def topoff_scheduler_logic(
                 total_skipped += 1
                 continue
             
-            # Create new planned instance with null content_item_id
+            # Assign category (rotate through available categories)
+            suggested_category = category_rotation[idx % len(category_rotation)] if category_rotation else None
+            
+            # Create new planned instance with null content_item_id and suggested category
             instance = models.PostInstance(
                 tenant_id=tenant_id,
                 content_item_id=None,  # Null for planned slots
                 channel_account_id=account.id,
                 scheduled_for=target_dt,
-                status='Planned'
+                status='Planned',
+                suggested_category=suggested_category
             )
             instances_to_create.append(instance)
         

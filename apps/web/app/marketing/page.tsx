@@ -1725,9 +1725,24 @@ function CalendarView() {
                             whiteSpace: 'nowrap'
                           }}>
                             {isPlanned ? (
-                              <span style={{ fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>
-                                Needs content
-                              </span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>
+                                  Needs content
+                                </span>
+                                {instance.suggested_category && (
+                                  <span style={{
+                                    fontSize: '9px',
+                                    padding: '2px 4px',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'rgba(156, 39, 176, 0.2)',
+                                    color: '#9C27B0',
+                                    fontWeight: '500',
+                                    textTransform: 'capitalize'
+                                  }}>
+                                    {instance.suggested_category.replace('_', ' ')}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               contentItem?.title || 'Untitled'
                             )}
@@ -2706,8 +2721,21 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
             <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
               {instance.content_item_id ? (contentItem?.title || 'Untitled') : 'Planned Slot'}
             </h3>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-              {channelAccount?.name || 'Unknown Account'} • {instance.status}
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>{channelAccount?.name || 'Unknown Account'} • {instance.status}</span>
+              {instance.suggested_category && (
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  backgroundColor: 'rgba(156, 39, 176, 0.2)',
+                  color: '#9C27B0',
+                  fontWeight: '500',
+                  textTransform: 'capitalize'
+                }}>
+                  {instance.suggested_category.replace('_', ' ')}
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -2830,12 +2858,21 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
 function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { instance: any, contentItem: any, onClose: () => void, onSuccess: () => void }) {
   const [title, setTitle] = useState('')
   const [baseCaption, setBaseCaption] = useState('')
+  const [contentCategory, setContentCategory] = useState(instance.suggested_category || '')
   const [postType, setPostType] = useState('Post')
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [uploadedMedia, setUploadedMedia] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  
+  const categories = [
+    { value: 'ad_content', label: 'Ad Content' },
+    { value: 'team_post', label: 'Team Post' },
+    { value: 'coupon', label: 'Coupon' },
+    { value: 'diy', label: 'DIY' },
+    { value: 'blog_post', label: 'Blog Post' }
+  ]
 
   async function handleMediaUpload(file: File, contentItemId?: string): Promise<any> {
     const token = localStorage.getItem('token')
@@ -2916,6 +2953,7 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
             tenant_id: instance.tenant_id,
             title: title.trim(),
             base_caption: baseCaption.trim(),
+            content_category: contentCategory || instance.suggested_category || null,
             status: 'Draft',
             owner: 'admin'
           })
@@ -3074,6 +3112,29 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
                   fontSize: '14px'
                 }}
               />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                Content Category {instance.suggested_category && <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: '400' }}>(Suggested: {instance.suggested_category.replace('_', ' ')})</span>}
+              </label>
+              <select
+                value={contentCategory}
+                onChange={(e) => setContentCategory(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="">Select category...</option>
+                {categories.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
