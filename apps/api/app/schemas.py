@@ -221,6 +221,7 @@ class JobOut(JobBase):
 class ServiceCallBase(BaseModel):
     tenant_id: str
     builder_id: Optional[UUID]
+    customer_id: Optional[UUID] = None
     customer_name: str
     phone: Optional[str]
     email: Optional[EmailStr]
@@ -298,6 +299,15 @@ class ServiceCallWorkflow(ServiceCallWorkflowBase):
     class Config:
         from_attributes = True
 
+class ServiceCallOut(ServiceCallBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    workflow: Optional[ServiceCallWorkflow] = None
+
+    class Config:
+        from_attributes = True
+
 # Customer Schemas
 class CustomerBase(BaseModel):
     name: str
@@ -336,15 +346,6 @@ class CustomerOut(CustomerBase):
 
 class CustomerWithServiceCalls(CustomerOut):
     service_calls: Optional[List[ServiceCallOut]] = None
-
-class ServiceCallOut(ServiceCallBase):
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
-    workflow: Optional[ServiceCallWorkflow] = None
-
-    class Config:
-        from_attributes = True
 
 class AuditLogOut(BaseModel):
     id: UUID
