@@ -53,7 +53,7 @@ export function Card({
 }
 
 interface CardHeaderProps {
-  title?: string
+  title?: string | React.ReactNode
   subtitle?: string
   action?: React.ReactNode
   children?: React.ReactNode
@@ -77,7 +77,10 @@ export function CardHeader({ title, subtitle, action, children, className = '' }
             fontSize: 'var(--text-lg)', 
             fontWeight: 600, 
             color: 'var(--color-text-primary)',
-            marginBottom: subtitle ? '4px' : '0'
+            marginBottom: subtitle ? '4px' : '0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
             {title}
           </h2>

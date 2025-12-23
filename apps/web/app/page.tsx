@@ -8,10 +8,19 @@ import { handleApiError } from '../lib/error-handler'
 import { StatSkeleton } from '../components/ui/Skeleton'
 import { StatCard } from '../components/ui/StatCard'
 import { Button } from '../components/ui/Button'
+import { Card, CardHeader } from '../components/ui/Card'
+import { PageHeader } from '../components/ui/PageHeader'
 import { useTenant } from '../contexts/TenantContext'
 import { TodaysSchedule } from '../components/TodaysSchedule'
 import { Dataflow } from '../components/Dataflow'
 import { TechPerformance } from '../components/TechPerformance'
+import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
+import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+
+// Icon component wrapper
+function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
+  return <Icon size={size} color={color} />
+}
 
 export default function Dashboard() {
   const router = useRouter()
@@ -225,14 +234,10 @@ export default function Dashboard() {
   return (
     <div style={{ padding: isMobile ? '16px' : '32px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-          Operations Dashboard
-        </h1>
-        <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-          H2O Plumbing & All County Construction
-        </p>
-      </div>
+      <PageHeader
+        title="Operations Dashboard"
+        description="H2O Plumbing & All County Construction"
+      />
 
       {/* Stats Grid - 5 key cards */}
       <div style={{
@@ -297,14 +302,28 @@ export default function Dashboard() {
         marginBottom: '24px'
       }}>
         {/* Left Column - Open Tasks */}
-        <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-5">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)] uppercase tracking-widest text-xs">Open Tasks</h2>
-            <a href="/jobs" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
-          </div>
+        <Card>
+          <CardHeader 
+            title="Open Tasks"
+            action={
+              <a 
+                href="/jobs" 
+                style={{ 
+                  fontSize: 'var(--text-sm)', 
+                  color: 'var(--color-primary)', 
+                  textDecoration: 'none',
+                  fontWeight: 500
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
+                View All →
+              </a>
+            }
+          />
           {openTasks.length === 0 ? (
             <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
-              <p className="text-[var(--color-text-secondary)] mb-4">No open tasks</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>No open tasks</p>
               <Button onClick={() => router.push('/jobs')} variant="primary" size="sm">
                 Create New
               </Button>
@@ -320,29 +339,38 @@ export default function Dashboard() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '12px',
-                    backgroundColor: 'var(--color-hover)',
-                    borderRadius: '8px',
+                    backgroundColor: 'var(--color-surface-elevated)',
+                    borderRadius: 'var(--radius-md)',
                     textDecoration: 'none',
-                    borderLeft: `3px solid ${item.type === 'job' ? '#60A5FA' : '#FF9800'}`
+                    borderLeft: `3px solid ${item.type === 'job' ? 'var(--color-primary)' : 'var(--color-warning)'}`,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                    e.currentTarget.style.transform = 'translateX(2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)'
+                    e.currentTarget.style.transform = 'translateX(0)'
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', fontSize: '14px', marginBottom: '2px' }}>
+                    <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
                       {item.type === 'job' ? (
                         <>{item.community} - Lot <span className="font-mono">{item.lot_number}</span></>
                       ) : item.customer_name}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
                       {item.type === 'job' ? 'Job' : 'Service Call'} • {item.status}
                     </div>
                   </div>
                   <span style={{
                     padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    backgroundColor: item.type === 'job' ? 'rgba(96, 165, 250, 0.15)' : 'rgba(255, 152, 0, 0.15)',
-                    color: item.type === 'job' ? '#60A5FA' : '#FF9800'
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 500,
+                    backgroundColor: item.type === 'job' ? 'var(--color-primary-light)' : 'var(--color-warning-bg)',
+                    color: item.type === 'job' ? 'var(--color-primary)' : 'var(--color-warning)'
                   }}>
                     {item.type === 'job' ? 'JOB' : 'CALL'}
                   </span>
@@ -350,42 +378,62 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Middle Column - Bids Pipeline */}
-        <div className={`bg-[var(--color-card)]/50 border backdrop-blur-sm shadow-xl rounded-lg p-5 ${bidFollowUps.length > 0 ? 'border-blue-500/30' : 'border-white/[0.08]'}`}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)] uppercase tracking-widest text-xs flex items-center gap-2">
-              📋 Bids Pipeline
-            </h2>
-            <a href="/bids" style={{ fontSize: '13px', color: 'var(--color-primary)', textDecoration: 'none' }}>View All →</a>
-          </div>
+        <Card style={{
+          borderColor: bidFollowUps.length > 0 ? 'var(--color-primary)' : undefined,
+          borderWidth: bidFollowUps.length > 0 ? '1px' : undefined
+        }}>
+          <CardHeader 
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IconWrapper Icon={UilFileAlt} size={16} />
+                <span>Bids Pipeline</span>
+              </div>
+            }
+            action={
+              <a 
+                href="/bids" 
+                style={{ 
+                  fontSize: 'var(--text-sm)', 
+                  color: 'var(--color-primary)', 
+                  textDecoration: 'none',
+                  fontWeight: 500
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
+                View All →
+              </a>
+            }
+          />
           {bidFollowUps.length === 0 ? (
             <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
-              <p className="text-[var(--color-text-secondary)] mb-4">No bids need follow-up</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>No bids need follow-up</p>
               <Button onClick={() => router.push('/bids')} variant="primary" size="sm">
                 Create New Bid
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-4 sm:gap-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {bidFollowUps.map((bid: any) => {
                 let reasonText = ''
                 let reasonColor = 'var(--color-text-secondary)'
-                let borderColor = '#60A5FA'
+                let borderColor = 'var(--color-primary)'
                 
                 if (bid.followUpReason === 'overdue') {
                   reasonText = `${bid.daysOverdue} day${bid.daysOverdue !== 1 ? 's' : ''} overdue`
-                  reasonColor = '#EF5350'
-                  borderColor = '#EF5350'
+                  reasonColor = 'var(--color-error)'
+                  borderColor = 'var(--color-error)'
                 } else if (bid.followUpReason === 'sent_no_response') {
                   reasonText = `Sent ${bid.daysSinceSent} day${bid.daysSinceSent !== 1 ? 's' : ''} ago`
-                  reasonColor = '#FF9800'
-                  borderColor = '#FF9800'
+                  reasonColor = 'var(--color-warning)'
+                  borderColor = 'var(--color-warning)'
                 } else if (bid.followUpReason === 'approaching_due') {
                   reasonText = `Due in ${bid.daysUntilDue} day${bid.daysUntilDue !== 1 ? 's' : ''}`
-                  reasonColor = '#FF9800'
-                  borderColor = '#FF9800'
+                  reasonColor = 'var(--color-warning)'
+                  borderColor = 'var(--color-warning)'
                 }
                 
                 const isWon = bid.status === 'Won'
@@ -394,32 +442,39 @@ export default function Dashboard() {
                   <a
                     key={bid.id}
                     href={`/bids/${bid.id}`}
-                    className={`
-                      flex flex-col p-3 bg-[var(--color-card)]/50 rounded-lg no-underline border-l-2 transition-all
-                      ${isWon 
-                        ? 'border-green-500 shadow-[2px_0_10px_rgba(34,197,94,0.15)]' 
-                        : `border-[${borderColor}]`
-                      }
-                      hover:translate-x-1 hover:shadow-lg
-                    `}
                     style={{
-                      borderLeftColor: isWon ? undefined : borderColor
+                      display: 'flex',
+                      flexDirection: 'column',
+                      padding: '12px',
+                      backgroundColor: 'var(--color-surface-elevated)',
+                      borderRadius: 'var(--radius-md)',
+                      textDecoration: 'none',
+                      borderLeft: `3px solid ${isWon ? 'var(--color-success)' : borderColor}`,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateX(2px)'
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateX(0)'
+                      e.currentTarget.style.boxShadow = 'none'
                     }}
                   >
-                    <div style={{ fontWeight: '500', color: 'var(--color-text-primary)', fontSize: '14px', marginBottom: '4px' }}>
+                    <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '4px' }}>
                       {bid.project_name}
                     </div>
-                    <div style={{ fontSize: '12px', color: reasonColor, marginBottom: '2px' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: reasonColor, marginBottom: '2px' }}>
                       {reasonText}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{
                         padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        fontWeight: '500',
-                        backgroundColor: bid.status === 'Sent' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(158, 158, 158, 0.15)',
-                        color: bid.status === 'Sent' ? '#4CAF50' : '#9E9E9E'
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 500,
+                        backgroundColor: bid.status === 'Sent' ? 'var(--color-success-bg)' : 'var(--color-neutral-bg)',
+                        color: bid.status === 'Sent' ? 'var(--color-success)' : 'var(--color-neutral)'
                       }}>
                         {bid.status}
                       </span>
@@ -432,24 +487,30 @@ export default function Dashboard() {
               })}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Right Column - Overdue Items */}
-        <div className={`bg-[var(--color-card)]/50 border backdrop-blur-sm shadow-xl rounded-lg p-5 ${stats.totalOverdue > 0 ? 'border-red-500/30' : 'border-white/[0.08]'}`}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 className={`text-base font-semibold uppercase tracking-widest text-xs flex items-center gap-2 ${stats.totalOverdue > 0 ? 'text-red-500' : 'text-[var(--color-text-primary)]'}`}>
-              {stats.totalOverdue > 0 && <span>⚠️</span>} Overdue Items
-            </h2>
-          </div>
+        <Card style={{
+          borderColor: stats.totalOverdue > 0 ? 'var(--color-error)' : undefined,
+          borderWidth: stats.totalOverdue > 0 ? '1px' : undefined
+        }}>
+          <CardHeader 
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: stats.totalOverdue > 0 ? 'var(--color-error)' : undefined }}>
+                {stats.totalOverdue > 0 && <IconWrapper Icon={UilExclamationTriangle} size={16} color="var(--color-error)" />}
+                <span>Overdue Items</span>
+              </div>
+            }
+          />
           {overdueItems.length === 0 ? (
             <div className="border-2 border-dashed border-[var(--color-border)] rounded-lg p-8 text-center">
-              <p className="text-[var(--color-text-secondary)] mb-4">No overdue items</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: '16px' }}>No overdue items</p>
               <Button onClick={() => router.push('/jobs')} variant="secondary" size="sm">
                 View All Tasks
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-4 sm:gap-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {overdueItems.map((item: any) => (
                 <a
                   key={item.id}
@@ -464,21 +525,30 @@ export default function Dashboard() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '12px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
+                    backgroundColor: 'var(--color-surface-elevated)',
+                    borderRadius: 'var(--radius-md)',
                     textDecoration: 'none',
-                    borderLeft: '3px solid #EF5350'
+                    borderLeft: '3px solid var(--color-error)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-hover)'
+                    e.currentTarget.style.transform = 'translateX(2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)'
+                    e.currentTarget.style.transform = 'translateX(0)'
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: '500', color: '#111827', fontSize: '14px', marginBottom: '2px' }}>
+                    <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
                       {item.type === 'job' ? (
                         <>{item.community} - Lot <span className="font-mono">{item.lot_number}</span></>
                       ) : item.type === 'service_call' ? item.customer_name :
                        item.type === 'review_request' ? item.customer_name :
                        `Recovery: ${item.customer_name}`}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#EF5350' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>
                       {item.days_overdue} days overdue
                     </div>
                   </div>
@@ -486,7 +556,7 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   )
