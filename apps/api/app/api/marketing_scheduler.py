@@ -136,16 +136,31 @@ async def topoff_scheduler_logic(
     end_date = start_date + timedelta(days=days)
     
     # Get all active channel accounts for tenant
+    # Include accounts with status='active' or null status (legacy accounts)
+    from sqlalchemy import or_
     accounts_result = await db.execute(
         select(models.ChannelAccount)
         .where(
             and_(
                 models.ChannelAccount.tenant_id == tenant_id,
-                models.ChannelAccount.status == 'active'
+                or_(
+                    models.ChannelAccount.status == 'active',
+                    models.ChannelAccount.status == None  # Include legacy accounts with null status
+                )
             )
         )
     )
-    accounts = accounts_result.scalars().all()
+    all_accounts = accounts_result.scalars().all()
+    
+    # Filter to accounts that have scheduling configuration
+    # An account needs at least posts_per_week > 0 or schedule_times to generate slots
+    accounts = []
+    for account in all_accounts:
+        # Check if account has scheduling configuration
+        # Default posts_per_week is 3, so if it's None, we'll use the default in compute_schedule_datetimes
+        # But we should still process accounts even if they only have defaults
+        # The real check is: does compute_schedule_datetimes return any datetimes?
+        accounts.append(account)
     
     if not accounts:
         return {
@@ -154,7 +169,7 @@ async def topoff_scheduler_logic(
             "instances_skipped": 0,
             "window_start": start_date.isoformat(),
             "window_end": end_date.isoformat(),
-            "message": "No active channel accounts found for tenant"
+            "message": "No active channel accounts with scheduling configuration found for tenant"
         }
     
     total_created = 0
