@@ -24,7 +24,7 @@ export function PageHeader({ title, description, action, breadcrumbs }: PageHead
           fontSize: 'var(--text-sm)',
           color: 'var(--color-text-secondary)'
         }}>
-          {breadcrumbs.map((crumb, index) => (
+          {breadcrumbs.filter(Boolean).map((crumb, index) => (
             <React.Fragment key={index}>
               {crumb.href ? (
                 <a 

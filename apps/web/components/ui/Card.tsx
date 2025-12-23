@@ -40,6 +40,7 @@ export function Card({
   
   return (
     <Component
+      type={onClick ? 'button' : undefined}
       className={`${baseClasses} ${className}`}
       onClick={onClick}
       style={{ 

@@ -364,11 +364,11 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
                       {item.type === 'job' ? (
-                        <>{item.community} - Lot <span className="font-mono">{item.lot_number}</span></>
-                      ) : item.customer_name}
+                        <>{item.community || 'Unknown'} - Lot <span className="font-mono">{item.lot_number || 'N/A'}</span></>
+                      ) : (item.customer_name || 'Unknown Customer')}
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                      {item.type === 'job' ? 'Job' : 'Service Call'} • {item.status}
+                      {item.type === 'job' ? 'Job' : 'Service Call'} • {item.status || 'Unknown'}
                     </div>
                   </div>
                   <span style={{
@@ -550,13 +550,13 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
                       {item.type === 'job' ? (
-                        <>{item.community} - Lot <span className="font-mono">{item.lot_number}</span></>
-                      ) : item.type === 'service_call' ? item.customer_name :
-                       item.type === 'review_request' ? item.customer_name :
-                       `Recovery: ${item.customer_name}`}
+                        <>{item.community || 'Unknown'} - Lot <span className="font-mono">{item.lot_number || 'N/A'}</span></>
+                      ) : item.type === 'service_call' ? (item.customer_name || 'Unknown Customer') :
+                       item.type === 'review_request' ? (item.customer_name || 'Unknown Customer') :
+                       `Recovery: ${item.customer_name || 'Unknown Customer'}`}
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>
-                      {item.days_overdue} days overdue
+                      {item.days_overdue || 0} days overdue
                     </div>
                   </div>
                 </a>

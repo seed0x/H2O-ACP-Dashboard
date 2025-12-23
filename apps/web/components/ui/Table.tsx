@@ -24,7 +24,7 @@ export function Table<T extends { id: string | number }>({
   actions
 }: TableProps<T>) {
   const isMobile = useMobile()
-  if (data.length === 0) {
+  if (!data || data.length === 0) {
     return (
       <div style={{
         backgroundColor: 'var(--color-surface)',

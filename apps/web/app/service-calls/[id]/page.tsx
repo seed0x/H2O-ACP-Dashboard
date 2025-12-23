@@ -297,8 +297,8 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
   return (
     <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader
-        title={sc.customer_name}
-        description={`${sc.address_line1}, ${sc.city}, ${sc.state} ${sc.zip}`}
+        title={sc.customer_name || 'Unknown Customer'}
+        description={`${sc.address_line1 || ''}, ${sc.city || ''}, ${sc.state || ''} ${sc.zip || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/\s{2,}/g, ' ') || 'No address provided'}
         action={
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button onClick={() => router.push('/service-calls')} variant="secondary">Back</Button>

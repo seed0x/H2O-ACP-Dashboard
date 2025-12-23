@@ -184,21 +184,22 @@ export function TodaysSchedule() {
   if (scheduleItems.length === 0) {
     return (
       <div style={{
-        backgroundColor: 'var(--color-card)',
+        backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-lg)',
         padding: '48px',
-        textAlign: 'center'
+        textAlign: 'center',
+        boxShadow: 'var(--shadow-sm)'
       }}>
         <div style={{ 
-          fontSize: '18px', 
-          fontWeight: '600', 
+          fontSize: 'var(--text-lg)', 
+          fontWeight: 600, 
           color: 'var(--color-text-primary)', 
           marginBottom: '8px' 
         }}>
           No Schedule for Today
         </div>
-        <div style={{ color: 'var(--color-text-secondary)' }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
           All clear! No jobs or service calls scheduled for today.
         </div>
       </div>
@@ -220,19 +221,16 @@ export function TodaysSchedule() {
         flexWrap: 'wrap',
         gap: '12px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '20px' }}>📅</span>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: 'var(--color-text-primary)',
-            margin: 0
-          }}>
-            Today's Schedule
-          </h2>
-        </div>
+        <h2 style={{
+          fontSize: 'var(--text-lg)',
+          fontWeight: 600,
+          color: 'var(--color-text-primary)',
+          margin: 0
+        }}>
+          Today's Schedule
+        </h2>
         <div style={{ 
-          fontSize: '14px', 
+          fontSize: 'var(--text-sm)', 
           color: 'var(--color-text-secondary)',
           display: 'flex',
           alignItems: 'center',
