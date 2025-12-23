@@ -62,8 +62,10 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
-  const [scheduledStart, setScheduledStart] = useState('')
-  const [scheduledEnd, setScheduledEnd] = useState('')
+  const [scheduledStartDate, setScheduledStartDate] = useState('')
+  const [scheduledStartTime, setScheduledStartTime] = useState('')
+  const [scheduledEndDate, setScheduledEndDate] = useState('')
+  const [scheduledEndTime, setScheduledEndTime] = useState('')
   const [notes, setNotes] = useState('')
   const [suggestedPortals, setSuggestedPortals] = useState<any[]>([])
   const [loadingPortals, setLoadingPortals] = useState(false)
@@ -100,8 +102,27 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       setStatus(scData.status || '')
       setPriority(scData.priority || '')
       setAssignedTo(scData.assigned_to || '')
-      setScheduledStart(scData.scheduled_start ? scData.scheduled_start.split('T')[0] : '')
-      setScheduledEnd(scData.scheduled_end ? scData.scheduled_end.split('T')[0] : '')
+      
+      // Parse scheduled_start with time
+      if (scData.scheduled_start) {
+        const startDate = new Date(scData.scheduled_start)
+        setScheduledStartDate(startDate.toISOString().split('T')[0])
+        setScheduledStartTime(startDate.toTimeString().slice(0, 5)) // HH:MM
+      } else {
+        setScheduledStartDate('')
+        setScheduledStartTime('')
+      }
+      
+      // Parse scheduled_end with time
+      if (scData.scheduled_end) {
+        const endDate = new Date(scData.scheduled_end)
+        setScheduledEndDate(endDate.toISOString().split('T')[0])
+        setScheduledEndTime(endDate.toTimeString().slice(0, 5)) // HH:MM
+      } else {
+        setScheduledEndDate('')
+        setScheduledEndTime('')
+      }
+      
       setNotes(scData.notes || '')
       
       // Load builder
@@ -181,13 +202,23 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       }
       const headers = { 'Authorization': `Bearer ${token}` }
       
+      // Combine date and time for scheduled dates
+      const combineDateTime = (date: string, time: string): string | null => {
+        if (!date) return null
+        if (!time) {
+          // If no time, use start of day
+          return new Date(date + 'T00:00:00').toISOString()
+        }
+        return new Date(date + 'T' + time + ':00').toISOString()
+      }
+      
       const updateData: any = {
         status,
         priority,
         assigned_to: assignedTo || null,
         notes,
-        scheduled_start: scheduledStart ? new Date(scheduledStart).toISOString() : null,
-        scheduled_end: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+        scheduled_start: combineDateTime(scheduledStartDate, scheduledStartTime),
+        scheduled_end: combineDateTime(scheduledEndDate, scheduledEndTime),
       }
       
       await axios.patch(`${API_BASE_URL}/service-calls/${id}`, updateData, { headers, withCredentials: true })
@@ -412,21 +443,35 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
                 Scheduled Start
               </label>
-              <Input
-                type="date"
-                value={scheduledStart}
-                onChange={(e) => setScheduledStart(e.target.value)}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                <Input
+                  type="date"
+                  value={scheduledStartDate}
+                  onChange={(e) => setScheduledStartDate(e.target.value)}
+                />
+                <Input
+                  type="time"
+                  value={scheduledStartTime}
+                  onChange={(e) => setScheduledStartTime(e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
                 Scheduled End
               </label>
-              <Input
-                type="date"
-                value={scheduledEnd}
-                onChange={(e) => setScheduledEnd(e.target.value)}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                <Input
+                  type="date"
+                  value={scheduledEndDate}
+                  onChange={(e) => setScheduledEndDate(e.target.value)}
+                />
+                <Input
+                  type="time"
+                  value={scheduledEndTime}
+                  onChange={(e) => setScheduledEndTime(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -10,9 +10,6 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { showToast } from '../../components/Toast'
 import { handleApiError, logError } from '../../lib/error-handler'
 
-// Hardcoded tech user - change this to match your tech user's username
-const TECH_USERNAME = 'tech'
-
 interface ScheduleItem {
   id: string
   customer_name: string
@@ -44,9 +41,34 @@ export default function TechSchedulePage() {
   const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [techUsername, setTechUsername] = useState<string>('')
   const isInitialLoad = useRef(true)
 
+  // Get username from JWT token
   useEffect(() => {
+    try {
+      const token = localStorage.getItem('token')
+      if (token) {
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]))
+          const username = payload.username || 'tech'
+          setTechUsername(username)
+        } else {
+          setTechUsername('tech') // Fallback
+        }
+      } else {
+        setTechUsername('tech') // Fallback
+      }
+    } catch (error) {
+      console.error('Failed to parse token for username:', error)
+      setTechUsername('tech') // Fallback
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!techUsername) return // Wait for username to be loaded
+    
     let pollInterval: NodeJS.Timeout | null = null
     
     // Initial load
@@ -72,7 +94,7 @@ export default function TechSchedulePage() {
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [techUsername])
 
   async function loadTodaysSchedule(silent = false) {
     // Don't show loading spinner on silent refreshes (polling)
@@ -85,8 +107,14 @@ export default function TechSchedulePage() {
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       const today = new Date().toISOString().split('T')[0]
 
+      if (!techUsername) {
+        setError('Unable to determine user. Please log in again.')
+        setLoading(false)
+        return
+      }
+
       const response = await axios.get(
-        `${API_BASE_URL}/service-calls?tenant_id=h2o&assigned_to=${TECH_USERNAME}&scheduled_date=${today}`,
+        `${API_BASE_URL}/service-calls?tenant_id=h2o&assigned_to=${techUsername}&scheduled_date=${today}`,
         { headers, withCredentials: true }
       )
       
@@ -124,7 +152,7 @@ export default function TechSchedulePage() {
     return (
       <div style={{ padding: '32px' }}>
         <PageHeader
-          title={`Today's Schedule - ${TECH_USERNAME}`}
+          title={`Today's Schedule${techUsername ? ` - ${techUsername}` : ''}`}
           description={new Date().toLocaleDateString('en-US', { 
             weekday: 'long', 
             year: 'numeric', 
@@ -152,7 +180,7 @@ export default function TechSchedulePage() {
     return (
       <div style={{ padding: '32px' }}>
         <PageHeader
-          title={`Today's Schedule - ${TECH_USERNAME}`}
+          title={`Today's Schedule${techUsername ? ` - ${techUsername}` : ''}`}
           action={<Button onClick={() => router.push('/')}>← Back</Button>}
         />
         <div style={{
@@ -171,7 +199,7 @@ export default function TechSchedulePage() {
   return (
     <div style={{ padding: '32px' }}>
       <PageHeader
-        title={`Today's Schedule - ${TECH_USERNAME}`}
+        title={`Today's Schedule${techUsername ? ` - ${techUsername}` : ''}`}
         description={`${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • ${scheduleItems.length} ${scheduleItems.length === 1 ? 'appointment' : 'appointments'} scheduled`}
         action={
           <div style={{ display: 'flex', gap: '8px' }}>

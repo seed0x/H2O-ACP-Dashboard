@@ -383,11 +383,19 @@ async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: st
     if scheduled_date:
         # Filter by scheduled_start date (match the date part only)
         try:
-            date_obj = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00')).date()
+            # Handle both YYYY-MM-DD and ISO datetime formats
+            if 'T' in scheduled_date or '+' in scheduled_date or 'Z' in scheduled_date:
+                date_obj = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00')).date()
+            else:
+                # Plain date string YYYY-MM-DD
+                date_obj = datetime.fromisoformat(scheduled_date).date()
+            
             start_of_day = datetime.combine(date_obj, datetime.min.time()).replace(tzinfo=timezone.utc)
             end_of_day = datetime.combine(date_obj, datetime.max.time()).replace(tzinfo=timezone.utc)
             q = q.where(models.ServiceCall.scheduled_start >= start_of_day).where(models.ServiceCall.scheduled_start <= end_of_day)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Invalid scheduled_date format '{scheduled_date}': {e}")
             pass  # Invalid date format, ignore filter
     q = q.order_by(models.ServiceCall.scheduled_start.asc().nullslast(), models.ServiceCall.created_at.desc()).limit(limit).offset(offset)
     res = await db.execute(q)
@@ -395,6 +403,7 @@ async def list_service_calls(db: AsyncSession, tenant_id: str | None, status: st
 
 async def update_service_call(db: AsyncSession, sc: models.ServiceCall, sc_in: schemas.ServiceCallUpdate, changed_by: str) -> models.ServiceCall:
     old_status = sc.status
+    old_assigned_to = sc.assigned_to  # Track assigned_to changes
     for field, value in sc_in.dict(exclude_unset=True).items():
         old = getattr(sc, field)
         setattr(sc, field, value)
@@ -411,6 +420,31 @@ async def update_service_call(db: AsyncSession, sc: models.ServiceCall, sc_in: s
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error triggering service call automation: {e}", exc_info=True)
+    
+    # Trigger notification if assigned_to changed
+    if sc_in.assigned_to is not None and old_assigned_to != sc.assigned_to:
+        try:
+            from ..core.automation import create_notification
+            if sc.assigned_to:
+                # Find user by username to get user_id
+                user_query = select(models.User).where(models.User.username == sc.assigned_to)
+                result = await db.execute(user_query)
+                user = result.scalar_one_or_none()
+                
+                if user:
+                    await create_notification(
+                        db,
+                        sc.tenant_id,
+                        'assignment',
+                        f'Service Call Assigned: {sc.customer_name}',
+                        f'You have been assigned to a service call at {sc.address_line1}, {sc.city}',
+                        'service_call',
+                        str(sc.id),
+                        user.id
+                    )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error creating assignment notification: {e}", exc_info=True)
     
     # Legacy automation: If service call was just completed, create review request
     if old_status != 'completed' and sc.status == 'completed':
