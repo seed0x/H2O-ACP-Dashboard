@@ -21,32 +21,45 @@ export function Card({
   onClick,
   style
 }: CardProps) {
-  const paddingClasses = {
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8'
+  const paddingStyles: Record<string, React.CSSProperties> = {
+    sm: { padding: 'var(--space-4)' },
+    md: { padding: 'var(--space-6)' },
+    lg: { padding: 'var(--space-8)' }
   }
 
-  const baseClasses = `
-    bg-[var(--color-surface)]
-    border border-[var(--color-border)]
-    rounded-lg
-    ${paddingClasses[padding]}
-    ${hover ? 'transition-all duration-200 hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-primary)]/30 cursor-pointer' : ''}
-    ${onClick ? 'cursor-pointer' : ''}
-  `.trim().replace(/\s+/g, ' ')
+  const baseStyles: React.CSSProperties = {
+    backgroundColor: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-lg)',
+    boxShadow: 'var(--shadow-sm)',
+    ...paddingStyles[padding],
+    ...(hover || onClick ? {
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+    } : {}),
+    ...style
+  }
+
+  const hoverStyles: React.CSSProperties = hover || onClick ? {
+    backgroundColor: 'var(--color-surface-elevated)',
+    borderColor: 'var(--color-primary)',
+    boxShadow: 'var(--shadow-md)',
+  } : {}
 
   const Component = onClick ? 'button' : 'div'
   
   return (
     <Component
       type={onClick ? 'button' : undefined}
-      className={`${baseClasses} ${className}`}
+      className={className}
       onClick={onClick}
-      style={{ 
-        boxShadow: 'var(--shadow-sm)',
-        ...style
-      }}
+      style={baseStyles}
+      onMouseEnter={hover || onClick ? (e) => {
+        Object.assign(e.currentTarget.style, baseStyles, hoverStyles)
+      } : undefined}
+      onMouseLeave={hover || onClick ? (e) => {
+        Object.assign(e.currentTarget.style, baseStyles)
+      } : undefined}
     >
       {children}
     </Component>

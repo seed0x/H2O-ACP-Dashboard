@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 interface StatCardProps {
   title: string
@@ -19,26 +19,59 @@ export function StatCard({
   trend,
   actionUrl 
 }: StatCardProps) {
+  const [isHovered, setIsHovered] = useState(false)
+
+  const baseStyles: React.CSSProperties = {
+    backgroundColor: alert ? 'rgba(239, 68, 68, 0.05)' : 'var(--color-card)',
+    border: alert ? '1px solid #EF4444' : '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-lg)',
+    boxShadow: 'var(--shadow-lg)',
+    padding: 'var(--space-4)',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: '100px',
+    aspectRatio: '16 / 9',
+    transition: 'all 0.2s ease',
+    ...(href ? { cursor: 'pointer' } : {}),
+    ...(isHovered && href ? {
+      borderColor: 'var(--color-primary)',
+      transform: 'scale(1.02)',
+    } : {})
+  }
+
   const content = (
-    <div className={`
-      ${alert ? 'bg-red-500/5 border-red-500' : 'bg-[var(--color-card)] border border-[var(--color-border)]'}
-      shadow-xl rounded-lg p-4 transition-all group
-      ${href ? 'cursor-pointer hover:border-[var(--color-primary)]/30 hover:shadow-2xl hover:scale-[1.02]' : ''}
-      aspect-video flex flex-col justify-between min-h-[100px]
-    `}
-    style={{
-      backgroundColor: alert ? undefined : 'var(--color-card)'
-    }}>
-      <div className="text-xs text-[var(--color-text-secondary)] mb-2 uppercase tracking-wider font-medium">
+    <div
+      style={baseStyles}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div style={{
+        fontSize: 'var(--text-xs)',
+        color: 'var(--color-text-secondary)',
+        marginBottom: 'var(--space-2)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        fontWeight: 500,
+      }}>
         {title}
       </div>
-      <div className="flex items-end justify-between">
-        <div className="flex flex-col">
-          <div className="text-2xl font-bold tabular-nums" style={{ color }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            fontSize: 'var(--text-2xl)',
+            fontWeight: 700,
+            fontVariantNumeric: 'tabular-nums',
+            color,
+          }}>
             {value}
           </div>
           {trend !== undefined && (
-            <div className={`text-xs mt-1 ${trend >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div style={{
+              fontSize: 'var(--text-xs)',
+              marginTop: '4px',
+              color: trend >= 0 ? '#10B981' : '#EF4444',
+            }}>
               {trend >= 0 ? '+' : ''}{trend}%
             </div>
           )}
@@ -46,9 +79,16 @@ export function StatCard({
         {href && (
           <a
             href={href}
-            className="text-xs text-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity font-medium"
+            style={{
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-primary)',
+              opacity: isHovered ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+              fontWeight: 500,
+              minWidth: 'fit-content',
+              textDecoration: 'none',
+            }}
             onClick={(e) => e.stopPropagation()}
-            style={{ minWidth: 'fit-content' }}
           >
             View All →
           </a>
@@ -58,7 +98,11 @@ export function StatCard({
   )
   
   if (href) {
-    return <a href={href} className="no-underline">{content}</a>
+    return (
+      <a href={href} style={{ textDecoration: 'none', display: 'block' }}>
+        {content}
+      </a>
+    )
   }
   return content
 }

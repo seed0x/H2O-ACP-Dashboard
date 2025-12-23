@@ -14,28 +14,90 @@ export function Button({
   className = '',
   ...props 
 }: ButtonProps) {
-  const variantClasses = {
-    primary: 'bg-[var(--color-primary)] text-white border-transparent hover:bg-[var(--color-primary-hover)] focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 focus:ring-offset-[var(--color-bg)]',
-    secondary: 'bg-transparent text-[var(--color-text-primary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-primary)]',
-    danger: 'bg-[var(--color-error)] text-white border-transparent hover:bg-[#DC2626] focus:ring-2 focus:ring-[var(--color-error)] focus:ring-offset-2 focus:ring-offset-[var(--color-bg)]',
-    ghost: 'bg-transparent text-[var(--color-text-secondary)] border border-transparent hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]'
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      backgroundColor: 'var(--color-primary)',
+      color: '#ffffff',
+      border: '1px solid transparent',
+    },
+    secondary: {
+      backgroundColor: 'transparent',
+      color: 'var(--color-text-primary)',
+      border: '1px solid var(--color-border)',
+    },
+    danger: {
+      backgroundColor: 'var(--color-error)',
+      color: '#ffffff',
+      border: '1px solid transparent',
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+      color: 'var(--color-text-secondary)',
+      border: '1px solid transparent',
+    }
   }
 
-  const sizeClasses = {
-    sm: 'px-3 py-1.5 text-xs min-h-[32px]',
-    md: 'px-5 py-2.5 text-sm min-h-[44px]',
-    lg: 'px-7 py-3.5 text-base min-h-[48px]'
+  const sizeStyles: Record<string, React.CSSProperties> = {
+    sm: {
+      padding: '6px 12px',
+      fontSize: 'var(--text-xs)',
+      minHeight: '32px',
+    },
+    md: {
+      padding: '10px 20px',
+      fontSize: 'var(--text-sm)',
+      minHeight: '44px',
+    },
+    lg: {
+      padding: '14px 28px',
+      fontSize: 'var(--text-base)',
+      minHeight: '48px',
+    }
   }
+
+  const baseStyles: React.CSSProperties = {
+    fontFamily: 'inherit',
+    fontWeight: 500,
+    borderRadius: 'var(--radius-lg)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    outline: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...variantStyles[variant],
+    ...sizeStyles[size],
+  }
+
+  const hoverStyles: React.CSSProperties = 
+    variant === 'primary' 
+      ? { backgroundColor: 'var(--color-primary-hover)' }
+      : variant === 'secondary'
+      ? { backgroundColor: 'var(--color-surface-elevated)', borderColor: 'var(--color-primary)' }
+      : variant === 'danger'
+      ? { backgroundColor: '#DC2626' }
+      : { backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-text-primary)' }
 
   return (
     <button
-      className={`
-        font-medium rounded-lg transition-all duration-200
-        focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed
-        ${variantClasses[variant]}
-        ${sizeClasses[size]}
-        ${className}
-      `}
+      className={className}
+      style={baseStyles}
+      onMouseEnter={(e) => {
+        Object.assign(e.currentTarget.style, hoverStyles)
+      }}
+      onMouseLeave={(e) => {
+        Object.assign(e.currentTarget.style, baseStyles)
+      }}
+      onFocus={(e) => {
+        if (variant === 'primary') {
+          e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary), 0 0 0 4px var(--color-bg)'
+        } else if (variant === 'danger') {
+          e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-error), 0 0 0 4px var(--color-bg)'
+        }
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.boxShadow = ''
+      }}
       {...props}
     >
       {children}
