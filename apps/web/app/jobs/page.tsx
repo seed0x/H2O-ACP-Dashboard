@@ -211,6 +211,8 @@ export default function JobsPage() {
         onRowClick={(job) => router.push(`/jobs/${job.id}`)}
         emptyMessage="No jobs found. Create your first job to get started."
         actions={getQuickActions}
+        itemsPerPage={25}
+        maxHeight="600px"
       />
     </div>
   )

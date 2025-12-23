@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { QuickActions, QuickAction } from '../QuickActions'
 import { useMobile } from '../../lib/useMobile'
 
@@ -14,6 +14,8 @@ interface TableProps<T> {
   onRowClick?: (row: T) => void
   emptyMessage?: string
   actions?: (row: T) => QuickAction[]
+  itemsPerPage?: number
+  maxHeight?: string
 }
 
 export function Table<T extends { id: string | number }>({ 
@@ -21,9 +23,22 @@ export function Table<T extends { id: string | number }>({
   columns, 
   onRowClick,
   emptyMessage = 'No data available',
-  actions
+  actions,
+  itemsPerPage = 50,
+  maxHeight
 }: TableProps<T>) {
   const isMobile = useMobile()
+  const [currentPage, setCurrentPage] = useState(1)
+  
+  const totalPages = Math.ceil(data.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedData = data.slice(startIndex, endIndex)
+  
+  // Reset to page 1 when data changes
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [data.length])
   if (!data || data.length === 0) {
     return (
       <div style={{
@@ -45,11 +60,15 @@ export function Table<T extends { id: string | number }>({
       backgroundColor: 'var(--color-card)',
       border: '1px solid var(--color-border)',
       borderRadius: '12px',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column'
     }}>
       <div style={{
         overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch'
+        overflowY: maxHeight ? 'auto' : 'visible',
+        WebkitOverflowScrolling: 'touch',
+        maxHeight: maxHeight || 'none'
       }}>
         <table style={{ 
           width: '100%', 
@@ -95,12 +114,12 @@ export function Table<T extends { id: string | number }>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row, rowIndex) => (
+          {paginatedData.map((row, rowIndex) => (
             <tr
               key={row.id}
               onClick={() => onRowClick?.(row)}
               style={{
-                borderBottom: rowIndex < data.length - 1 ? '1px solid var(--color-border)' : 'none',
+                borderBottom: rowIndex < paginatedData.length - 1 ? '1px solid var(--color-border)' : 'none',
                 cursor: onRowClick ? 'pointer' : 'default',
                 transition: 'background-color 0.15s'
               }}
@@ -146,6 +165,70 @@ export function Table<T extends { id: string | number }>({
         </tbody>
       </table>
       </div>
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{
+          padding: '16px',
+          borderTop: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: 'var(--color-hover)'
+        }}>
+          <div style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-text-secondary)'
+          }}>
+            Showing {startIndex + 1} to {Math.min(endIndex, data.length)} of {data.length} items
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center'
+          }}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '8px 12px',
+                fontSize: 'var(--text-sm)',
+                backgroundColor: currentPage === 1 ? 'var(--color-border)' : 'var(--color-primary)',
+                color: currentPage === 1 ? 'var(--color-text-secondary)' : 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: currentPage === 1 ? 0.5 : 1
+              }}
+            >
+              Previous
+            </button>
+            <span style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-primary)',
+              padding: '0 12px'
+            }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '8px 12px',
+                fontSize: 'var(--text-sm)',
+                backgroundColor: currentPage === totalPages ? 'var(--color-border)' : 'var(--color-primary)',
+                color: currentPage === totalPages ? 'var(--color-text-secondary)' : 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                opacity: currentPage === totalPages ? 0.5 : 1
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
