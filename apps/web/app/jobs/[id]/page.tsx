@@ -11,8 +11,19 @@ import { Input } from '../../../components/ui/Input'
 import { Select } from '../../../components/ui/Select'
 import { Textarea } from '../../../components/ui/Textarea'
 import { TasksPanel } from '../../../components/ui/TasksPanel'
+import { Card, CardHeader, CardSection } from '../../../components/ui/Card'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
+import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
+import UilUser from '@iconscout/react-unicons/icons/uil-user'
+import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
+import UilPhone from '@iconscout/react-unicons/icons/uil-phone'
+import UilEnvelope from '@iconscout/react-unicons/icons/uil-envelope'
+import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
+import UilCheckCircle from '@iconscout/react-unicons/icons/uil-check-circle'
+import UilBuilding from '@iconscout/react-unicons/icons/uil-building'
+import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+import UilClock from '@iconscout/react-unicons/icons/uil-clock'
 
 interface Job {
   id: string
@@ -74,16 +85,9 @@ interface AuditLog {
   changed_at: string
 }
 
-// Helper function to get status color and icon
-function getStatusInfo(status: string) {
-  const statusMap: Record<string, { color: string; bgColor: string; icon: string }> = {
-    'Completed': { color: '#4CAF50', bgColor: 'rgba(76, 175, 80, 0.1)', icon: '🟢' },
-    'Scheduled': { color: '#FFA726', bgColor: 'rgba(255, 152, 0, 0.1)', icon: '🟡' },
-    'In Progress': { color: '#2196F3', bgColor: 'rgba(33, 150, 243, 0.1)', icon: '🔵' },
-    'On Hold': { color: '#FF9800', bgColor: 'rgba(255, 152, 0, 0.1)', icon: '🟠' },
-    'New': { color: '#9E9E9E', bgColor: 'rgba(158, 158, 158, 0.1)', icon: '⚪' },
-  }
-  return statusMap[status] || { color: '#9E9E9E', bgColor: 'rgba(158, 158, 158, 0.1)', icon: '⚪' }
+// Icon component wrapper for consistent sizing
+function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
+  return <Icon size={size} color={color} />
 }
 
 // Helper to format date with time
@@ -345,7 +349,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
     ? Math.floor((new Date().getTime() - new Date(job.scheduled_end).getTime()) / (1000 * 60 * 60 * 24))
     : 0
 
-  const statusInfo = getStatusInfo(status || job.status)
+  const currentStatus = status || job.status
   const hasWarranty = warrantyStart || warrantyEnd || warrantyNotes
   const hasPortals = suggestedPortals.length > 0
 
@@ -368,97 +372,104 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
       maxWidth: '1400px', 
       margin: '0 auto'
     }}>
-      {/* Improved Header with Key Info */}
-      <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6 mb-6">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
-              Job #{job.lot_number} - Lot {job.lot_number}
-            </h1>
-            <div style={{ fontSize: '16px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-              {job.address_line1}, {job.city}, {job.state} {job.zip}
-            </div>
-            <div style={{ fontSize: '14px', color: 'var(--color-text-tertiary)' }}>
-              Phase: {job.phase} {builder && `• ${builder.name}`}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <Button onClick={() => router.push('/jobs')} variant="secondary">← Back</Button>
+      {/* Professional Header */}
+      <PageHeader
+        title={`Lot ${job.lot_number}`}
+        description={`${job.address_line1}, ${job.city}, ${job.state} ${job.zip}`}
+        breadcrumbs={[
+          { label: 'Jobs', href: '/jobs' },
+          { label: `Lot ${job.lot_number}` }
+        ]}
+        action={
+          <>
+            <Button onClick={() => router.push('/jobs')} variant="secondary">
+              Back
+            </Button>
             <Button onClick={saveJob} disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* Key Info Bar */}
-        <div style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap',
-          padding: '16px',
-          backgroundColor: 'var(--color-hover)',
-          borderRadius: '8px',
-          alignItems: 'center'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '20px' }}>{statusInfo.icon}</span>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Status</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: statusInfo.color }}>
-                {status || job.status}
-              </div>
-            </div>
+      {/* Key Info Cards */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        <Card padding="sm">
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+            Status
           </div>
-          
-          {techName && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '20px' }}>👤</span>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Technician</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                  {techName}
-                </div>
-              </div>
+          <StatusBadge status={currentStatus} />
+        </Card>
+        
+        {techName && (
+          <Card padding="sm">
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+              Technician
             </div>
-          )}
-          
-          {scheduledStartDate && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '20px' }}>📅</span>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Scheduled</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                  {new Date(scheduledStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {scheduledStartTime && ` • ${scheduledStartTime}`}
-                </div>
-              </div>
+              <IconWrapper Icon={UilUser} size={18} />
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                {techName}
+              </span>
             </div>
-          )}
-        </div>
+          </Card>
+        )}
+        
+        {scheduledStartDate && (
+          <Card padding="sm">
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+              Scheduled
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconWrapper Icon={UilCalendarAlt} size={18} />
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                {new Date(scheduledStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {scheduledStartTime && ` • ${scheduledStartTime}`}
+              </span>
+            </div>
+          </Card>
+        )}
+
+        {builder && (
+          <Card padding="sm">
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+              Builder
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconWrapper Icon={UilBuilding} size={18} />
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                {builder.name}
+              </span>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Overdue Alert */}
       {isOverdue && (
-        <div style={{
-          padding: '16px',
-          backgroundColor: 'rgba(239, 83, 80, 0.1)',
-          border: '1px solid #EF5350',
-          borderRadius: '8px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
+        <Card padding="md" className="mb-6" style={{ 
+          backgroundColor: 'var(--color-error-bg)', 
+          borderColor: 'var(--color-error)',
+          borderWidth: '1px',
+          borderStyle: 'solid'
         }}>
-          <span style={{ fontSize: '24px' }}>⚠️</span>
-          <div>
-            <div style={{ fontWeight: '600', color: '#EF5350', marginBottom: '4px' }}>
-              Overdue by {daysOverdue} day{daysOverdue !== 1 ? 's' : ''}
-            </div>
-            <div style={{ fontSize: '14px', color: '#EF5350' }}>
-              Scheduled end date: {job.scheduled_end ? new Date(job.scheduled_end).toLocaleDateString() : 'Not set'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <IconWrapper Icon={UilExclamationTriangle} size={24} color="var(--color-error)" />
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--color-error)', marginBottom: '4px' }}>
+                Overdue by {daysOverdue} day{daysOverdue !== 1 ? 's' : ''}
+              </div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-error)' }}>
+                Scheduled end date: {job.scheduled_end ? new Date(job.scheduled_end).toLocaleDateString() : 'Not set'}
+              </div>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Main Content Layout - 60/40 Split with Sticky Sidebar */}
@@ -472,34 +483,28 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
         {/* Main Column (60%) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Status & Assignment Section */}
-          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-              Status & Assignment
-            </h2>
+          <Card>
+            <CardHeader title="Status & Assignment" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                   Status
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '24px' }}>{statusInfo.icon}</span>
-                  <Select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    options={[
-                      { value: 'New', label: 'New' },
-                      { value: 'Scheduled', label: 'Scheduled' },
-                      { value: 'In Progress', label: 'In Progress' },
-                      { value: 'Completed', label: 'Completed' },
-                      { value: 'On Hold', label: 'On Hold' }
-                    ]}
-                    style={{ flex: 1 }}
-                  />
-                </div>
+                <Select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  options={[
+                    { value: 'New', label: 'New' },
+                    { value: 'Scheduled', label: 'Scheduled' },
+                    { value: 'In Progress', label: 'In Progress' },
+                    { value: 'Completed', label: 'Completed' },
+                    { value: 'On Hold', label: 'On Hold' }
+                  ]}
+                />
               </div>
               
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                   Assigned Technician
                 </label>
                 <Input
@@ -511,7 +516,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                     <Button 
                       variant="secondary" 
-                      style={{ fontSize: '12px', padding: '4px 12px' }}
+                      size="sm"
                       onClick={() => router.push(`/tech-schedule?tech=${encodeURIComponent(techName)}`)}
                     >
                       View Schedule
@@ -521,7 +526,26 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
               </div>
               
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                  Phase
+                </label>
+                <Select
+                  value={phase}
+                  onChange={(e) => setPhase(e.target.value)}
+                  options={[
+                    { value: 'Pre-Construction', label: 'Pre-Construction' },
+                    { value: 'Rough-In', label: 'Rough-In' },
+                    { value: 'Top Out', label: 'Top Out' },
+                    { value: 'Post and Beam', label: 'Post and Beam' },
+                    { value: 'Trim', label: 'Trim' },
+                    { value: 'Final', label: 'Final' },
+                    { value: 'Completed', label: 'Completed' }
+                  ]}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                   Owner/Assignee
                 </label>
                 <Input
@@ -531,17 +555,13 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                 />
               </div>
             </div>
-          </div>
+          </Card>
 
-          {/* Improved Scheduling Section */}
-          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-              Scheduling
-            </h2>
-            
-            {/* Work Window - Combined Start/End */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '12px' }}>
+          {/* Scheduling Section */}
+          <Card>
+            <CardHeader title="Scheduling" />
+            <CardSection>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
                 Work Window
               </label>
               <div style={{
@@ -551,7 +571,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                 alignItems: 'end'
               }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Start</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Start</div>
                   <Input
                     type="date"
                     value={scheduledStartDate}
@@ -572,16 +592,16 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                     justifyContent: 'center',
                     paddingBottom: '8px'
                   }}>
-                    <div style={{ fontSize: '20px', color: 'var(--color-text-secondary)' }}>→</div>
+                    <IconWrapper Icon={UilClock} size={20} />
                     {durationDays && (
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                         {durationDays} {durationDays === 1 ? 'day' : 'days'}
                       </div>
                     )}
                   </div>
                 )}
                 <div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>End</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>End</div>
                   <Input
                     type="date"
                     value={scheduledEndDate}
@@ -595,11 +615,10 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                   />
                 </div>
               </div>
-            </div>
+            </CardSection>
             
-            {/* Completion Date */}
-            <div>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+            <CardSection>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Completion Date (Actual)
               </label>
               <Input
@@ -608,50 +627,51 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                 onChange={(e) => setCompletionDate(e.target.value)}
                 placeholder="Not completed yet"
               />
-            </div>
-          </div>
+            </CardSection>
+          </Card>
 
-          {/* Enhanced Warranty Section */}
-          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6" style={{
-            border: warrantyStart ? '2px solid #10b981' : '1px solid var(--color-border)',
-            backgroundColor: warrantyStart ? 'rgba(16, 185, 129, 0.05)' : 'var(--color-card)'
+          {/* Warranty Section */}
+          <Card style={{
+            borderColor: warrantyStart ? 'var(--color-success)' : undefined,
+            borderWidth: warrantyStart ? '2px' : undefined,
+            backgroundColor: warrantyStart ? 'var(--color-success-bg)' : undefined
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)', margin: 0 }}>
-                🔧 Warranty Period
-              </h2>
-              {warrantyStart && warrantyEnd && (
+            <CardHeader 
+              title="Warranty Period"
+              action={warrantyStart && warrantyEnd && (
                 <StatusBadge 
                   status={new Date(warrantyEnd) >= new Date() ? 'Active' : 'Expired'}
                   variant={new Date(warrantyEnd) >= new Date() ? 'success' : 'error'}
                 />
               )}
-            </div>
+            />
 
             {warrantyStart && warrantyEnd ? (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                      Start Date
-                    </label>
-                    <Input 
-                      type="date" 
-                      value={warrantyStart} 
-                      onChange={(e) => setWarrantyStart(e.target.value)}
-                    />
+                <CardSection>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                        Start Date
+                      </label>
+                      <Input 
+                        type="date" 
+                        value={warrantyStart} 
+                        onChange={(e) => setWarrantyStart(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                        End Date
+                      </label>
+                      <Input 
+                        type="date" 
+                        value={warrantyEnd} 
+                        onChange={(e) => setWarrantyEnd(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                      End Date
-                    </label>
-                    <Input 
-                      type="date" 
-                      value={warrantyEnd} 
-                      onChange={(e) => setWarrantyEnd(e.target.value)}
-                    />
-                  </div>
-                </div>
+                </CardSection>
                 
                 {(() => {
                   const endDate = new Date(warrantyEnd)
@@ -660,24 +680,33 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                   const isActive = daysRemaining > 0
                   
                   return (
-                    <div style={{ 
-                      marginTop: '12px', 
-                      padding: '12px', 
-                      backgroundColor: isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
-                      borderRadius: '6px' 
-                    }}>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: isActive ? '#10b981' : '#ef4444' }}>
-                        {isActive ? `${daysRemaining} days remaining` : `Expired ${Math.abs(daysRemaining)} days ago`}
+                    <CardSection>
+                      <div style={{ 
+                        padding: '12px', 
+                        backgroundColor: isActive ? 'var(--color-success-bg)' : 'var(--color-error-bg)', 
+                        borderRadius: 'var(--radius-md)',
+                        border: `1px solid ${isActive ? 'var(--color-success)' : 'var(--color-error)'}`
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <IconWrapper 
+                            Icon={isActive ? UilCheckCircle : UilExclamationTriangle} 
+                            size={18} 
+                            color={isActive ? 'var(--color-success)' : 'var(--color-error)'}
+                          />
+                          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: isActive ? 'var(--color-success)' : 'var(--color-error)' }}>
+                            {isActive ? `${daysRemaining} days remaining` : `Expired ${Math.abs(daysRemaining)} days ago`}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                          Warranty expires {endDate.toLocaleDateString()}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                        Warranty expires {endDate.toLocaleDateString()}
-                      </div>
-                    </div>
+                    </CardSection>
                   )
                 })()}
                 
-                <div style={{ marginTop: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                <CardSection>
+                  <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
                     Warranty Notes
                   </label>
                   <Textarea
@@ -686,29 +715,29 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                     placeholder="Additional warranty information..."
                     rows={3}
                   />
-                </div>
+                </CardSection>
               </>
             ) : (
               <div style={{ 
                 textAlign: 'center', 
-                padding: '24px', 
+                padding: '32px 24px', 
                 color: 'var(--color-text-secondary)',
-                fontSize: '14px'
+                fontSize: 'var(--text-sm)'
               }}>
-                <div style={{ fontSize: '48px', marginBottom: '8px' }}>📋</div>
-                <div style={{ fontWeight: '500', marginBottom: '4px' }}>No warranty period set</div>
-                <div style={{ fontSize: '12px' }}>
+                <IconWrapper Icon={UilFileAlt} size={48} />
+                <div style={{ fontWeight: 500, marginTop: '12px', marginBottom: '4px', color: 'var(--color-text-primary)' }}>
+                  No warranty period set
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)' }}>
                   Warranty will auto-start when job completes in Trim/Final phase
                 </div>
               </div>
             )}
-          </div>
+          </Card>
 
-          {/* Improved Notes Section */}
-          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: 'var(--color-text-primary)' }}>
-              📝 Notes & Updates
-            </h2>
+          {/* Notes Section */}
+          <Card>
+            <CardHeader title="Notes & Updates" />
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -720,70 +749,68 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
               <div style={{
                 marginTop: '16px',
                 padding: '12px',
-                backgroundColor: 'var(--color-hover)',
-                borderRadius: '6px',
+                backgroundColor: 'var(--color-surface-elevated)',
+                borderRadius: 'var(--radius-md)',
                 borderLeft: '3px solid var(--color-primary)'
               }}>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
-                  📌 Imported from Outlook: {builder?.name || 'Unknown'}
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                  Imported from Outlook: {builder?.name || 'Unknown'}
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
                   {job.notes}
                 </div>
               </div>
             )}
-          </div>
+          </Card>
 
-          {/* Improved Activity Timeline */}
-          <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: timelineExpanded ? '20px' : '0' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                📊 Activity Timeline
-              </h2>
-              {audit.length > 0 && (
+          {/* Activity Timeline */}
+          <Card>
+            <CardHeader 
+              title="Activity Timeline"
+              action={audit.length > 0 && (
                 <Button
                   variant="secondary"
+                  size="sm"
                   onClick={() => setTimelineExpanded(!timelineExpanded)}
-                  style={{ fontSize: '12px', padding: '4px 12px' }}
                 >
                   {timelineExpanded ? '▲' : '▼'}
                 </Button>
               )}
-            </div>
+            />
             
             {timelineExpanded || audit.length === 0 ? (
               audit.length === 0 ? (
-                <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: '32px' }}>
                   No activity recorded
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {Object.entries(groupedAudit).map(([date, logs]) => (
                     <div key={date}>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>
                         {date}
                       </div>
                       {logs.map((log) => (
                         <div key={log.id} style={{
                           padding: '12px',
-                          backgroundColor: 'var(--color-hover)',
-                          borderRadius: '6px',
+                          backgroundColor: 'var(--color-surface-elevated)',
+                          borderRadius: 'var(--radius-md)',
                           marginBottom: '8px',
                           borderLeft: '3px solid var(--color-primary)'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                            <div style={{ fontWeight: '500', color: 'var(--color-text-primary)' }}>
+                            <div style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>
                               {log.action} {log.field ? `(${log.field})` : ''}
                             </div>
-                            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
                               {new Date(log.changed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                             </div>
                           </div>
-                          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
                             by {log.changed_by}
                           </div>
                           {log.old_value && log.new_value && (
-                            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
                               {log.old_value} → {log.new_value}
                             </div>
                           )}
@@ -794,7 +821,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                 </div>
               )
             ) : null}
-          </div>
+          </Card>
         </div>
 
         {/* Sidebar (40%) - Sticky Summary */}
@@ -808,56 +835,79 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
           maxHeight: isMobile ? 'none' : 'calc(100vh - 48px)',
           overflowY: isMobile ? 'visible' : 'auto'
         }}>
-          {/* Enhanced Builder Card */}
+          {/* Builder Card */}
           {builder && (
-            <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-              <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
-                Builder
-              </h2>
-              
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
-                  🏗️ {builder.name}
+            <Card>
+              <CardHeader title="Builder" />
+              <CardSection>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <IconWrapper Icon={UilBuilding} size={20} />
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {builder.name}
+                  </div>
                 </div>
-              </div>
+              </CardSection>
               
               {contacts.length > 0 && (
-                <div style={{ marginBottom: '20px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '500', color: 'var(--color-text-primary)', marginBottom: '12px' }}>
-                    Contact
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <CardSection title="Contacts">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {contacts.slice(0, 2).map(contact => (
-                      <div key={contact.id} style={{ padding: '12px', backgroundColor: 'var(--color-hover)', borderRadius: '6px' }}>
-                        <div style={{ fontWeight: '500', marginBottom: '4px' }}>{contact.name}</div>
-                        <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '6px' }}>{contact.role}</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div key={contact.id} style={{ padding: '12px', backgroundColor: 'var(--color-surface-elevated)', borderRadius: 'var(--radius-md)' }}>
+                        <div style={{ fontWeight: 500, marginBottom: '4px', color: 'var(--color-text-primary)' }}>{contact.name}</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>{contact.role}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {contact.phone && (
-                            <a href={`tel:${contact.phone}`} style={{ fontSize: '13px', color: 'var(--color-primary)' }}>
-                              📞 {contact.phone}
+                            <a 
+                              href={`tel:${contact.phone}`} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px',
+                                fontSize: 'var(--text-xs)', 
+                                color: 'var(--color-primary)',
+                                textDecoration: 'none'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                              onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                            >
+                              <IconWrapper Icon={UilPhone} size={14} color="var(--color-primary)" />
+                              {contact.phone}
                             </a>
                           )}
                           {contact.email && (
-                            <a href={`mailto:${contact.email}`} style={{ fontSize: '13px', color: 'var(--color-primary)' }}>
-                              ✉️ {contact.email}
+                            <a 
+                              href={`mailto:${contact.email}`} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px',
+                                fontSize: 'var(--text-xs)', 
+                                color: 'var(--color-primary)',
+                                textDecoration: 'none'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                              onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                            >
+                              <IconWrapper Icon={UilEnvelope} size={14} color="var(--color-primary)" />
+                              {contact.email}
                             </a>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </CardSection>
               )}
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <Button variant="secondary" style={{ width: '100%', fontSize: '13px' }}>
-                  💬 Message Builder
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                <Button variant="secondary" size="sm" style={{ width: '100%' }}>
+                  Message Builder
                 </Button>
-                <Button variant="secondary" style={{ width: '100%', fontSize: '13px' }}>
-                  📋 View All Jobs
+                <Button variant="secondary" size="sm" style={{ width: '100%' }}>
+                  View All Jobs
                 </Button>
               </div>
-            </div>
+            </Card>
           )}
 
           {/* Tasks Panel */}
@@ -869,21 +919,21 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
 
           {/* Suggested Portals - Only show if has portals */}
           {hasPortals && (
-            <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                  🔗 Integration Portals
-                </h2>
-                <Button
-                  variant="secondary"
-                  onClick={() => router.push('/directory')}
-                  style={{ fontSize: '12px', padding: '4px 12px' }}
-                >
-                  View All
-                </Button>
-              </div>
+            <Card>
+              <CardHeader 
+                title="Integration Portals"
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => router.push('/directory')}
+                  >
+                    View All
+                  </Button>
+                }
+              />
               {loadingPortals ? (
-                <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px', textAlign: 'center', padding: '32px' }}>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: '32px' }}>
                   Loading portals...
                 </div>
               ) : (
@@ -891,21 +941,22 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                   {suggestedPortals.slice(0, 3).map(portal => (
                     <div key={portal.id} style={{
                       padding: '12px',
-                      backgroundColor: 'var(--color-hover)',
-                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-surface-elevated)',
+                      borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--color-border)'
                     }}>
-                      <div style={{ fontWeight: '500', marginBottom: '4px', color: 'var(--color-text-primary)' }}>
+                      <div style={{ fontWeight: 500, marginBottom: '4px', color: 'var(--color-text-primary)' }}>
                         {portal.portal_definition.name}
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
                         {portal.portal_definition.jurisdiction && `${portal.portal_definition.jurisdiction} • `}
                         <StatusBadge status={portal.portal_definition.category} variant="category" />
                       </div>
                       <Button
                         variant="primary"
+                        size="sm"
                         onClick={() => window.open(portal.portal_definition.base_url, '_blank', 'noopener,noreferrer')}
-                        style={{ width: '100%', fontSize: '12px', padding: '6px 12px' }}
+                        style={{ width: '100%' }}
                       >
                         Open Portal
                       </Button>
@@ -913,7 +964,7 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           )}
         </div>
       </div>
