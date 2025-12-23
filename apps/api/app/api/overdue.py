@@ -101,7 +101,7 @@ async def get_overdue_service_calls(
 
 @router.get('/reviews/requests/overdue')
 async def get_overdue_review_requests(
-    tenant_id: Optional[str] = Query(None),
+    tenant_id: Optional[str] = Query(None, description="Tenant ID filter"),
     db: AsyncSession = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
@@ -142,7 +142,7 @@ async def get_overdue_review_requests(
 
 @router.get('/recovery-tickets/overdue')
 async def get_overdue_recovery_tickets(
-    tenant_id: Optional[str] = Query(None),
+    tenant_id: Optional[str] = Query(None, description="Tenant ID filter"),
     db: AsyncSession = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
