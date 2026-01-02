@@ -746,6 +746,42 @@ async def list_users(
     result = await db.execute(query)
     return result.scalars().all()
 
+
+# Simple user listing for assignment dropdowns (any authenticated user can access)
+class AssignableUser(BaseModel):
+    username: str
+    full_name: Optional[str] = None
+    role: str
+
+@router.get('/users/assignable', response_model=list[AssignableUser])
+async def list_assignable_users(
+    tenant_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """List users that can be assigned to tasks/jobs (any authenticated user can access)"""
+    query = select(models.User).where(models.User.is_active == True)
+    
+    # Filter by tenant if specified, or get users for all tenants user has access to
+    if tenant_id:
+        query = query.where(
+            (models.User.tenant_id == tenant_id) | (models.User.tenant_id.is_(None))
+        )
+    
+    query = query.order_by(models.User.username)
+    result = await db.execute(query)
+    users = result.scalars().all()
+    
+    return [
+        AssignableUser(
+            username=u.username,
+            full_name=u.full_name,
+            role=u.role
+        )
+        for u in users
+    ]
+
+
 @router.get('/users/{user_id}', response_model=UserOut)
 async def get_user(
     user_id: UUID,

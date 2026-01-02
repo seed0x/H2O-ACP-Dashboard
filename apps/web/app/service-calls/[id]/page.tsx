@@ -13,6 +13,7 @@ import { WorkflowStepper } from '../../../components/ui/WorkflowStepper'
 import { Card, CardHeader, CardSection } from '../../../components/ui/Card'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
+import { useUsers } from '../../../lib/useUsers'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
 import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
@@ -83,6 +84,7 @@ interface AuditLog {
 
 export default function ServiceCallDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
+  const { userOptions, loading: usersLoading } = useUsers('h2o')
   const [sc, setSc] = useState<ServiceCall | null>(null)
   const [builder, setBuilder] = useState<Builder | null>(null)
   const [audit, setAudit] = useState<AuditLog[]>([])
@@ -745,10 +747,13 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                   Assigned To
                 </label>
-                <Input
+                <Select
                   value={billingWriteupAssignedTo}
                   onChange={(e) => setBillingWriteupAssignedTo(e.target.value)}
-                  placeholder="Who's writing it up?"
+                  options={[
+                    { value: '', label: 'Select assignee...' },
+                    ...userOptions
+                  ]}
                 />
               </div>
             )}
@@ -773,10 +778,13 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Primary Tech
               </label>
-              <Input
+              <Select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="Primary tech name"
+                options={[
+                  { value: '', label: 'Select technician...' },
+                  ...userOptions
+                ]}
               />
             </div>
             <div>

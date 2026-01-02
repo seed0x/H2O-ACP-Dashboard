@@ -6,11 +6,13 @@ import { showToast } from '../../components/Toast'
 import { reviewApi, ReviewRequest, Review, RecoveryTicket, ReviewStats } from '../../lib/api/reviews'
 import { handleApiError } from '../../lib/error-handler'
 import { Suspense } from 'react'
+import { useUsers } from '../../lib/useUsers'
 
 function ReviewsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'requests'
+  const { userOptions, loading: usersLoading } = useUsers('h2o')
   
   const [reviewRequests, setReviewRequests] = useState<ReviewRequest[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
@@ -309,6 +311,7 @@ function ReviewsContent() {
           tickets={filteredTickets}
           onUpdateStatus={handleUpdateTicketStatus}
           onAssign={handleAssignTicket}
+          userOptions={userOptions}
         />
       )}
     </div>
@@ -648,11 +651,13 @@ function ReviewsTab({ reviews, onMakePublic }: { reviews: Review[]; onMakePublic
 function TicketsTab({ 
   tickets, 
   onUpdateStatus, 
-  onAssign 
+  onAssign,
+  userOptions
 }: { 
   tickets: RecoveryTicket[]; 
   onUpdateStatus: (id: string, status: string) => void;
   onAssign: (id: string, assignedTo: string) => void;
+  userOptions: Array<{ value: string; label: string }>;
 }) {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, any> = {
@@ -747,10 +752,9 @@ function TicketsTab({
               <option value="closed">Closed</option>
             </select>
 
-            <input
-              placeholder="Assign to..."
-              defaultValue={ticket.assigned_to || ''}
-              onBlur={(e) => e.target.value && onAssign(ticket.id, e.target.value)}
+            <select
+              value={ticket.assigned_to || ''}
+              onChange={(e) => e.target.value && onAssign(ticket.id, e.target.value)}
               style={{
                 padding: '8px 12px',
                 backgroundColor: 'var(--color-hover)',
@@ -758,9 +762,15 @@ function TicketsTab({
                 borderRadius: '6px',
                 color: 'var(--color-text-primary)',
                 fontSize: '13px',
-                width: '200px'
+                width: '200px',
+                cursor: 'pointer'
               }}
-            />
+            >
+              <option value="">Assign to...</option>
+              {userOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
 
             <button
               onClick={() => window.open(`/recovery-tickets/${ticket.id}`, '_blank')}

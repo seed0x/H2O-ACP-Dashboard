@@ -14,6 +14,7 @@ import { TasksPanel } from '../../../components/ui/TasksPanel'
 import { Card, CardHeader, CardSection } from '../../../components/ui/Card'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
+import { useUsers } from '../../../lib/useUsers'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
 import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
@@ -117,6 +118,7 @@ function combineDateTime(date: string, time: string): string | null {
 export default function JobDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
   const isMobile = useMobile()
+  const { userOptions, loading: usersLoading } = useUsers('all_county')
   const [job, setJob] = useState<Job | null>(null)
   const [builder, setBuilder] = useState<Builder | null>(null)
   const [contacts, setContacts] = useState<BuilderContact[]>([])
@@ -532,10 +534,13 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                   Assigned Technician
                 </label>
-                <Input
+                <Select
                   value={techName}
                   onChange={(e) => setTechName(e.target.value)}
-                  placeholder="Enter technician name"
+                  options={[
+                    { value: '', label: 'Select technician...' },
+                    ...userOptions
+                  ]}
                 />
                 {techName && (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -573,10 +578,13 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                   Owner/Assignee
                 </label>
-                <Input
+                <Select
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  placeholder="Enter owner/assignee name"
+                  options={[
+                    { value: '', label: 'Select assignee...' },
+                    ...userOptions
+                  ]}
                 />
               </div>
             </div>

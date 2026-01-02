@@ -10,9 +10,11 @@ import { Select } from '../../../components/ui/Select'
 import { Textarea } from '../../../components/ui/Textarea'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
+import { useUsers } from '../../../lib/useUsers'
 
 export default function RecoveryTicketDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
+  const { userOptions, loading: usersLoading } = useUsers('h2o')
   const [ticket, setTicket] = useState<RecoveryTicket | null>(null)
   const [review, setReview] = useState<any>(null)
   const [id, setId] = useState<string>('')
@@ -175,10 +177,13 @@ export default function RecoveryTicketDetail({ params }: { params: Promise<{ id:
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)', marginBottom: '6px', textTransform: 'uppercase' }}>
                 Assigned To
               </label>
-              <Input
+              <Select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="Owner name"
+                options={[
+                  { value: '', label: 'Select assignee...' },
+                  ...userOptions
+                ]}
               />
             </div>
             <div>
