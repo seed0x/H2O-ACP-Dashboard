@@ -2054,16 +2054,27 @@ function AccountsView() {
   )
 }
 
-    const monday = getThisWeekStart()
-    const friday = new Date(monday)
-    friday.setDate(monday.getDate() + 4) // Friday (4 days after Monday)
-    friday.setHours(23, 59, 59, 999)
-    return friday
-  }
-  
-  const getNextWeekStart = () => {
-    const monday = getThisWeekStart()
-    const nextMonday = new Date(monday)
+function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, channels: any[], onClose: () => void, onUpdate: () => void }) {
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [showAudit, setShowAudit] = useState(false)
+  const [editForm, setEditForm] = useState({
+    title: post.title || '',
+    body_text: post.body_text || '',
+    scheduled_for: post.scheduled_for && typeof post.scheduled_for === 'string' ? post.scheduled_for.slice(0, 16) : '',
+    draft_due_date: post.draft_due_date && typeof post.draft_due_date === 'string' ? post.draft_due_date.slice(0, 16) : '',
+    channel_ids: Array.isArray(post.channel_ids) ? post.channel_ids : [],
+    status: post.status || 'Draft',
+    owner: post.owner || 'admin',
+    reviewer: post.reviewer || '',
+    tags: Array.isArray(post.tags) ? post.tags : [],
+    target_city: post.target_city || '',
+    cta_type: post.cta_type || 'None',
+    cta_url: post.cta_url || ''
+  })
+  const [updateError, setUpdateError] = useState<string>('')
+  const [updating, setUpdating] = useState(false)
+
+  async function handleUpdate() {
     nextMonday.setDate(monday.getDate() + 7)
     return nextMonday
   }
