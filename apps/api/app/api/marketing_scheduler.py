@@ -270,7 +270,7 @@ async def topoff_scheduler_logic(
             .where(models.MarketingChannel.id == account.channel_id)
         )
         channel = channel_result.scalar_one_or_none()
-        is_google_my_business = channel and ('google' in channel.name.lower() or 'gmb' in channel.name.lower() or channel.key == 'google_my_business')
+        is_google_my_business = channel and ('google' in (channel.display_name or '').lower() or 'gmb' in (channel.display_name or '').lower() or channel.key == 'google_business_profile' or channel.key == 'google_my_business')
         
         # Get weighted category selection function
         def get_weighted_category(account: models.ChannelAccount) -> str:
