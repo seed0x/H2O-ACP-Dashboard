@@ -16,28 +16,69 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table('service_call_tasks',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('service_call_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('service_calls.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('tenant_id', sa.Text, nullable=False),
-        sa.Column('task_type', sa.String(), nullable=False),
-        sa.Column('title', sa.Text, nullable=False),
-        sa.Column('description', sa.Text, nullable=True),
-        sa.Column('status', sa.String(), nullable=False, server_default='pending'),
-        sa.Column('assigned_to', sa.String(), nullable=True),
-        sa.Column('due_date', sa.Date(), nullable=True),
-        sa.Column('completed_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('completed_by', sa.String(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.Column('created_by', sa.String(), nullable=True)
-    )
+    # Create table only if it doesn't exist (idempotent)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.tables 
+                          WHERE table_schema = 'public' AND table_name = 'service_call_tasks') THEN
+                CREATE TABLE service_call_tasks (
+                    id UUID DEFAULT gen_random_uuid() NOT NULL,
+                    service_call_id UUID NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    task_type VARCHAR NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    status VARCHAR DEFAULT 'pending' NOT NULL,
+                    assigned_to VARCHAR,
+                    due_date DATE,
+                    completed_at TIMESTAMP WITH TIME ZONE,
+                    completed_by VARCHAR,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                    created_by VARCHAR,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(service_call_id) REFERENCES service_calls (id) ON DELETE CASCADE
+                );
+            END IF;
+        END $$;
+    """)
     
-    op.create_index('ix_service_call_tasks_service_call_id', 'service_call_tasks', ['service_call_id'])
-    op.create_index('ix_service_call_tasks_status', 'service_call_tasks', ['status'])
-    op.create_index('ix_service_call_tasks_assigned_to', 'service_call_tasks', ['assigned_to'])
-    op.create_index('ix_service_call_tasks_due_date', 'service_call_tasks', ['due_date'])
-    op.create_index('ix_service_call_tasks_tenant_status', 'service_call_tasks', ['tenant_id', 'status'])
+    # Create indexes only if they don't exist (idempotent)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_service_call_tasks_service_call_id') THEN
+                CREATE INDEX ix_service_call_tasks_service_call_id ON service_call_tasks(service_call_id);
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_service_call_tasks_status') THEN
+                CREATE INDEX ix_service_call_tasks_status ON service_call_tasks(status);
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_service_call_tasks_assigned_to') THEN
+                CREATE INDEX ix_service_call_tasks_assigned_to ON service_call_tasks(assigned_to);
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_service_call_tasks_due_date') THEN
+                CREATE INDEX ix_service_call_tasks_due_date ON service_call_tasks(due_date);
+            END IF;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_service_call_tasks_tenant_status') THEN
+                CREATE INDEX ix_service_call_tasks_tenant_status ON service_call_tasks(tenant_id, status);
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade():
