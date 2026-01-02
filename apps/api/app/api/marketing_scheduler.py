@@ -92,19 +92,10 @@ def compute_schedule_datetimes(
         tz = pytz.timezone('America/Los_Angeles')  # Fallback
     
     # Convert start/end to account timezone
-    # #region agent log
-    import json
-    with open('.cursor/debug.log', 'a') as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"marketing_scheduler.py:95","message":"Before timezone conversion","data":{"start_date_tzinfo":str(start_date.tzinfo),"end_date_tzinfo":str(end_date.tzinfo),"start_date":str(start_date),"end_date":str(end_date)},"timestamp":int(__import__('time').time()*1000)})+'\n')
-    # #endregion
     if start_date.tzinfo is None:
         start_date = pytz.utc.localize(start_date)
     if end_date.tzinfo is None:
         end_date = pytz.utc.localize(end_date)
-    # #region agent log
-    with open('.cursor/debug.log', 'a') as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"marketing_scheduler.py:99","message":"After timezone conversion","data":{"start_date_tzinfo":str(start_date.tzinfo),"end_date_tzinfo":str(end_date.tzinfo),"start_date":str(start_date),"end_date":str(end_date)},"timestamp":int(__import__('time').time()*1000)})+'\n')
-    # #endregion
     
     start_local = start_date.astimezone(tz)
     end_local = end_date.astimezone(tz)
@@ -164,10 +155,6 @@ def compute_schedule_datetimes(
             )
             # Convert to UTC for storage
             target_datetime_utc = target_datetime_local.astimezone(pytz.utc).replace(tzinfo=None)
-            # #region agent log
-            with open('.cursor/debug.log', 'a') as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"marketing_scheduler.py:157","message":"Before comparison","data":{"target_datetime_utc_tzinfo":str(target_datetime_utc.tzinfo),"start_date_tzinfo":str(start_date.tzinfo),"end_date_tzinfo":str(end_date.tzinfo),"target_datetime_utc":str(target_datetime_utc),"start_date":str(start_date),"end_date":str(end_date)},"timestamp":int(__import__('time').time()*1000)})+'\n')
-            # #endregion
             
             # Only include if within range (all should be timezone-naive now)
             if start_date <= target_datetime_utc <= end_date:
@@ -199,11 +186,6 @@ async def topoff_scheduler_logic(
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = start_date + timedelta(days=days)
-    # #region agent log
-    import json
-    with open('.cursor/debug.log', 'a') as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"marketing_scheduler.py:188","message":"topoff_scheduler_logic entry","data":{"start_date_tzinfo":str(start_date.tzinfo),"end_date_tzinfo":str(end_date.tzinfo),"start_date":str(start_date),"end_date":str(end_date),"days":days},"timestamp":int(__import__('time').time()*1000)})+'\n')
-    # #endregion
     
     # Get all active channel accounts for tenant
     # Include accounts with status='active' or null status (legacy accounts)
@@ -250,11 +232,6 @@ async def topoff_scheduler_logic(
         accounts_processed += 1
         
         # Compute target datetimes for this account
-        # #region agent log
-        import json
-        with open('.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"marketing_scheduler.py:235","message":"Calling compute_schedule_datetimes","data":{"start_date_tzinfo":str(start_date.tzinfo),"end_date_tzinfo":str(end_date.tzinfo),"start_date":str(start_date),"end_date":str(end_date),"account_id":str(account.id)},"timestamp":int(__import__('time').time()*1000)})+'\n')
-        # #endregion
         target_datetimes = compute_schedule_datetimes(account, start_date, end_date)
         
         if not target_datetimes:
