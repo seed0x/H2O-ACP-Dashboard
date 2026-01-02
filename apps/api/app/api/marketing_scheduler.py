@@ -28,7 +28,7 @@ CONTENT_TEMPLATES = {
             "Get to Know Our Team",
             "Team Member Feature"
         ],
-        "caption_template": "🌟 Team spotlight time! #MeetTheTeam #OurTeam"
+        "caption_template": "Team spotlight time! #MeetTheTeam #OurTeam"
     },
     "diy": {
         "title_templates": [
@@ -38,7 +38,7 @@ CONTENT_TEMPLATES = {
             "Homeowner Tip: Easy Fix",
             "Quick Fix: DIY Solution"
         ],
-        "caption_template": "💡 Quick tip from our pros! #DIY #HomeTips #HomeMaintenance"
+        "caption_template": "Quick tip from our pros! #DIY #HomeTips #HomeMaintenance"
     },
     "coupon": {
         "title_templates": [
@@ -48,7 +48,7 @@ CONTENT_TEMPLATES = {
             "Limited Time Discount",
             "Special Promotion"
         ],
-        "caption_template": "🎉 Limited time offer! #SpecialDeal #Discount #SaveMoney"
+        "caption_template": "Limited time offer! #SpecialDeal #Discount #SaveMoney"
     },
     "blog_post": {
         "title_templates": [
@@ -58,7 +58,7 @@ CONTENT_TEMPLATES = {
             "Blog Update: Tips & Tricks",
             "New Article: Expert Tips"
         ],
-        "caption_template": "📖 New blog post! Link in bio. #Blog #ExpertAdvice #Tips"
+        "caption_template": "New blog post! Link in bio. #Blog #ExpertAdvice #Tips"
     },
     "ad_content": {
         "title_templates": [

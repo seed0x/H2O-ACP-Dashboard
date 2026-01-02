@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 _startup_complete = False
 
 async def ensure_admin_user():
-    """Create or update admin user with dev password - can be called on startup or first request"""
+    """Create or update admin user - uses ADMIN_PASSWORD env var or generates secure password"""
     try:
         from .db.session import AsyncSessionLocal
         from .models import User
         from .core.password import hash_password
         from sqlalchemy import select
+        import secrets
+        import string
         
         async with AsyncSessionLocal() as db:
             result = await db.execute(
@@ -29,12 +31,22 @@ async def ensure_admin_user():
             )
             admin_user = result.scalar_one_or_none()
             
-            # Use dev password: admin121
-            dev_password = "admin121"
+            # Use ADMIN_PASSWORD from env, or generate secure password in dev only
+            admin_password = settings.admin_password
+            if not admin_password or admin_password == "adminpassword":
+                # Only generate in development
+                if settings.environment == "development":
+                    # Generate a random password for dev
+                    alphabet = string.ascii_letters + string.digits
+                    admin_password = ''.join(secrets.choice(alphabet) for _ in range(16))
+                    logger.warning(f"⚠ Generated dev admin password (not for production): {admin_password}")
+                else:
+                    logger.error("✗ ADMIN_PASSWORD not set in production! Admin user creation skipped.")
+                    return False
             
             if admin_user:
-                # Update password to dev password
-                admin_user.hashed_password = hash_password(dev_password)
+                # Update password and ensure admin role
+                admin_user.hashed_password = hash_password(admin_password)
                 admin_user.role = "admin"
                 admin_user.is_active = True
                 admin_user.tenant_id = None  # Admin has access to all tenants
@@ -43,7 +55,7 @@ async def ensure_admin_user():
                 admin_user = User(
                     username="admin",
                     email="admin@h2oplumbers.com",
-                    hashed_password=hash_password(dev_password),
+                    hashed_password=hash_password(admin_password),
                     role="admin",
                     tenant_id=None,
                     is_active=True
@@ -51,31 +63,44 @@ async def ensure_admin_user():
                 db.add(admin_user)
             
             await db.commit()
-            logger.info("✓ Admin user ready (dev password: admin121)")
+            logger.info("✓ Admin user ready")
             return True
     except Exception as e:
         logger.warning(f"⚠ Could not create admin user: {e}", exc_info=True)
         return False
 
 async def ensure_default_users():
-    """Create default users (office staff and techs) if they don't exist"""
+    """Create default users (office staff and techs) if they don't exist - DEV ONLY"""
+    # Only create default users in development environment
+    if settings.environment != "development":
+        logger.info("Skipping default users creation (production mode)")
+        return
+    
     try:
         from .db.session import AsyncSessionLocal
         from .models import User
         from .core.password import hash_password
         from sqlalchemy import select
+        import secrets
+        import string
+        
+        # Generate secure passwords for default users (dev only)
+        def generate_dev_password(username: str) -> str:
+            """Generate a predictable but secure dev password"""
+            # Use a simple pattern for dev: username + random suffix
+            alphabet = string.ascii_letters + string.digits
+            suffix = ''.join(secrets.choice(alphabet) for _ in range(8))
+            return f"{username}123_{suffix}"
         
         default_users = [
             # Office Staff (Admin)
-            {"username": "sandi", "password": "sandi121", "full_name": "Sandi", "role": "admin", "tenant_id": None},
-            {"username": "skylee", "password": "skylee121", "full_name": "Skylee", "role": "admin", "tenant_id": None},
+            {"username": "sandi", "full_name": "Sandi", "role": "admin", "tenant_id": None},
+            {"username": "skylee", "full_name": "Skylee", "role": "admin", "tenant_id": None},
             # Tech Users
-            {"username": "max", "password": "max123", "full_name": "Max", "role": "user", "tenant_id": "h2o"},
-            {"username": "mikeal", "password": "mikeal123", "full_name": "Mikeal", "role": "user", "tenant_id": "h2o"},
-            {"username": "shawn", "password": "shawn123", "full_name": "Shawn", "role": "user", "tenant_id": "h2o"},
-            {"username": "william", "password": "william123", "full_name": "William", "role": "user", "tenant_id": "h2o"},
-            # Dev Admin
-            {"username": "admin", "password": "admin121", "full_name": "Developer", "role": "admin", "tenant_id": None}
+            {"username": "max", "full_name": "Max", "role": "user", "tenant_id": "h2o"},
+            {"username": "mikeal", "full_name": "Mikeal", "role": "user", "tenant_id": "h2o"},
+            {"username": "shawn", "full_name": "Shawn", "role": "user", "tenant_id": "h2o"},
+            {"username": "william", "full_name": "William", "role": "user", "tenant_id": "h2o"},
         ]
         
         async with AsyncSessionLocal() as db:
@@ -86,25 +111,27 @@ async def ensure_default_users():
                 existing_user = result.scalar_one_or_none()
                 
                 if not existing_user:
+                    # Generate password for new user
+                    password = generate_dev_password(user_data["username"])
                     # Create user
                     new_user = User(
                         username=user_data["username"],
                         email=f"{user_data['username']}@h2oplumbers.com",
-                        hashed_password=hash_password(user_data["password"]),
+                        hashed_password=hash_password(password),
                         full_name=user_data["full_name"],
                         role=user_data["role"],
                         tenant_id=user_data["tenant_id"],
                         is_active=True
                     )
                     db.add(new_user)
-                    logger.info(f"✓ Created user: {user_data['username']} (role: {user_data['role']})")
+                    logger.info(f"✓ Created dev user: {user_data['username']} (role: {user_data['role']}, password: {password})")
                 else:
-                    # Update password and role if user exists (ensures correct permissions)
-                    existing_user.hashed_password = hash_password(user_data["password"])
+                    # Don't update existing users' passwords automatically
+                    # Only ensure role and tenant_id are correct
                     existing_user.role = user_data["role"]
                     existing_user.tenant_id = user_data["tenant_id"]
                     existing_user.is_active = True
-                    logger.info(f"✓ Updated user: {user_data['username']} (role: {user_data['role']})")
+                    logger.info(f"✓ Updated dev user: {user_data['username']} (role: {user_data['role']})")
             
             # Delete fake/hardcoded users that should no longer exist
             fake_users_to_delete = ["northwynd"]

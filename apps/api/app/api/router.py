@@ -305,9 +305,9 @@ async def login(request: Request, login_data: LoginRequest, response: Response, 
         # Log unexpected errors and return 500 with error details
         import traceback
         import logging
+        logger = logging.getLogger(__name__)
         error_details = traceback.format_exc()
-        logging.error(f"Login error: {error_details}")
-        print(f"Login error: {error_details}")  # Log to console for debugging
+        logger.error(f"Login error: {error_details}", exc_info=True)
         # Return more detailed error in development, generic in production
         error_message = f"Internal server error during login: {str(e)}" if settings.environment == "development" else "Internal server error during login"
         raise HTTPException(
@@ -583,7 +583,7 @@ async def patch_service_call(id: UUID, sc_in: ServiceCallUpdate, db: AsyncSessio
             await on_service_call_completed(db, sc, changed_by=current_user.username)
         except Exception as e:
             # Don't fail the service call update if review request creation fails
-            print(f"Warning: Failed to create review request for service call {sc.id}: {e}")
+            logger.warning(f"Failed to create review request for service call {sc.id}: {e}", exc_info=True)
     
     return sc
 

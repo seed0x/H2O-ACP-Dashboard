@@ -1712,17 +1712,26 @@ async def convert_review_to_content(
     # Link review to content item
     review.content_item_id = content_item.id
     
-    # Create PostInstances for each channel
+    # Create PostInstances for each channel - batch query to avoid N+1
+    # First, verify all channel accounts exist in a single query
+    accounts_result = await db.execute(
+        select(models.ChannelAccount).where(
+            models.ChannelAccount.id.in_(request.channel_account_ids)
+        )
+    )
+    accounts = {acc.id: acc for acc in accounts_result.scalars().all()}
+    
+    # Check for missing accounts
+    missing_accounts = set(request.channel_account_ids) - set(accounts.keys())
+    if missing_accounts:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Channel accounts not found: {', '.join(str(aid) for aid in missing_accounts)}"
+        )
+    
+    # Create instances for all accounts
     instances = []
     for channel_account_id in request.channel_account_ids:
-        # Verify channel account exists
-        account_result = await db.execute(
-            select(models.ChannelAccount).where(models.ChannelAccount.id == channel_account_id)
-        )
-        account = account_result.scalar_one_or_none()
-        if not account:
-            raise HTTPException(status_code=404, detail=f"Channel account {channel_account_id} not found")
-        
         instance = models.PostInstance(
             tenant_id=tenant_id,
             content_item_id=content_item.id,

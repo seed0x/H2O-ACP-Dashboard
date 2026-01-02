@@ -26,89 +26,115 @@ async def get_analytics_overview(
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
     
-    # Jobs stats
-    jobs_query = select(models.Job)
+    # Jobs stats - filter in database, not Python
+    active_jobs_query = select(func.count(models.Job.id)).where(models.Job.status != 'Completed')
+    completed_jobs_query = select(func.count(models.Job.id)).where(models.Job.status == 'Completed')
+    completed_this_week_query = select(func.count(models.Job.id)).where(
+        and_(
+            models.Job.status == 'Completed',
+            models.Job.completion_date.isnot(None),
+            models.Job.completion_date >= week_ago.date()
+        )
+    )
+    
     if tenant_id:
-        jobs_query = jobs_query.where(models.Job.tenant_id == tenant_id)
+        active_jobs_query = active_jobs_query.where(models.Job.tenant_id == tenant_id)
+        completed_jobs_query = completed_jobs_query.where(models.Job.tenant_id == tenant_id)
+        completed_this_week_query = completed_this_week_query.where(models.Job.tenant_id == tenant_id)
     
-    jobs_result = await db.execute(jobs_query)
-    all_jobs = jobs_result.scalars().all()
+    active_jobs_count = (await db.execute(active_jobs_query)).scalar() or 0
+    completed_jobs_count = (await db.execute(completed_jobs_query)).scalar() or 0
+    completed_this_week_count = (await db.execute(completed_this_week_query)).scalar() or 0
     
-    active_jobs = [j for j in all_jobs if j.status != 'Completed']
-    completed_jobs = [j for j in all_jobs if j.status == 'Completed']
-    completed_this_week = [j for j in completed_jobs if j.completion_date and j.completion_date >= week_ago.date()]
+    # Service calls stats - filter in database
+    pending_sc_query = select(func.count(models.ServiceCall.id)).where(
+        models.ServiceCall.status.in_(['New', 'Scheduled'])
+    )
+    completed_sc_query = select(func.count(models.ServiceCall.id)).where(
+        models.ServiceCall.status == 'Completed'
+    )
     
-    # Service calls stats
-    sc_query = select(models.ServiceCall)
     if tenant_id:
-        sc_query = sc_query.where(models.ServiceCall.tenant_id == tenant_id)
+        pending_sc_query = pending_sc_query.where(models.ServiceCall.tenant_id == tenant_id)
+        completed_sc_query = completed_sc_query.where(models.ServiceCall.tenant_id == tenant_id)
     
-    sc_result = await db.execute(sc_query)
-    all_service_calls = sc_result.scalars().all()
+    pending_service_calls_count = (await db.execute(pending_sc_query)).scalar() or 0
+    completed_service_calls_count = (await db.execute(completed_sc_query)).scalar() or 0
     
-    pending_service_calls = [sc for sc in all_service_calls if sc.status in ['New', 'Scheduled']]
-    completed_service_calls = [sc for sc in all_service_calls if sc.status == 'Completed']
+    # Review stats - filter in database
+    pending_rr_query = select(func.count(models.ReviewRequest.id)).where(models.ReviewRequest.status == 'pending')
+    sent_rr_query = select(func.count(models.ReviewRequest.id)).where(models.ReviewRequest.status == 'sent')
+    completed_rr_query = select(func.count(models.ReviewRequest.id)).where(models.ReviewRequest.status == 'completed')
     
-    # Review stats
-    review_requests_query = select(models.ReviewRequest)
     if tenant_id:
-        review_requests_query = review_requests_query.where(models.ReviewRequest.tenant_id == tenant_id)
+        pending_rr_query = pending_rr_query.where(models.ReviewRequest.tenant_id == tenant_id)
+        sent_rr_query = sent_rr_query.where(models.ReviewRequest.tenant_id == tenant_id)
+        completed_rr_query = completed_rr_query.where(models.ReviewRequest.tenant_id == tenant_id)
     
-    review_requests_result = await db.execute(review_requests_query)
-    all_review_requests = review_requests_result.scalars().all()
+    pending_review_requests_count = (await db.execute(pending_rr_query)).scalar() or 0
+    sent_review_requests_count = (await db.execute(sent_rr_query)).scalar() or 0
+    completed_review_requests_count = (await db.execute(completed_rr_query)).scalar() or 0
     
-    pending_review_requests = [r for r in all_review_requests if r.status == 'pending']
-    sent_review_requests = [r for r in all_review_requests if r.status == 'sent']
-    completed_review_requests = [r for r in all_review_requests if r.status == 'completed']
+    # Reviews - join with review_requests for tenant filtering
+    reviews_query = select(
+        func.count(models.Review.id).label('total'),
+        func.count(models.Review.id).filter(models.Review.is_public == True).label('public'),
+        func.avg(models.Review.rating).label('avg_rating')
+    ).join(models.ReviewRequest, models.Review.review_request_id == models.ReviewRequest.id)
     
-    reviews_query = select(models.Review)
-    reviews_result = await db.execute(reviews_query)
-    all_reviews = reviews_result.scalars().all()
-    
-    # Filter reviews by tenant through review requests
     if tenant_id:
-        all_reviews = [r for r in all_reviews if r.review_request and r.review_request.tenant_id == tenant_id]
+        reviews_query = reviews_query.where(models.ReviewRequest.tenant_id == tenant_id)
     
-    public_reviews = [r for r in all_reviews if r.is_public]
-    avg_rating = sum(r.rating for r in all_reviews) / len(all_reviews) if all_reviews else 0
+    reviews_stats = (await db.execute(reviews_query)).first()
+    all_reviews_count = reviews_stats.total or 0
+    public_reviews_count = reviews_stats.public or 0
+    avg_rating = float(reviews_stats.avg_rating) if reviews_stats.avg_rating else 0.0
     
-    # Recovery tickets
-    tickets_query = select(models.RecoveryTicket)
+    # Recovery tickets - filter in database
+    open_tickets_query = select(func.count(models.RecoveryTicket.id)).where(
+        models.RecoveryTicket.status.in_(['open', 'in_progress'])
+    )
+    total_tickets_query = select(func.count(models.RecoveryTicket.id))
+    resolved_tickets_query = select(func.count(models.RecoveryTicket.id)).where(
+        models.RecoveryTicket.status.in_(['resolved', 'closed'])
+    )
+    
     if tenant_id:
-        tickets_query = tickets_query.where(models.RecoveryTicket.tenant_id == tenant_id)
+        open_tickets_query = open_tickets_query.where(models.RecoveryTicket.tenant_id == tenant_id)
+        total_tickets_query = total_tickets_query.where(models.RecoveryTicket.tenant_id == tenant_id)
+        resolved_tickets_query = resolved_tickets_query.where(models.RecoveryTicket.tenant_id == tenant_id)
     
-    tickets_result = await db.execute(tickets_query)
-    all_tickets = tickets_result.scalars().all()
-    
-    open_tickets = [t for t in all_tickets if t.status in ['open', 'in_progress']]
+    open_tickets_count = (await db.execute(open_tickets_query)).scalar() or 0
+    all_tickets_count = (await db.execute(total_tickets_query)).scalar() or 0
+    resolved_tickets_count = (await db.execute(resolved_tickets_query)).scalar() or 0
     
     # Calculate metrics
-    review_request_rate = len(completed_review_requests) / len(completed_service_calls) if completed_service_calls else 0
-    review_completion_rate = len(completed_review_requests) / len(sent_review_requests) if sent_review_requests else 0
-    recovery_ticket_rate = len(all_tickets) / len(all_reviews) if all_reviews else 0
-    recovery_resolution_rate = len([t for t in all_tickets if t.status in ['resolved', 'closed']]) / len(all_tickets) if all_tickets else 0
+    review_request_rate = completed_review_requests_count / completed_service_calls_count if completed_service_calls_count > 0 else 0
+    review_completion_rate = completed_review_requests_count / sent_review_requests_count if sent_review_requests_count > 0 else 0
+    recovery_ticket_rate = all_tickets_count / all_reviews_count if all_reviews_count > 0 else 0
+    recovery_resolution_rate = resolved_tickets_count / all_tickets_count if all_tickets_count > 0 else 0
     
     return {
         'jobs': {
-            'active': len(active_jobs),
-            'completed': len(completed_jobs),
-            'completed_this_week': len(completed_this_week),
+            'active': active_jobs_count,
+            'completed': completed_jobs_count,
+            'completed_this_week': completed_this_week_count,
         },
         'service_calls': {
-            'pending': len(pending_service_calls),
-            'completed': len(completed_service_calls),
+            'pending': pending_service_calls_count,
+            'completed': completed_service_calls_count,
         },
         'reviews': {
-            'requests_pending': len(pending_review_requests),
-            'requests_sent': len(sent_review_requests),
-            'requests_completed': len(completed_review_requests),
-            'total_reviews': len(all_reviews),
-            'public_reviews': len(public_reviews),
+            'requests_pending': pending_review_requests_count,
+            'requests_sent': sent_review_requests_count,
+            'requests_completed': completed_review_requests_count,
+            'total_reviews': all_reviews_count,
+            'public_reviews': public_reviews_count,
             'average_rating': round(avg_rating, 2),
         },
         'recovery_tickets': {
-            'open': len(open_tickets),
-            'total': len(all_tickets),
+            'open': open_tickets_count,
+            'total': all_tickets_count,
         },
         'metrics': {
             'review_request_rate': round(review_request_rate, 2),

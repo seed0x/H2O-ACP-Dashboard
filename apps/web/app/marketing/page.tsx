@@ -41,6 +41,7 @@ function MarketingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'calendar'
+  const { currentTenant } = useTenant()
 
   const tabs = [
     { id: 'calendar', label: 'Calendar' },
@@ -176,8 +177,9 @@ function PostsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      // For marketing, always use h2o tenant (marketing is h2o-specific)
-      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, {
+      // Use current tenant (marketing supports both tenants)
+      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=${tenantId}`, {
         headers,
         credentials: 'include'
       })
@@ -193,7 +195,8 @@ function PostsView() {
     try {
       setLoading(true)
       
-      let data = await marketingApi.listPostInstances('h2o', {
+      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+      let data = await marketingApi.listPostInstances(tenantId, {
         status: statusFilter || undefined
       })
       
@@ -248,7 +251,7 @@ function PostsView() {
 
       // Step 1: Create ContentItem
       const contentItemBody: any = {
-        tenant_id: 'h2o',
+        tenant_id: currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o',
         title: postForm.title.trim(),
         base_caption: postForm.base_caption.trim(),
         status: postForm.status,
@@ -285,7 +288,8 @@ function PostsView() {
         }
       }
 
-      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk?tenant_id=h2o`, {
+      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk?tenant_id=${tenantId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -928,11 +932,12 @@ function AccountsView() {
       }
       
       const [accountsRes, channelsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, { 
+        const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+        fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=${tenantId}`, { 
           headers,
           credentials: 'include' 
         }),
-        fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, { 
+        fetch(`${API_BASE_URL}/marketing/channels?tenant_id=${tenantId}`, { 
           headers,
           credentials: 'include' 
         })
@@ -998,7 +1003,7 @@ function AccountsView() {
       
       // Map form data to API schema
       const requestBody = {
-        tenant_id: 'h2o',
+        tenant_id: currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o',
         channel_id: formData.channel_id,
         name: formData.account_name,
         login_email: formData.account_email,
@@ -1769,7 +1774,8 @@ function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { 
         headers['Authorization'] = `Bearer ${token}`
       }
       
-      const response = await fetch(`${API_BASE_URL}/marketing/post-instances?tenant_id=h2o&content_item_id=${item.id}`, {
+      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+      const response = await fetch(`${API_BASE_URL}/marketing/post-instances?tenant_id=${tenantId}&content_item_id=${item.id}`, {
         headers,
         credentials: 'include'
       })
