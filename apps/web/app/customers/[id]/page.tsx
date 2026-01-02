@@ -18,11 +18,7 @@ import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
 import { useTenant } from '../../../contexts/TenantContext'
-
-// Icon component wrapper
-function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
-  return <Icon size={size} color={color} />
-}
+import { IconWrapper } from '../../../components/ui/IconWrapper'
 
 interface Customer {
   id: string

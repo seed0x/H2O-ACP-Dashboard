@@ -14,6 +14,7 @@ import { Card, CardHeader, CardSection } from '../../../components/ui/Card'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
 import { useUsers } from '../../../lib/useUsers'
+import { IconWrapper } from '../../../components/ui/IconWrapper'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
 import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
@@ -31,11 +32,6 @@ import UilShoppingCart from '@iconscout/react-unicons/icons/uil-shopping-cart'
 import UilEnvelopeSend from '@iconscout/react-unicons/icons/uil-envelope-send'
 import UilPhoneAlt from '@iconscout/react-unicons/icons/uil-phone-alt'
 import UilCheck from '@iconscout/react-unicons/icons/uil-check'
-
-// Icon component wrapper for consistent sizing
-function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
-  return <Icon size={size} color={color} />
-}
 
 interface ServiceCall {
   id: string

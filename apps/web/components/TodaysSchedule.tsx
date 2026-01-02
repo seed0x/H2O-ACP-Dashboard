@@ -7,6 +7,7 @@ import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { useTenant } from '../contexts/TenantContext'
 import { handleApiError } from '../lib/error-handler'
+import { formatTime } from '../lib/utils/dateFormat'
 import { TenantIndicator } from './TenantIndicator'
 
 interface ScheduleItem {
@@ -108,22 +109,9 @@ export function TodaysSchedule() {
       items.sort((a, b) => a.time.localeCompare(b.time))
       setScheduleItems(items)
     } catch (error) {
-      console.error('Failed to load today\'s schedule:', error)
+      handleApiError(error, 'Load today\'s schedule')
     } finally {
       setLoading(false)
-    }
-  }
-
-  function formatTime(dateString: string): string {
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      })
-    } catch {
-      return 'Time N/A'
     }
   }
 

@@ -184,7 +184,7 @@ function PostsView() {
       const data = await response.json()
       setChannelAccounts(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Failed to load channel accounts:', error)
+      handleApiError(error, 'Load channel accounts')
       setChannelAccounts([])
     }
   }
@@ -219,7 +219,6 @@ function PostsView() {
       setPostInstances(data)
       setLoading(false)
     } catch (error) {
-      console.error('Failed to load post instances:', error)
       handleApiError(error, 'Load post instances')
       setPostInstances([])
       setLoading(false)
@@ -310,7 +309,7 @@ function PostsView() {
       setMediaUrlInput('')
       await loadPostInstances()
     } catch (error: any) {
-      console.error('Failed to create post:', error)
+      handleApiError(error, 'Create post')
       setError(error.message || 'Failed to create post. Please try again.')
     } finally {
       setSubmitting(false)
@@ -895,7 +894,7 @@ function AccountsView() {
       const result = await oauthApi.getGoogleAuthUrl(accountId)
       window.location.href = result.authorization_url
     } catch (error: any) {
-      console.error('Failed to start OAuth:', error)
+      handleApiError(error, 'Start Google OAuth')
       showToast(error.message || 'Failed to connect Google. Make sure OAuth is configured.', 'error')
       setConnectingAccountId(null)
     }
@@ -909,7 +908,7 @@ function AccountsView() {
       showToast('Google account disconnected', 'success')
       loadData()
     } catch (error: any) {
-      console.error('Failed to disconnect:', error)
+      handleApiError(error, 'Disconnect Google')
       showToast(error.message || 'Failed to disconnect', 'error')
     }
   }
@@ -949,7 +948,7 @@ function AccountsView() {
       setChannels(Array.isArray(channelsData) ? channelsData : [])
       setLoading(false)
     } catch (error) {
-      console.error('Failed to load accounts:', error)
+      handleApiError(error, 'Load channel accounts')
       setAccounts([])
       setChannels([])
       setLoading(false)
@@ -1025,7 +1024,7 @@ function AccountsView() {
       setFormError('')
       loadData()
     } catch (error: any) {
-      console.error('Failed to save account:', error)
+      handleApiError(error, 'Save channel account')
       setFormError(error.message || 'Failed to save account. Please try again.')
       showToast(error.message || 'Failed to save account', 'error')
     } finally {
@@ -1055,7 +1054,7 @@ function AccountsView() {
         throw new Error('Failed to delete account')
       }
     } catch (error: any) {
-      console.error('Failed to delete account:', error)
+      handleApiError(error, 'Delete channel account')
       showToast(error.message || 'Failed to delete account', 'error')
     }
   }
@@ -1477,7 +1476,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
       onUpdate()
       showToast('Post updated successfully', 'success')
     } catch (error: any) {
-      console.error('Failed to update post:', error)
+      handleApiError(error, 'Update post')
       setUpdateError(error.message || 'Failed to update post. Please try again.')
       showToast(error.message || 'Failed to update post', 'error')
     } finally {
@@ -1504,7 +1503,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
         setAuditLogs(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Failed to load audit trail:', error)
+      handleApiError(error, 'Load audit trail')
     }
   }
 
@@ -2241,8 +2240,8 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
       showSuccess('Content added successfully')
       onSuccess()
     } catch (error: any) {
-      console.error('Failed to add content:', error)
-      const errorMessage = error?.message || handleApiError(error) || 'Failed to add content. Please try again.'
+      handleApiError(error, 'Add content to post')
+      const errorMessage = error?.message || 'Failed to add content. Please try again.'
       setError(errorMessage)
       handleApiError(error, 'Add content to planned slot')
     } finally {
@@ -2512,7 +2511,7 @@ function MarkPostedModal({ instance, onClose, onSuccess }: { instance: any, onCl
 
       onSuccess()
     } catch (error: any) {
-      console.error('Failed to mark as posted:', error)
+      handleApiError(error, 'Mark post as posted')
       setError(error.message || 'Failed to mark as posted. Please try again.')
     } finally {
       setSubmitting(false)
@@ -2774,7 +2773,7 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
 
       onSuccess()
     } catch (error: any) {
-      console.error('Failed to generate posts:', error)
+      handleApiError(error, 'Generate posts')
       setError(error.message || 'Failed to generate posts. Please try again.')
     } finally {
       setSubmitting(false)

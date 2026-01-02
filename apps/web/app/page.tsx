@@ -15,6 +15,7 @@ import { TodaysSchedule } from '../components/TodaysSchedule'
 import { Dataflow } from '../components/Dataflow'
 import { TechPerformance } from '../components/TechPerformance'
 import { ServiceCallsCalendar } from '../components/ServiceCallsCalendar'
+import { IconWrapper } from '../components/ui/IconWrapper'
 import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
 import UilShoppingCart from '@iconscout/react-unicons/icons/uil-shopping-cart'
@@ -22,11 +23,6 @@ import UilEnvelopeSend from '@iconscout/react-unicons/icons/uil-envelope-send'
 import UilPhoneAlt from '@iconscout/react-unicons/icons/uil-phone-alt'
 import UilInvoice from '@iconscout/react-unicons/icons/uil-invoice'
 import UilClipboardNotes from '@iconscout/react-unicons/icons/uil-clipboard-notes'
-
-// Icon component wrapper
-function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
-  return <Icon size={size} color={color} />
-}
 
 export default function Dashboard() {
   const router = useRouter()
@@ -69,12 +65,12 @@ export default function Dashboard() {
         try {
           const res = await axios.get(`${API_BASE_URL}/jobs?tenant_id=all_county`, { headers, withCredentials: true })
           jobs = res.data || []
-        } catch (e) { console.error('Failed to load jobs:', e) }
+        } catch (e) { handleApiError(e, 'Load jobs') }
         
         try {
           const res = await axios.get(`${API_BASE_URL}/jobs/overdue?tenant_id=all_county`, { headers, withCredentials: true })
           overdueJobsData = res.data || []
-        } catch (e) { console.error('Failed to load overdue jobs:', e) }
+        } catch (e) { handleApiError(e, 'Load overdue jobs') }
       }
       
       // Load service calls & reviews (H2O) - only today and next week
@@ -96,27 +92,27 @@ export default function Dashboard() {
             const callDate = new Date(call.scheduled_start)
             return callDate >= today && callDate <= nextWeekEnd
           })
-        } catch (e) { console.error('Failed to load service calls:', e) }
+        } catch (e) { handleApiError(e, 'Load service calls') }
         
         try {
           const res = await axios.get(`${API_BASE_URL}/service-calls/overdue?tenant_id=h2o`, { headers, withCredentials: true })
           overdueCallsData = res.data || []
-        } catch (e) { console.error('Failed to load overdue calls:', e) }
+        } catch (e) { handleApiError(e, 'Load overdue service calls') }
         
         try {
           const res = await axios.get(`${API_BASE_URL}/reviews/requests?tenant_id=h2o`, { headers, withCredentials: true })
           reviewRequests = res.data || []
-        } catch (e) { console.error('Failed to load review requests:', e) }
+        } catch (e) { handleApiError(e, 'Load review requests') }
         
         try {
           const res = await axios.get(`${API_BASE_URL}/reviews/requests/overdue?tenant_id=h2o`, { headers, withCredentials: true })
           overdueReviewsData = res.data || []
-        } catch (e) { console.error('Failed to load overdue reviews:', e) }
+        } catch (e) { handleApiError(e, 'Load overdue review requests') }
         
         try {
           const res = await axios.get(`${API_BASE_URL}/recovery-tickets/overdue?tenant_id=h2o`, { headers, withCredentials: true })
           overdueTicketsData = res.data || []
-        } catch (e) { console.error('Failed to load overdue tickets:', e) }
+        } catch (e) { handleApiError(e, 'Load overdue recovery tickets') }
       }
       
       // Load bids for "sold this week" and follow-ups
@@ -127,7 +123,7 @@ export default function Dashboard() {
           withCredentials: true 
         })
         bids = res.data || []
-      } catch (e) { console.error('Failed to load bids:', e) }
+      } catch (e) { handleApiError(e, 'Load bids') }
       
       // Calculate sold this week (bids with status 'Won' updated this week)
       const weekAgo = new Date()
@@ -234,7 +230,7 @@ export default function Dashboard() {
         const tasks = Array.isArray(tasksRes.data) ? tasksRes.data : []
         setPendingServiceCallTasks(tasks)
       } catch (err) {
-        console.error('Failed to load pending tasks:', err)
+        handleApiError(err, 'Load pending tasks')
         setPendingServiceCallTasks([])
       }
       
@@ -251,7 +247,7 @@ export default function Dashboard() {
       setOverdueItems(allOverdue)
       setLoading(false)
     } catch (err) {
-      console.error('Failed to load dashboard', err)
+      handleApiError(err, 'Load dashboard')
       setLoading(false)
     }
   }

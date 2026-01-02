@@ -15,6 +15,7 @@ import { Card, CardHeader, CardSection } from '../../../components/ui/Card'
 import { showToast } from '../../../components/Toast'
 import { handleApiError, logError } from '../../../lib/error-handler'
 import { useUsers } from '../../../lib/useUsers'
+import { IconWrapper } from '../../../components/ui/IconWrapper'
 import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
 import UilUser from '@iconscout/react-unicons/icons/uil-user'
 import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
@@ -84,11 +85,6 @@ interface AuditLog {
   new_value?: string
   changed_by: string
   changed_at: string
-}
-
-// Icon component wrapper for consistent sizing
-function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
-  return <Icon size={size} color={color} />
 }
 
 // Helper to format date with time
