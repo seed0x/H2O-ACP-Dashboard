@@ -867,6 +867,7 @@ function getStatusColor(status: string) {
 // CalendarView is now in CalendarView.tsx
 
 function AccountsView() {
+  const { currentTenant } = useTenant()
   const [accounts, setAccounts] = useState<any[]>([])
   const [channels, setChannels] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -931,8 +932,8 @@ function AccountsView() {
         headers['Authorization'] = `Bearer ${token}`
       }
       
+      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
       const [accountsRes, channelsRes] = await Promise.all([
-        const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
         fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=${tenantId}`, { 
           headers,
           credentials: 'include' 
@@ -1758,6 +1759,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
 
 // Content Item Detail Modal
 function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { item: any, channelAccounts: any[], onClose: () => void, onUpdate: () => void }) {
+  const { currentTenant } = useTenant()
   const [postInstances, setPostInstances] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
