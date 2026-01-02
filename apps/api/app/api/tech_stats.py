@@ -35,12 +35,15 @@ async def get_all_tech_stats(
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     
-    # Get all unique tech usernames from service calls
+    # Get all unique tech usernames from service calls (include scheduled calls, not just created_at)
     techs_query = select(models.ServiceCall.assigned_to).where(
         and_(
             models.ServiceCall.tenant_id == tenant_id,
             models.ServiceCall.assigned_to.isnot(None),
-            models.ServiceCall.created_at >= start_date
+            or_(
+                models.ServiceCall.created_at >= start_date,
+                models.ServiceCall.scheduled_start >= start_date
+            )
         )
     ).distinct()
     techs_result = await db.execute(techs_query)
@@ -58,11 +61,26 @@ async def get_all_tech_stats(
                 models.ServiceCall.assigned_to == username,
                 models.ServiceCall.tenant_id == tenant_id,
                 models.ServiceCall.status == 'Completed',
-                models.ServiceCall.created_at >= start_date
+                or_(
+                    models.ServiceCall.created_at >= start_date,
+                    models.ServiceCall.scheduled_start >= start_date
+                )
             )
         )
         completed_result = await db.execute(completed_sc_query)
         completed = completed_result.scalar() or 0
+        
+        # Get scheduled service calls count (upcoming work)
+        scheduled_sc_query = select(func.count(models.ServiceCall.id)).where(
+            and_(
+                models.ServiceCall.assigned_to == username,
+                models.ServiceCall.tenant_id == tenant_id,
+                models.ServiceCall.status == 'Scheduled',
+                models.ServiceCall.scheduled_start >= start_date
+            )
+        )
+        scheduled_result = await db.execute(scheduled_sc_query)
+        scheduled = scheduled_result.scalar() or 0
         
         # Get sold count (bids won linked to service calls assigned to this tech)
         sold_query = select(func.count(models.Bid.id)).select_from(
@@ -117,14 +135,15 @@ async def get_all_tech_stats(
         stats_list.append({
             "username": username,
             "completed": completed,
+            "scheduled": scheduled,
             "sold": sold,
             "lost": lost,
             "conversion_rate": conversion_rate,
             "total_outcomes": total_outcomes
         })
     
-    # Sort by completed count (descending)
-    stats_list.sort(key=lambda x: x["completed"], reverse=True)
+    # Sort by scheduled + completed count (descending)
+    stats_list.sort(key=lambda x: (x["scheduled"] + x["completed"]), reverse=True)
     
     return stats_list
 

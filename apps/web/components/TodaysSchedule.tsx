@@ -40,7 +40,9 @@ export function TodaysSchedule() {
     try {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-      const today = new Date().toISOString().split('T')[0]
+      // Use local date, not UTC - format as YYYY-MM-DD
+      const now = new Date()
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
       const items: ScheduleItem[] = []
 

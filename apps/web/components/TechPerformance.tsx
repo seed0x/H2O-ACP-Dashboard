@@ -11,6 +11,7 @@ import { useTenant } from '../contexts/TenantContext'
 interface TechStats {
   username: string
   completed: number
+  scheduled: number
   sold: number
   lost: number
   conversion_rate: number | null
@@ -138,7 +139,11 @@ export function TechPerformance() {
               )}
             </div>
             
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <div className="text-xs text-[var(--color-text-secondary)] mb-1">Scheduled</div>
+                <div className="text-lg font-bold text-purple-400">{tech.scheduled}</div>
+              </div>
               <div>
                 <div className="text-xs text-[var(--color-text-secondary)] mb-1">Completed</div>
                 <div className="text-lg font-bold text-blue-400">{tech.completed}</div>
