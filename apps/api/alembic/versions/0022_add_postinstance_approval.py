@@ -17,8 +17,15 @@ depends_on = None
 
 
 def upgrade():
-    # Add reviewer field to post_instances for approval tracking
-    op.add_column('post_instances', sa.Column('reviewer', sa.String(), nullable=True))
+    # Add reviewer field to post_instances for approval tracking (idempotent - check if exists first)
+    op.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name='post_instances' AND column_name='reviewer') THEN
+                ALTER TABLE post_instances ADD COLUMN reviewer VARCHAR;
+            END IF;
+        END $$;
+    """)
     
     # Note: Status values are validated in application code, not at database level
     # The valid statuses for PostInstance are now:
