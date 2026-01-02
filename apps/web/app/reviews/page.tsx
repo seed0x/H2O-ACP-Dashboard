@@ -37,7 +37,15 @@ function ReviewsContent() {
           reviewApi.listRequests(tenantId, statusFilter || undefined),
           reviewApi.getStats(tenantId)
         ])
-        setReviewRequests(Array.isArray(requestsData) ? requestsData : [])
+        // Filter out old review requests (older than 30 days)
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        const recentRequests = Array.isArray(requestsData) ? requestsData.filter((req: any) => {
+          if (!req.created_at) return true // Keep if no date
+          const createdDate = new Date(req.created_at)
+          return createdDate >= thirtyDaysAgo
+        }) : []
+        setReviewRequests(recentRequests)
         setStats(statsData)
       } else if (activeTab === 'reviews') {
         const data = await reviewApi.listReviews(tenantId)

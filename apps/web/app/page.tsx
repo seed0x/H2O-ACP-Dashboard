@@ -77,11 +77,25 @@ export default function Dashboard() {
         } catch (e) { console.error('Failed to load overdue jobs:', e) }
       }
       
-      // Load service calls & reviews (H2O)
+      // Load service calls & reviews (H2O) - only today and next week
       if (isTenantSelected('h2o')) {
         try {
-          const res = await axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o`, { headers, withCredentials: true })
-          serviceCalls = res.data || []
+          // Filter to only show today and next week
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const nextWeekEnd = new Date(today)
+          nextWeekEnd.setDate(today.getDate() + 7) // 7 days from today
+          nextWeekEnd.setHours(23, 59, 59, 999)
+          
+          const res = await axios.get(`${API_BASE_URL}/service-calls?tenant_id=h2o&limit=1000`, { headers, withCredentials: true })
+          const allCalls = res.data || []
+          
+          // Filter by date range
+          serviceCalls = allCalls.filter((call: any) => {
+            if (!call.scheduled_start) return false
+            const callDate = new Date(call.scheduled_start)
+            return callDate >= today && callDate <= nextWeekEnd
+          })
         } catch (e) { console.error('Failed to load service calls:', e) }
         
         try {

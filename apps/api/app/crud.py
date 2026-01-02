@@ -905,12 +905,27 @@ async def list_customers(db: AsyncSession, tenant_id: str, search: Optional[str]
             )
         )
     
-    q = q.order_by(models.Customer.created_at.desc()).limit(limit).offset(offset)
+    q = q.order_by(models.Customer.created_at.desc()).limit(limit * 2).offset(offset)  # Get more to filter duplicates
     res = await db.execute(q)
     rows = res.all()
     
+    # Deduplicate customers by name+phone or name+email
+    seen = set()
     customers = []
     for customer, service_calls_count in rows:
+        # Create unique key from name + phone or name + email
+        unique_key = None
+        if customer.phone:
+            unique_key = f"{customer.name.lower().strip()}|{customer.phone.strip()}"
+        elif customer.email:
+            unique_key = f"{customer.name.lower().strip()}|{customer.email.lower().strip()}"
+        else:
+            unique_key = f"{customer.name.lower().strip()}|{customer.address_line1.lower().strip() if customer.address_line1 else 'no-address'}"
+        
+        if unique_key and unique_key in seen:
+            continue  # Skip duplicate
+        
+        seen.add(unique_key)
         customer_dict = {
             'id': str(customer.id),
             'tenant_id': customer.tenant_id,
@@ -928,6 +943,9 @@ async def list_customers(db: AsyncSession, tenant_id: str, search: Optional[str]
             'service_calls_count': service_calls_count or 0,
         }
         customers.append(customer_dict)
+        
+        if len(customers) >= limit:
+            break  # Stop once we have enough unique customers
     
     return customers
 

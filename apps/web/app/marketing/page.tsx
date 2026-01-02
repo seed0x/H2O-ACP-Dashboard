@@ -451,30 +451,11 @@ function PostsView() {
   async function loadPostInstances() {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams()
       
-      // For marketing, always use h2o tenant (marketing is h2o-specific)
-      params.append('tenant_id', 'h2o')
-      if (statusFilter) params.append('status', statusFilter)
-      
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/marketing/post-instances?${params}`, {
-        headers,
-        credentials: 'include'
+      let data = await marketingApi.listPostInstances('h2o', {
+        status: statusFilter || undefined
       })
       
-      if (!response.ok) {
-        throw new Error(`Failed to load post instances: ${response.statusText}`)
-      }
-      
-      let data = await response.json()
       if (!Array.isArray(data)) {
         data = []
       }
@@ -498,6 +479,7 @@ function PostsView() {
       setLoading(false)
     } catch (error) {
       console.error('Failed to load post instances:', error)
+      handleApiError(error, 'Load post instances')
       setPostInstances([])
       setLoading(false)
     }
@@ -1802,30 +1784,12 @@ function CalendarView() {
   async function handleTopoff() {
     setTopoffLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('Not authenticated. Please log in again.')
-      }
-
-      const response = await fetch(`${API_BASE_URL}/marketing/scheduler/topoff?tenant_id=h2o&days=28`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to top off slots' }))
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      const result = await response.json()
+      const result = await marketingApi.topoffScheduler('h2o', 28)
       showToast(`Created ${result.instances_created} new slots, skipped ${result.instances_skipped} existing`, 'success')
       await loadCalendar()
     } catch (error: any) {
       console.error('Failed to top off slots:', error)
+      handleApiError(error, 'Top off scheduler')
       showToast(error.message || 'Failed to top off slots', 'error')
     } finally {
       setTopoffLoading(false)
@@ -1854,34 +1818,15 @@ function CalendarView() {
       }
 
       // Step 1: Create ContentItem
-      const contentItemBody: any = {
+      const contentItem = await marketingApi.createContentItem({
         tenant_id: 'h2o',
         title: postForm.title.trim(),
         base_caption: postForm.base_caption.trim(),
         status: postForm.status,
         owner: postForm.owner,
-        content_category: postForm.content_category || null,
-        media_urls: postForm.media_urls.length > 0 ? postForm.media_urls : null,
-        cta_type: postForm.cta_type || null,
-        cta_url: postForm.cta_url || null
-      }
-      
-      const itemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify(contentItemBody)
+        content_category: postForm.content_category || undefined,
+        media_urls: postForm.media_urls.length > 0 ? postForm.media_urls : undefined
       })
-      
-      if (!itemResponse.ok) {
-        const errorData = await itemResponse.json().catch(() => ({ detail: 'Failed to create content item' }))
-        throw new Error(errorData.detail || `HTTP ${itemResponse.status}: ${itemResponse.statusText}`)
-      }
-      
-      const contentItem = await itemResponse.json()
 
       // Step 2: Create PostInstances for selected accounts
       let scheduledFor: string | undefined
@@ -1892,24 +1837,11 @@ function CalendarView() {
         }
       }
 
-      const instancesResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/bulk?tenant_id=h2o`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          content_item_id: contentItem.id,
-          channel_account_ids: postForm.channel_account_ids,
-          scheduled_for: scheduledFor
-        })
+      await marketingApi.createPostInstances('h2o', {
+        content_item_id: contentItem.id,
+        channel_account_ids: postForm.channel_account_ids,
+        scheduled_for: scheduledFor
       })
-      
-      if (!instancesResponse.ok) {
-        const errorData = await instancesResponse.json().catch(() => ({ detail: 'Failed to create post instances' }))
-        throw new Error(errorData.detail || `HTTP ${instancesResponse.status}: ${instancesResponse.statusText}`)
-      }
       
       setShowNewPostModal(false)
       setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin', content_category: '', media_urls: [], cta_type: '', cta_url: '' })
@@ -1919,6 +1851,7 @@ function CalendarView() {
       showToast('Post created successfully', 'success')
     } catch (error: any) {
       console.error('Failed to create post:', error)
+      handleApiError(error, 'Create post')
       setError(error.message || 'Failed to create post. Please try again.')
       showToast(error.message || 'Failed to create post', 'error')
     } finally {
@@ -2152,7 +2085,10 @@ function CalendarView() {
                         return (
                           <div
                             key={instance.id}
-                            onClick={() => setSelectedPost(instance)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedPost(instance)
+                            }}
                             className={`
                               ${viewMode === 'month' ? 'p-1.5 text-[10px]' : 'p-2 text-xs'}
                               rounded-md cursor-pointer transition-all
