@@ -7,6 +7,7 @@ import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
 import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
 import { marketingApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset } from '../../lib/api/marketing'
+import { apiGet, apiPost } from '../../lib/api/client'
 import { PhotoUpload } from '../../components/marketing/PhotoUpload'
 import { handleApiError, showSuccess } from '../../lib/error-handler'
 import { CalendarSkeleton } from '../../components/marketing/CalendarSkeleton'
@@ -93,13 +94,10 @@ function MarketingContent() {
         </div>
 
         {/* Tab Content */}
-        <div className="flex gap-6 relative">
-          <div className="flex-1">
-            {activeTab === 'calendar' && <CalendarView />}
-            {activeTab === 'posts' && <PostsView />}
-            {activeTab === 'accounts' && <AccountsView />}
-          </div>
-          <DemandSignalsPanel />
+        <div className="flex-1">
+          {activeTab === 'calendar' && <CalendarView />}
+          {activeTab === 'posts' && <PostsView />}
+          {activeTab === 'accounts' && <AccountsView />}
         </div>
       </div>
     </>
@@ -132,26 +130,7 @@ function DemandSignalsPanel() {
         throw new Error('Not authenticated')
       }
 
-      const url = `${API_BASE_URL}/marketing/demand-signals?tenant_id=h2o&days=${period}`
-      console.log('Fetching demand signals from:', url)
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      })
-
-      console.log('Demand signals response status:', response.status, response.statusText)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }))
-        console.error('Demand signals API error:', errorData)
-        throw new Error(errorData.detail || `Failed to load demand signals: ${response.statusText}`)
-      }
-
-      const data = await response.json()
+      const data = await apiGet(`/marketing/demand-signals?tenant_id=h2o&days=${period}`)
       console.log('Demand signals data received:', data)
       setSignals(data)
     } catch (error: any) {
@@ -1041,10 +1020,37 @@ function PostsView() {
                       {channelAccount?.name || 'Unknown Account'}
                     </td>
                     <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                      {contentItem?.title || 'Planned'}
+                      {contentItem?.title || (
+                        <div className="flex flex-col gap-1">
+                          <span style={{ fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>Planned</span>
+                          {instance.suggested_category && (
+                            <StatusBadge 
+                              status={instance.suggested_category.replace(/_/g, ' ')} 
+                              variant="category"
+                              className="text-[10px] px-1.5 py-0.5 w-fit"
+                            />
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '16px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                      -
+                      {contentItem?.content_category ? (
+                        <StatusBadge 
+                          status={contentItem.content_category.replace(/_/g, ' ')} 
+                          variant="category"
+                          className="text-[10px] px-1.5 py-0.5"
+                        />
+                      ) : (
+                        instance.suggested_category ? (
+                          <StatusBadge 
+                            status={instance.suggested_category.replace(/_/g, ' ')} 
+                            variant="category"
+                            className="text-[10px] px-1.5 py-0.5"
+                          />
+                        ) : (
+                          '-'
+                        )
+                      )}
                     </td>
                     <td style={{ padding: '16px', fontSize: '14px' }}>
                       {contentItem ? (
@@ -1502,7 +1508,16 @@ function CalendarView() {
     return 'month'
   })
   
-  const [currentDate, setCurrentDate] = useState(new Date())
+  // Default to current week (Monday) on load
+  const [currentDate, setCurrentDate] = useState(() => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + daysToMonday)
+    return monday
+  })
+  const [showOnlyPlanned, setShowOnlyPlanned] = useState(false)
   const [selectedPost, setSelectedPost] = useState<any>(null)
   const [channels, setChannels] = useState<any[]>([])
   const [showNewPostModal, setShowNewPostModal] = useState(false)
@@ -1525,10 +1540,74 @@ function CalendarView() {
   const [topoffLoading, setTopoffLoading] = useState(false)
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
   
+  // Get this week and next week dates (Mon-Fri only)
+  const getThisWeekStart = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + daysToMonday)
+    monday.setHours(0, 0, 0, 0)
+    return monday
+  }
+  
+  const getThisWeekEnd = () => {
+    const monday = getThisWeekStart()
+    const friday = new Date(monday)
+    friday.setDate(monday.getDate() + 4) // Friday (4 days after Monday)
+    friday.setHours(23, 59, 59, 999)
+    return friday
+  }
+  
+  const getNextWeekStart = () => {
+    const monday = getThisWeekStart()
+    const nextMonday = new Date(monday)
+    nextMonday.setDate(monday.getDate() + 7)
+    return nextMonday
+  }
+  
+  const getNextWeekEnd = () => {
+    const nextMonday = getNextWeekStart()
+    const nextFriday = new Date(nextMonday)
+    nextFriday.setDate(nextMonday.getDate() + 4)
+    nextFriday.setHours(23, 59, 59, 999)
+    return nextFriday
+  }
+  
+  // Count planned slots for this week and next week
+  const getPlannedSlotsCount = (startDate: Date, endDate: Date) => {
+    return calendarData.reduce((count, dayData) => {
+      const dayDate = new Date(dayData.date)
+      if (dayDate >= startDate && dayDate <= endDate) {
+        const plannedInDay = dayData.instances?.filter((inst: any) => !inst.content_item_id) || []
+        return count + plannedInDay.length
+      }
+      return count
+    }, 0)
+  }
+  
+  const thisWeekStart = getThisWeekStart()
+  const thisWeekEnd = getThisWeekEnd()
+  const nextWeekStart = getNextWeekStart()
+  const nextWeekEnd = getNextWeekEnd()
+  const thisWeekPlanned = getPlannedSlotsCount(thisWeekStart, thisWeekEnd)
+  const nextWeekPlanned = getPlannedSlotsCount(nextWeekStart, nextWeekEnd)
+  
   // Save view mode preference
   const handleViewModeChange = (mode: 'week' | 'month') => {
     setViewMode(mode)
     localStorage.setItem('calendarViewMode', mode)
+  }
+  
+  // Quick navigation to this week or next week
+  const goToThisWeek = () => {
+    setCurrentDate(getThisWeekStart())
+    setViewMode('week')
+  }
+  
+  const goToNextWeek = () => {
+    setCurrentDate(getNextWeekStart())
+    setViewMode('week')
   }
   
   const toggleDayExpansion = (dateStr: string) => {
@@ -1575,35 +1654,57 @@ function CalendarView() {
 
       if (viewMode === 'month') {
         // For month view, get the first and last day of the month
-        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-        end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
-        // Include a few days before and after for proper week alignment
-        const startDay = start.getDay()
-        start.setDate(start.getDate() - startDay) // Start from Sunday of the week containing the 1st
-        const endDay = end.getDay()
-        end.setDate(end.getDate() + (6 - endDay)) // End on Saturday of the week containing the last day
+        const year = currentDate.getFullYear()
+        const month = currentDate.getMonth()
+        start = new Date(year, month, 1)
+        end = new Date(year, month + 1, 0)
+        
+        // Find Monday of the week containing the 1st (Mon-Fri work week)
+        const firstDayOfWeek = start.getDay()
+        if (firstDayOfWeek === 0) {
+          start.setDate(start.getDate() + 1) // Sunday -> Monday
+        } else if (firstDayOfWeek > 1) {
+          start.setDate(start.getDate() - (firstDayOfWeek - 1)) // Back to Monday
+        }
+        
+        // Find Friday of the week containing the last day
+        const lastDayOfWeek = end.getDay()
+        if (lastDayOfWeek === 0) {
+          end.setDate(end.getDate() - 2) // Sunday -> previous Friday
+        } else if (lastDayOfWeek === 6) {
+          end.setDate(end.getDate() - 1) // Saturday -> Friday
+        }
+        // If it's Monday-Friday, use it as is
       } else {
-        // For week view, extend to 60 days ahead
+        // For week view, show current week (Mon-Fri) plus buffer
         start = new Date(currentDate)
-        start.setDate(start.getDate() - 7)
+        const dayOfWeek = start.getDay()
+        const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
+        start.setDate(start.getDate() + daysToMonday - 7) // Previous week Monday
+        
         end = new Date(currentDate)
-        end.setDate(end.getDate() + 60)
+        end.setDate(end.getDate() + daysToMonday + 60) // 60 days from current week Monday
+      }
+
+      // Validate dates before API call
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        throw new Error('Invalid date range for calendar')
       }
 
       const data = await marketingApi.getCalendar('h2o', start, end)
       
       // Transform object format { "2024-12-18": [...] } to array format [{ date: "2024-12-18", instances: [...] }]
-      const calendarArray = Object.entries(data).map(([date, instances]) => ({
-        date,
+      const calendarArray = Object.entries(data || {}).map(([date, instances]) => ({
+        date: String(date),
         instances: Array.isArray(instances) ? instances : []
       }))
       
       setCalendarData(calendarArray)
-      setLoading(false)
     } catch (error) {
       console.error('Failed to load calendar:', error)
       handleApiError(error, 'Load calendar')
       setCalendarData([])
+    } finally {
       setLoading(false)
     }
   }
@@ -1611,12 +1712,20 @@ function CalendarView() {
   const getWeekDays = () => {
     const days = []
     const start = new Date(currentDate)
-    start.setDate(start.getDate() - start.getDay()) // Start of week
+    // Find Monday of current week (0=Sunday, 1=Monday, etc.)
+    const dayOfWeek = start.getDay()
+    const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
+    start.setDate(start.getDate() + daysToMonday)
     
-    for (let i = 0; i < 7; i++) {
+    // Only include Monday (1) through Friday (5) - 5 days total (no Saturday/Sunday)
+    for (let i = 0; i < 5; i++) {
       const day = new Date(start)
       day.setDate(start.getDate() + i)
-      days.push(day)
+      // Only include weekdays: Monday (1) through Friday (5)
+      const dayOfWeek = day.getDay()
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        days.push(day)
+      }
     }
     return days
   }
@@ -1632,21 +1741,37 @@ function CalendarView() {
     
     // Get last day of month
     const lastDay = new Date(year, month + 1, 0)
-    const lastDate = lastDay.getDate()
     
-    // Start from Sunday of the week containing the 1st
+    // Find Monday of the week containing the 1st
     const startDate = new Date(firstDay)
-    startDate.setDate(startDate.getDate() - firstDayOfWeek)
+    if (firstDayOfWeek === 0) {
+      // Sunday - go to Monday
+      startDate.setDate(startDate.getDate() + 1)
+    } else if (firstDayOfWeek > 1) {
+      // Tuesday-Saturday - go back to Monday
+      startDate.setDate(startDate.getDate() - (firstDayOfWeek - 1))
+    }
     
-    // End on Saturday of the week containing the last day
+    // Find Friday of the week containing the last day
     const endDayOfWeek = lastDay.getDay()
     const endDate = new Date(lastDay)
-    endDate.setDate(endDate.getDate() + (6 - endDayOfWeek))
+    if (endDayOfWeek === 0) {
+      // Sunday - go back to previous Friday
+      endDate.setDate(endDate.getDate() - 2)
+    } else if (endDayOfWeek === 6) {
+      // Saturday - go back to Friday
+      endDate.setDate(endDate.getDate() - 1)
+    }
+    // If it's Monday-Friday, use it as is
     
-    // Generate all days in the month view (including padding days)
+    // Generate all days in the month view, filtering out Saturday (6) and Sunday (0)
     const current = new Date(startDate)
     while (current <= endDate) {
-      days.push(new Date(current))
+      const dayOfWeek = current.getDay()
+      // Only include weekdays: Monday (1) through Friday (5)
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        days.push(new Date(current))
+      }
       current.setDate(current.getDate() + 1)
     }
     
@@ -1654,9 +1779,24 @@ function CalendarView() {
   }
 
   const getInstancesForDate = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
-    const dayData = calendarData.find(d => d.date === dateStr)
-    return dayData?.instances || []
+    if (!date || isNaN(date.getTime())) {
+      return []
+    }
+    try {
+      const dateStr = date.toISOString().split('T')[0]
+      const dayData = calendarData.find(d => d?.date === dateStr)
+      const instances = Array.isArray(dayData?.instances) ? dayData.instances : []
+      
+      // If filter is enabled, only show planned slots (empty slots)
+      if (showOnlyPlanned) {
+        return instances.filter((inst: any) => !inst.content_item_id)
+      }
+      
+      return instances
+    } catch (error) {
+      console.error('Error getting instances for date:', error)
+      return []
+    }
   }
 
   async function handleTopoff() {
@@ -1924,23 +2064,28 @@ function CalendarView() {
               Month
             </button>
           </div>
+          <button
+            onClick={() => setShowOnlyPlanned(!showOnlyPlanned)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all min-h-[44px] ${
+              showOnlyPlanned
+                ? 'bg-purple-600 text-white'
+                : 'bg-[var(--color-hover)] text-[var(--color-text-primary)] border border-[var(--color-border)]'
+            }`}
+            title="Show only planned slots that need content"
+          >
+            {showOnlyPlanned ? '✓' : ''} Show Only Empty Slots
+          </button>
         </div>
       </div>
-
-      {/* System Health Dashboard */}
-      <SystemHealthPanel />
-
-      {/* Auto-Generate Content Panel */}
-      <AutoGeneratePanel onContentAdded={loadCalendar} />
 
       {/* Calendar Grid */}
       {loading ? (
         <CalendarSkeleton viewMode={viewMode} />
       ) : (
         <div className="marketing-calendar-grid bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg overflow-hidden">
-        <div className={`grid grid-cols-7 gap-px bg-[var(--color-border)] ${viewMode === 'month' ? 'min-w-[700px]' : ''}`}>
-          {/* Day Headers */}
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+        <div className={`grid grid-cols-5 gap-px bg-[var(--color-border)] ${viewMode === 'month' ? 'min-w-[500px]' : ''}`}>
+          {/* Day Headers - Monday through Friday only (no Saturday/Sunday) */}
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
             <div
               key={day}
               className="p-3 bg-[var(--color-hover)] text-center text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider"
@@ -1955,19 +2100,36 @@ function CalendarView() {
             const isToday = day.toDateString() === new Date().toDateString()
             const isCurrentMonth = day.getMonth() === currentMonth && day.getFullYear() === currentYear
             const isOtherMonth = !isCurrentMonth
+            const dayDate = new Date(day)
+            dayDate.setHours(0, 0, 0, 0)
+            const isThisWeek = dayDate >= thisWeekStart && dayDate <= thisWeekEnd
+            const isNextWeek = dayDate >= nextWeekStart && dayDate <= nextWeekEnd
+            const plannedCount = instances.filter((inst: any) => !inst.content_item_id).length
             
             return (
               <div
                 key={day.toISOString()}
-                className={`marketing-calendar-day-cell bg-[var(--color-card)] relative p-3 ${isOtherMonth ? 'opacity-40' : ''}`}
+                className={`marketing-calendar-day-cell bg-[var(--color-card)] relative p-3 transition-colors ${isOtherMonth ? 'opacity-40' : ''} ${isToday ? 'ring-2 ring-[var(--color-primary)]/30' : ''} ${isThisWeek ? 'bg-orange-500/5 border-l-2 border-orange-500/30' : ''} ${isNextWeek && !isThisWeek ? 'bg-blue-500/5 border-l-2 border-blue-500/30' : ''}`}
                 style={{
-                  minHeight: viewMode === 'month' ? '100px' : '120px'
+                  minHeight: viewMode === 'month' ? '120px' : '140px'
                 }}
               >
-                <div className={`text-sm mb-2 ${isToday ? 'font-bold text-[var(--color-primary)]' : isOtherMonth ? 'font-medium text-[var(--color-text-tertiary)]' : 'font-medium text-[var(--color-text-primary)]'}`}>
-                  {day.getDate()}
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`text-sm font-semibold ${isToday ? 'text-[var(--color-primary)]' : isOtherMonth ? 'text-[var(--color-text-tertiary)]' : 'text-[var(--color-text-primary)]'}`}>
+                    {day.getDate()}
+                  </div>
+                  {plannedCount > 0 && (
+                    <div className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-medium">
+                      {plannedCount} empty
+                    </div>
+                  )}
                 </div>
                 
+                {instances.length === 0 && (
+                  <div className="text-[10px] text-[var(--color-text-tertiary)] italic mt-2 opacity-50">
+                    No posts
+                  </div>
+                )}
                 {instances.length > 0 && (() => {
                   const MAX_VISIBLE = 4
                   const dateStr = day.toISOString().split('T')[0]
@@ -1983,7 +2145,9 @@ function CalendarView() {
                         const contentItem = instance.content_item
                         const channelAccount = instance.channel_account
                         const accountName = channelAccount?.name || 'Unknown Account'
-                        const isPlanned = instance.status === 'Planned' || !instance.content_item_id
+                        // A post is "planned" (empty) only if it has no content_item_id
+                        // If content_item_id exists, show the content regardless of status
+                        const isPlanned = !instance.content_item_id
                         
                         return (
                           <div
@@ -1993,91 +2157,83 @@ function CalendarView() {
                               ${viewMode === 'month' ? 'p-1.5 text-[10px]' : 'p-2 text-xs'}
                               rounded-md cursor-pointer transition-all
                               ${isPlanned 
-                                ? 'bg-[var(--color-hover)]/50 border-2 border-dashed border-white/[0.08] opacity-50 hover:opacity-75' 
+                                ? 'bg-purple-500/20 border-2 border-dashed border-purple-400/60 hover:border-purple-400 hover:bg-purple-500/30' 
                                 : instance.status === 'Posted'
-                                ? 'bg-[var(--color-hover)]/50 border-l-2 border-green-500 border-solid border-white/[0.08] shadow-[2px_0_10px_rgba(34,197,94,0.15)] hover:border-[var(--color-primary)]/50'
-                                : 'bg-[var(--color-hover)]/50 border-2 border-solid border-white/[0.08] hover:border-[var(--color-primary)]/50'
+                                ? 'bg-green-500/20 border-l-2 border-green-500 hover:border-green-400'
+                                : 'bg-[var(--color-hover)]/50 border border-[var(--color-border)] hover:border-[var(--color-primary)]/50'
                               }
                             `}
-                            title={isPlanned ? `Planned slot - ${accountName}` : `${contentItem?.title || 'Untitled'} - ${accountName}${contentItem?.media_assets && contentItem.media_assets.length > 0 ? ` (${contentItem.media_assets.length} media)` : ''}`}
+                            title={isPlanned 
+                              ? `Planned slot - ${accountName}${instance.suggested_category ? ` - Needs: ${instance.suggested_category.replace(/_/g, ' ')}` : ''} - Click to add content`
+                              : `${contentItem?.title || 'Untitled'} - ${accountName}${contentItem?.media_assets && contentItem.media_assets.length > 0 ? ` (${contentItem.media_assets.length} media)` : ''}`}
                           >
-                            <div className="font-semibold text-[var(--color-text-primary)] mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                            <div className={`font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap ${isPlanned ? 'text-purple-300' : 'text-[var(--color-text-primary)]'}`}>
                               {isPlanned ? (
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="italic text-[var(--color-text-secondary)] text-xs">
-                                    Needs content
-                                  </span>
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs">📅</span>
+                                    <span className="text-xs italic">Empty slot</span>
+                                  </div>
                                   {instance.suggested_category && (
                                     <StatusBadge 
                                       status={instance.suggested_category.replace(/_/g, ' ')} 
                                       variant="category"
-                                      className="text-[9px] px-1 py-0"
+                                      className="text-[8px] px-1 py-0 w-fit"
                                     />
                                   )}
                                 </div>
                               ) : (
-                                contentItem?.title || 'Untitled'
+                                <span className="truncate">{contentItem?.title || 'Untitled'}</span>
                               )}
                             </div>
-                            {contentItem?.media_assets && contentItem.media_assets.length > 0 && (
-                              <div className="flex items-center gap-1.5 mt-1">
+                            {isPlanned && viewMode === 'month' && (
+                              <div className="text-[9px] text-[var(--color-text-secondary)] mt-0.5 truncate">
+                                {accountName}
+                              </div>
+                            )}
+                            {!isPlanned && contentItem?.media_assets && contentItem.media_assets.length > 0 && (
+                              <div className="flex items-center gap-1 mt-1">
                                 {contentItem.media_assets[0]?.file_type === 'image' && (
                                   <img
                                     src={contentItem.media_assets[0].file_url}
                                     alt=""
                                     className="w-4 h-4 rounded object-cover border border-white/20"
                                     onError={(e) => {
-                                      // Fallback if image fails to load
                                       e.currentTarget.style.display = 'none'
                                     }}
                                   />
                                 )}
-                                <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">
-                                  📷 {contentItem.media_assets.length}
+                                <span className="text-[9px] text-[var(--color-text-secondary)]">
+                                  {contentItem.media_assets.length} media
                                 </span>
                               </div>
                             )}
-                            {viewMode === 'week' && (
+                            {!isPlanned && viewMode === 'month' && (
+                              <div className="text-[9px] text-[var(--color-text-secondary)] mt-0.5 truncate">
+                                {accountName}
+                              </div>
+                            )}
+                            {viewMode === 'week' && !isPlanned && (
                               <>
-                                <div style={{
-                                  fontSize: '10px',
-                                  color: 'var(--color-text-secondary)',
-                                  marginBottom: '4px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap'
-                                }}>
-                                  📍 {accountName}
+                                <div className="text-[10px] text-[var(--color-text-secondary)] mt-1 truncate">
+                                  {accountName}
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                                  <span style={{
-                                    fontSize: '10px',
-                                    color: 'var(--color-text-secondary)'
-                                  }}>
-                                    👤 {contentItem?.owner || 'Unknown'}
-                                  </span>
-                                  <span style={{
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    fontSize: '9px',
-                                    fontWeight: '500',
-                                    ...getStatusColor(instance.status)
-                                  }}>
+                                <div className="flex items-center justify-between gap-2 mt-1">
+                                  <span className="text-[9px] text-[var(--color-text-secondary)]">
                                     {instance.status}
                                   </span>
+                                  {instance.scheduled_for && (
+                                    <span className="text-[9px] text-[var(--color-text-tertiary)]">
+                                      {new Date(instance.scheduled_for).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                    </span>
+                                  )}
                                 </div>
                               </>
                             )}
-                            {viewMode === 'month' && (
-                              <span style={{
-                                padding: '2px 4px',
-                                borderRadius: '4px',
-                                fontSize: '8px',
-                                fontWeight: '500',
-                                ...getStatusColor(instance.status)
-                              }}>
+                            {viewMode === 'month' && !isPlanned && (
+                              <div className="text-[8px] text-[var(--color-text-secondary)] mt-0.5">
                                 {instance.status}
-                              </span>
+                              </div>
                             )}
                           </div>
                         )
@@ -2998,10 +3154,12 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
   const [isPlannedSlot, setIsPlannedSlot] = useState(false)
   
   useEffect(() => {
-    // Check if this is a planned slot (no content_item_id or status is Planned)
-    setIsPlannedSlot(instance.content_item_id === null || instance.status === 'Planned')
-    // Auto-open editor for planned slots
-    if (instance.content_item_id === null || instance.status === 'Planned') {
+    // Check if this is a planned slot (no content_item_id)
+    // If content_item_id exists, it's not a planned slot regardless of status
+    const isPlanned = !instance.content_item_id
+    setIsPlannedSlot(isPlanned)
+    // Auto-open editor for planned slots (empty slots only)
+    if (isPlanned) {
       setShowEditContentModal(true)
     }
   }, [instance])
@@ -3174,9 +3332,7 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
   const [baseCaption, setBaseCaption] = useState('')
   const [contentCategory, setContentCategory] = useState(instance.suggested_category || '')
   const [postType, setPostType] = useState('Post')
-  const [mediaFiles, setMediaFiles] = useState<File[]>([])
-  const [uploadedMedia, setUploadedMedia] = useState<any[]>([])
-  const [uploading, setUploading] = useState(false)
+  const [uploadedMediaAssets, setUploadedMediaAssets] = useState<MediaAsset[]>(contentItem?.media_assets || [])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   
@@ -3189,29 +3345,26 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
   ]
 
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-
-    // Just store files for now, upload after content item is created
-    setMediaFiles([...mediaFiles, ...files])
-  }
-
-  function removeMedia(index: number) {
-    setUploadedMedia(uploadedMedia.filter((_, i) => i !== index))
-    setMediaFiles(mediaFiles.filter((_, i) => i !== index))
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     
+    // Validation
     if (!title.trim()) {
       setError('Title is required')
       return
     }
     if (!baseCaption.trim()) {
       setError('Content is required')
+      return
+    }
+    if (!instance?.tenant_id) {
+      setError('Invalid post instance: missing tenant_id')
+      return
+    }
+    if (!instance?.id) {
+      setError('Invalid post instance: missing id')
       return
     }
 
@@ -3230,16 +3383,13 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
           owner: 'admin'
         })
 
-        // Upload media files and attach to content item
-        if (mediaFiles.length > 0) {
-          for (const file of mediaFiles) {
-            try {
-              await marketingApi.uploadMedia(file, instance.tenant_id, newItem.id)
-            } catch (err) {
-              console.warn('Failed to upload media:', err)
-            }
-          }
+        if (!newItem?.id) {
+          throw new Error('Failed to create content item: no ID returned')
         }
+
+        // Media is already uploaded via PhotoUpload component - it handles uploads automatically
+        // The PhotoUpload component uploads files when selected and calls onUploadComplete
+        // If there are uploaded assets, they're already associated with the content item via contentItemId prop
 
         // Update the post instance to use the new content item
         await marketingApi.updatePostInstance(instance.id, {
@@ -3248,6 +3398,10 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         })
       } else {
         // Update existing content item
+        if (!contentItem.id) {
+          throw new Error('Invalid content item: missing id')
+        }
+
         await marketingApi.updateContentItem(contentItem.id, {
           title: title.trim(),
           base_caption: baseCaption.trim(),
@@ -3255,16 +3409,8 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
           status: 'Draft'
         })
 
-        // Upload and attach media to existing content item
-        if (mediaFiles.length > 0) {
-          for (const file of mediaFiles) {
-            try {
-              await marketingApi.uploadMedia(file, instance.tenant_id, contentItem.id)
-            } catch (err) {
-              console.warn('Failed to upload media:', err)
-            }
-          }
-        }
+        // Media is already uploaded via PhotoUpload component
+        // The PhotoUpload component handles uploads and associates them with contentItemId
 
         // Update post instance status
         await marketingApi.updatePostInstance(instance.id, {
@@ -3276,7 +3422,7 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
       onSuccess()
     } catch (error: any) {
       console.error('Failed to add content:', error)
-      const errorMessage = handleApiError(error)
+      const errorMessage = error?.message || handleApiError(error) || 'Failed to add content. Please try again.'
       setError(errorMessage)
       handleApiError(error, 'Add content to planned slot')
     } finally {
@@ -3377,80 +3523,19 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
                 Media (Images/Videos)
               </label>
-              <input
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={handleFileChange}
-                disabled={uploading}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  backgroundColor: 'var(--color-hover)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '14px',
-                  cursor: uploading ? 'not-allowed' : 'pointer'
+              <PhotoUpload
+                tenantId={instance.tenant_id}
+                contentItemId={contentItem?.id}
+                onUploadComplete={(assets) => {
+                  setUploadedMediaAssets(assets)
                 }}
+                onUploadError={(error) => {
+                  setError(error.message || 'Failed to upload media')
+                }}
+                existingAssets={contentItem?.media_assets || []}
+                maxFiles={10}
+                className="mt-2"
               />
-              {mediaFiles.length > 0 && (
-                <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {mediaFiles.map((file, index) => (
-                    <div key={index} style={{ position: 'relative', display: 'inline-block' }}>
-                      {file.type.startsWith('image/') ? (
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={file.name}
-                          style={{
-                            width: '80px',
-                            height: '80px',
-                            objectFit: 'cover',
-                            borderRadius: '6px',
-                            border: '1px solid var(--color-border)'
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '80px',
-                          height: '80px',
-                          backgroundColor: 'var(--color-hover)',
-                          borderRadius: '6px',
-                          border: '1px solid var(--color-border)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '24px'
-                        }}>
-                          🎥
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeMedia(index)}
-                        style={{
-                          position: 'absolute',
-                          top: '-8px',
-                          right: '-8px',
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          backgroundColor: '#EF5350',
-                          color: '#ffffff',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
           <div className="flex gap-3 mt-6">
@@ -4508,3 +4593,4 @@ function AccountsView() {
     </div>
   )
 }
+

@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react'
 import { SignalCard, SignalAction } from './SignalCard'
 import { useRouter } from 'next/navigation'
-import { API_BASE_URL } from '../lib/config'
 import { useTenant } from '../contexts/TenantContext'
+import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+import { apiGet } from '../lib/api/client'
 
 interface Signal {
   id: string
@@ -37,23 +38,10 @@ export function Dataflow() {
 
   async function loadSignals() {
     try {
-      const token = localStorage.getItem('token')
-      const headers: HeadersInit = { 'Content-Type': 'application/json' }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
       // Signals are h2o specific, but respect tenant selection
       const tenantParam = currentTenant === 'both' ? 'h2o' : currentTenant
-      const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=${tenantParam}`, {
-        headers,
-        credentials: 'include'
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSignals(Array.isArray(data) ? data : [])
-      }
+      const data = await apiGet<Signal[]>(`/signals/all?tenant_id=${tenantParam}`)
+      setSignals(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Failed to load signals:', error)
       setSignals([])
@@ -171,7 +159,7 @@ export function Dataflow() {
             alignItems: 'center',
             gap: '8px'
           }}>
-            <span>📝</span> Reviews
+            <UilFileAlt size={16} color="var(--color-text-primary)" /> Reviews
           </h2>
           <div style={{
             display: 'grid',

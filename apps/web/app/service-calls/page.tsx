@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Table } from '../../components/ui/Table'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import UilCheckCircle from '@iconscout/react-unicons/icons/uil-check-circle'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { QuickAction } from '../../components/QuickActions'
@@ -27,6 +28,11 @@ interface ServiceCall {
   priority: string
   created_at: string
   assigned_to?: string
+  additional_techs?: string
+  payment_status?: string
+  billing_writeup_status?: string
+  paperwork_turned_in?: boolean
+  scheduled_start?: string
 }
 
 export default function ServiceCallsPage() {
@@ -187,26 +193,94 @@ export default function ServiceCallsPage() {
     },
     {
       header: 'Issue',
-      accessor: (row: ServiceCall) => formatTableCell(row.issue_description ? row.issue_description.substring(0, 50) + '...' : null)
+      accessor: (row: ServiceCall) => (
+        <div style={{ maxWidth: '300px' }}>
+          {formatTableCell(row.issue_description ? row.issue_description.substring(0, 60) + (row.issue_description.length > 60 ? '...' : '') : null)}
+        </div>
+      )
     },
     {
-      header: 'Phone',
-      accessor: (row: ServiceCall) => formatTableCell(row.phone),
-      width: '140px'
+      header: 'Tech(s)',
+      accessor: (row: ServiceCall) => {
+        const techs = []
+        if (row.assigned_to) techs.push(row.assigned_to)
+        if (row.additional_techs) techs.push(...row.additional_techs.split(',').map(t => t.trim()).filter(Boolean))
+        return techs.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {techs.map((tech, idx) => (
+              <span key={idx} style={{
+                padding: '2px 8px',
+                backgroundColor: 'var(--color-hover)',
+                borderRadius: '4px',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-text-primary)'
+              }}>
+                {tech}
+              </span>
+            ))}
+          </div>
+        ) : formatTableCell(null)
+      },
+      width: '150px'
+    },
+    {
+      header: 'Scheduled',
+      accessor: (row: ServiceCall) => {
+        if (!row.scheduled_start) return formatTableCell(null)
+        const date = new Date(row.scheduled_start)
+        return (
+          <div style={{ fontSize: 'var(--text-sm)' }}>
+            <div style={{ fontWeight: 500 }}>{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+              {date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </div>
+          </div>
+        )
+      },
+      width: '120px'
+    },
+    {
+      header: 'Payment',
+      accessor: (row: ServiceCall) => {
+        if (!row.payment_status) return formatTableCell(null)
+        const colorMap: Record<string, string> = {
+          'Paid': 'green',
+          'Unpaid': 'red',
+          'Partial': 'yellow',
+          'Pending': 'blue'
+        }
+        const variant = (colorMap[row.payment_status] || 'default') as 'default' | 'success' | 'error' | 'warning' | 'info' | 'priority' | 'category'
+        return <StatusBadge status={row.payment_status} variant={variant} />
+      },
+      width: '100px'
+    },
+    {
+      header: 'Paperwork',
+      accessor: (row: ServiceCall) => row.paperwork_turned_in ? (
+        <span style={{ 
+          padding: '4px 8px',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          color: 'rgb(34, 197, 94)',
+          borderRadius: '4px',
+          fontSize: 'var(--text-xs)',
+          fontWeight: 500
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <UilCheckCircle size={12} color="rgb(34, 197, 94)" />
+            Turned In
+          </div>
+        </span>
+      ) : formatTableCell(null),
+      width: '110px'
     },
     {
       header: 'Priority',
       accessor: (row: ServiceCall) => row.priority ? <StatusBadge status={row.priority} variant="priority" /> : formatTableCell(null),
-      width: '120px'
+      width: '100px'
     },
     {
       header: 'Status',
       accessor: (row: ServiceCall) => row.status ? <StatusBadge status={row.status} /> : formatTableCell(null),
-      width: '130px'
-    },
-    {
-      header: 'Created',
-      accessor: (row: ServiceCall) => formatTableCell(row.created_at ? new Date(row.created_at).toLocaleDateString() : null),
       width: '120px'
     }
   ]

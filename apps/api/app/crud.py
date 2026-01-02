@@ -521,6 +521,77 @@ async def delete_service_call(db: AsyncSession, sc: models.ServiceCall, changed_
     await db.delete(sc)
     await db.commit()
 
+### Service Call Tasks/Check-offs
+async def create_service_call_task(db: AsyncSession, task_dict: dict, changed_by: str) -> models.ServiceCallTask:
+    task = models.ServiceCallTask(**task_dict)
+    db.add(task)
+    await db.flush()
+    await write_audit(db, task.tenant_id, 'service_call_task', task.id, 'create', changed_by)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise ValueError('Failed to create service call task')
+    await db.refresh(task)
+    return task
+
+async def get_service_call_task(db: AsyncSession, task_id: UUID) -> models.ServiceCallTask | None:
+    res = await db.execute(
+        select(models.ServiceCallTask)
+        .where(models.ServiceCallTask.id == task_id)
+    )
+    return res.scalar_one_or_none()
+
+async def list_service_call_tasks(db: AsyncSession, service_call_id: UUID, status: str | None = None):
+    q = select(models.ServiceCallTask).where(models.ServiceCallTask.service_call_id == service_call_id)
+    if status:
+        q = q.where(models.ServiceCallTask.status == status)
+    q = q.order_by(models.ServiceCallTask.created_at.desc())
+    res = await db.execute(q)
+    return res.scalars().all()
+
+async def list_pending_service_call_tasks(db: AsyncSession, tenant_id: str, assigned_to: str | None = None):
+    """Get all pending tasks for office staff dashboard"""
+    from datetime import date
+    q = select(models.ServiceCallTask).where(
+        models.ServiceCallTask.tenant_id == tenant_id,
+        models.ServiceCallTask.status == 'pending'
+    )
+    if assigned_to:
+        q = q.where(models.ServiceCallTask.assigned_to == assigned_to)
+    # Order by due_date (overdue first), then by created_at
+    q = q.order_by(
+        models.ServiceCallTask.due_date.asc().nullslast(),
+        models.ServiceCallTask.created_at.asc()
+    )
+    res = await db.execute(q)
+    return res.scalars().all()
+
+async def update_service_call_task(db: AsyncSession, task: models.ServiceCallTask, task_in: schemas.ServiceCallTaskUpdate, changed_by: str) -> models.ServiceCallTask:
+    old_status = task.status
+    for field, value in task_in.dict(exclude_unset=True).items():
+        if field == 'completed_at' and value is None:
+            # Don't set to None if we're not completing
+            continue
+        old = getattr(task, field)
+        setattr(task, field, value)
+        await write_audit(db, task.tenant_id, 'service_call_task', task.id, 'update', changed_by, field, str(old) if old is not None else None, str(value) if value is not None else None)
+    
+    # If marking as completed, set completed_at if not already set
+    if task_in.status == 'completed' and old_status != 'completed' and not task.completed_at:
+        from datetime import datetime, timezone
+        task.completed_at = datetime.now(timezone.utc)
+    
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+    return task
+
+async def delete_service_call_task(db: AsyncSession, task: models.ServiceCallTask, changed_by: str):
+    await write_audit(db, task.tenant_id, 'service_call_task', task.id, 'delete', changed_by)
+    await db.delete(task)
+    await db.commit()
+
 ### Audit log pagination
 async def list_audit(db: AsyncSession, entity_type: str | None, entity_id: UUID | None, tenant_id: str | None, limit: int = 50, offset: int = 0):
     q = select(models.AuditLog)

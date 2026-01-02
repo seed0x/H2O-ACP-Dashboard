@@ -17,6 +17,11 @@ import { TechPerformance } from '../components/TechPerformance'
 import { ServiceCallsCalendar } from '../components/ServiceCallsCalendar'
 import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+import UilShoppingCart from '@iconscout/react-unicons/icons/uil-shopping-cart'
+import UilEnvelopeSend from '@iconscout/react-unicons/icons/uil-envelope-send'
+import UilPhoneAlt from '@iconscout/react-unicons/icons/uil-phone-alt'
+import UilInvoice from '@iconscout/react-unicons/icons/uil-invoice'
+import UilClipboardNotes from '@iconscout/react-unicons/icons/uil-clipboard-notes'
 
 // Icon component wrapper
 function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
@@ -32,11 +37,13 @@ export default function Dashboard() {
     soldThisWeek: 0,
     totalOverdue: 0,
     pendingReviews: 0,
-    marketingPosts: 0
+    marketingPosts: 0,
+    pendingServiceCallTasks: 0
   })
   const [overdueItems, setOverdueItems] = useState<any[]>([])
   const [openTasks, setOpenTasks] = useState<any[]>([])
   const [bidFollowUps, setBidFollowUps] = useState<any[]>([])
+  const [pendingServiceCallTasks, setPendingServiceCallTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -204,12 +211,26 @@ export default function Dashboard() {
         r.status !== 'completed' && r.status !== 'review_received'
       ).length
       
+      // Load pending service call tasks
+      try {
+        const tasksRes = await axios.get(`${API_BASE_URL}/service-calls/tasks/pending?tenant_id=h2o`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          withCredentials: true
+        })
+        const tasks = Array.isArray(tasksRes.data) ? tasksRes.data : []
+        setPendingServiceCallTasks(tasks)
+      } catch (err) {
+        console.error('Failed to load pending tasks:', err)
+        setPendingServiceCallTasks([])
+      }
+      
       setStats({
         openTasks: openJobTasks.length + openCallTasks.length,
         soldThisWeek,
         totalOverdue,
         pendingReviews,
-        marketingPosts: 0 // Marketing endpoint not active yet
+        marketingPosts: 0, // Marketing endpoint not active yet
+        pendingServiceCallTasks: pendingServiceCallTasks.length
       })
       
       setOpenTasks(allOpenTasks)
@@ -247,10 +268,10 @@ export default function Dashboard() {
         description="H2O Plumbing & All County Construction"
       />
 
-      {/* Stats Grid - 5 key cards */}
+      {/* Stats Grid - 6 key cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)',
         gap: '16px',
         marginBottom: '24px'
       }}>
@@ -286,6 +307,154 @@ export default function Dashboard() {
           href="/marketing"
         />
       </div>
+
+      {/* Pending Service Call Tasks - Critical for office staff */}
+      {pendingServiceCallTasks.length > 0 && (
+        <Card style={{
+          marginBottom: '24px',
+          borderColor: 'var(--color-error)',
+          borderWidth: '2px'
+        }}>
+          <CardHeader 
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-error)' }}>
+                <IconWrapper Icon={UilExclamationTriangle} size={18} color="var(--color-error)" />
+                <span>Pending Follow-up Tasks ({pendingServiceCallTasks.length})</span>
+              </div>
+            }
+            action={
+              <a 
+                href="/service-calls" 
+                style={{ 
+                  fontSize: 'var(--text-sm)', 
+                  color: 'var(--color-primary)', 
+                  textDecoration: 'none',
+                  fontWeight: 500
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+              >
+                View All →
+              </a>
+            }
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {pendingServiceCallTasks.slice(0, 5).map((task: any) => {
+              const taskTypeIcons: Record<string, React.ComponentType<{ size?: number | string; color?: string }>> = {
+                'pull_permit': UilFileAlt,
+                'order_parts': UilShoppingCart,
+                'send_bid': UilEnvelopeSend,
+                'call_back_schedule': UilPhoneAlt,
+                'write_up_billing': UilInvoice,
+                'other': UilClipboardNotes
+              }
+              const isOverdue = task.due_date && new Date(task.due_date) < new Date()
+              
+              return (
+                <a
+                  key={task.id}
+                  href={`/service-calls/${task.service_call_id}`}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'start',
+                    padding: '16px',
+                    backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.05)' : 'var(--color-surface-elevated)',
+                    borderRadius: 'var(--radius-md)',
+                    textDecoration: 'none',
+                    borderLeft: `3px solid ${isOverdue ? 'var(--color-error)' : 'var(--color-primary)'}`,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateX(2px)'
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateX(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      marginBottom: '4px'
+                    }}>
+                      {(() => {
+                        const Icon = taskTypeIcons[task.task_type] || UilClipboardNotes
+                        return <Icon size={18} color="var(--color-text-primary)" />
+                      })()}
+                      <span style={{ 
+                        fontWeight: 600, 
+                        color: 'var(--color-text-primary)', 
+                        fontSize: 'var(--text-base)'
+                      }}>
+                        {task.title}
+                      </span>
+                      {isOverdue && (
+                        <span style={{
+                          padding: '2px 8px',
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          color: '#ef4444',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          fontWeight: 600
+                        }}>
+                          OVERDUE
+                        </span>
+                      )}
+                    </div>
+                    {task.description && (
+                      <div style={{ 
+                        fontSize: 'var(--text-sm)', 
+                        color: 'var(--color-text-secondary)',
+                        marginTop: '4px'
+                      }}>
+                        {task.description}
+                      </div>
+                    )}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '12px', 
+                      marginTop: '8px',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-tertiary)'
+                    }}>
+                      {task.assigned_to && (
+                        <span>Assigned to: <strong>{task.assigned_to}</strong></span>
+                      )}
+                      {task.due_date && (
+                        <span style={{ color: isOverdue ? '#ef4444' : undefined }}>
+                          Due: <strong>{new Date(task.due_date).toLocaleDateString()}</strong>
+                        </span>
+                      )}
+                      <span>Created by: <strong>{task.created_by || 'Tech'}</strong></span>
+                    </div>
+                  </div>
+                </a>
+              )
+            })}
+            {pendingServiceCallTasks.length > 5 && (
+              <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                <a
+                  href="/service-calls"
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-primary)',
+                    textDecoration: 'none',
+                    fontWeight: 500
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  View all {pendingServiceCallTasks.length} pending tasks →
+                </a>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Today's Schedule */}
       <div style={{ marginBottom: '24px' }}>

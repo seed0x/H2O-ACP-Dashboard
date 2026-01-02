@@ -1,8 +1,26 @@
 FROM python:3.12-slim
 WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python dependencies
 COPY requirements.txt ./
-RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/lists/* \
-	&& pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . /app
+
+# Make scripts executable
 RUN chmod +x /app/docker-entrypoint.sh
+RUN chmod +x /app/wait_for_db.py
+RUN chmod +x /app/fix_admin.py
+
+# Expose port
+EXPOSE 8000
+
+# Run entrypoint script
 CMD ["/app/docker-entrypoint.sh"]

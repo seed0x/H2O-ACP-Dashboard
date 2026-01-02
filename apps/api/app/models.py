@@ -196,6 +196,20 @@ class ServiceCall(Base):
     scheduled_end = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
     assigned_to = Column(String, nullable=True)  # Owner/assignee for accountability
+    additional_techs = Column(String, nullable=True)  # Comma-separated list of additional techs
+    
+    # Payment tracking
+    payment_status = Column(String, nullable=True)  # 'Paid', 'Unpaid', 'Pending', 'Partial'
+    payment_method = Column(String, nullable=True)  # 'Cash', 'Check', 'Card', 'Invoice', etc.
+    payment_amount = Column(Numeric(10, 2), nullable=True)
+    payment_date = Column(Date, nullable=True)
+    
+    # Billing write-up tracking
+    billing_writeup_status = Column(String, nullable=True)  # 'Needs Write-up', 'In Progress', 'Written Up'
+    billing_writeup_assigned_to = Column(String, nullable=True)  # Who's writing it up
+    
+    # Paperwork status
+    paperwork_turned_in = Column(Boolean, nullable=True, default=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -203,6 +217,7 @@ class ServiceCall(Base):
     # Relationships
     customer = relationship("Customer", back_populates="service_calls")
     workflow = relationship("ServiceCallWorkflow", back_populates="service_call", uselist=False, cascade="all, delete-orphan")
+    tasks = relationship("ServiceCallTask", back_populates="service_call", cascade="all, delete-orphan")
 
 class ServiceCallWorkflow(Base):
     __tablename__ = "service_call_workflows"
@@ -250,6 +265,26 @@ class ServiceCallWorkflow(Base):
 
     service_call = relationship("ServiceCall", back_populates="workflow")
     bid = relationship("Bid", foreign_keys=[bid_id])
+
+class ServiceCallTask(Base):
+    __tablename__ = "service_call_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    service_call_id = Column(UUID(as_uuid=True), ForeignKey("service_calls.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(Text, nullable=False)
+    task_type = Column(String, nullable=False)  # 'pull_permit', 'order_parts', 'send_bid', 'call_back_schedule', 'write_up_billing', 'other'
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default='pending')  # 'pending', 'in_progress', 'completed', 'cancelled'
+    assigned_to = Column(String, nullable=True)  # Office staff member
+    due_date = Column(Date, nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_by = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_by = Column(String, nullable=True)  # Tech who created it
+
+    service_call = relationship("ServiceCall", back_populates="tasks")
 
 class JobContact(Base):
     __tablename__ = "job_contacts"

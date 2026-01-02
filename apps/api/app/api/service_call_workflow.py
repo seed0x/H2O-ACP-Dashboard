@@ -17,6 +17,109 @@ from .. import crud
 router = APIRouter(prefix="/service-calls/{service_call_id}/workflow", tags=["service-call-workflow"])
 
 
+async def auto_create_tasks_from_workflow(
+    db: AsyncSession,
+    service_call: models.ServiceCall,
+    workflow: models.ServiceCallWorkflow,
+    update_dict: dict,
+    created_by: str
+):
+    """Auto-create tasks when workflow steps indicate needs"""
+    from sqlalchemy import select
+    
+    # Check if permit is needed (Step 2)
+    if 'needs_permit' in update_dict and update_dict['needs_permit'] is True:
+        # Check if task already exists
+        existing = await db.execute(
+            select(models.ServiceCallTask).where(
+                models.ServiceCallTask.service_call_id == service_call.id,
+                models.ServiceCallTask.task_type == 'pull_permit',
+                models.ServiceCallTask.status == 'pending'
+            )
+        )
+        if not existing.scalar_one_or_none():
+            task = models.ServiceCallTask(
+                service_call_id=service_call.id,
+                tenant_id=service_call.tenant_id,
+                task_type='pull_permit',
+                title='Pull Permit',
+                description=update_dict.get('permit_notes') or f'Permit needed for {service_call.customer_name}',
+                status='pending',
+                due_date=date.today() + timedelta(days=1),  # Due tomorrow
+                created_by=created_by
+            )
+            db.add(task)
+    
+    # Check if parts order is needed (Step 4)
+    if 'needs_parts_order' in update_dict and update_dict['needs_parts_order'] is True:
+        existing = await db.execute(
+            select(models.ServiceCallTask).where(
+                models.ServiceCallTask.service_call_id == service_call.id,
+                models.ServiceCallTask.task_type == 'order_parts',
+                models.ServiceCallTask.status == 'pending'
+            )
+        )
+        if not existing.scalar_one_or_none():
+            task = models.ServiceCallTask(
+                service_call_id=service_call.id,
+                tenant_id=service_call.tenant_id,
+                task_type='order_parts',
+                title='Order Parts',
+                description=update_dict.get('parts_order_notes') or f'Parts needed for {service_call.customer_name}',
+                status='pending',
+                due_date=date.today() + timedelta(days=1),
+                created_by=created_by
+            )
+            db.add(task)
+    
+    # Check if bid is needed (Step 5)
+    if 'needs_bid' in update_dict and update_dict['needs_bid'] is True:
+        existing = await db.execute(
+            select(models.ServiceCallTask).where(
+                models.ServiceCallTask.service_call_id == service_call.id,
+                models.ServiceCallTask.task_type == 'send_bid',
+                models.ServiceCallTask.status == 'pending'
+            )
+        )
+        if not existing.scalar_one_or_none():
+            task = models.ServiceCallTask(
+                service_call_id=service_call.id,
+                tenant_id=service_call.tenant_id,
+                task_type='send_bid',
+                title='Send Bid',
+                description=f'Bid needed for {service_call.customer_name}',
+                status='pending',
+                due_date=date.today() + timedelta(days=3),  # Bids can take a few days
+                created_by=created_by
+            )
+            db.add(task)
+    
+    # Check if reschedule is needed (Step 3)
+    if 'needs_reschedule' in update_dict and update_dict['needs_reschedule'] is True:
+        existing = await db.execute(
+            select(models.ServiceCallTask).where(
+                models.ServiceCallTask.service_call_id == service_call.id,
+                models.ServiceCallTask.task_type == 'call_back_schedule',
+                models.ServiceCallTask.status == 'pending'
+            )
+        )
+        if not existing.scalar_one_or_none():
+            reschedule_date = update_dict.get('reschedule_date')
+            task = models.ServiceCallTask(
+                service_call_id=service_call.id,
+                tenant_id=service_call.tenant_id,
+                task_type='call_back_schedule',
+                title='Call Back to Schedule',
+                description=update_dict.get('reschedule_notes') or f'Customer needs to reschedule - {service_call.customer_name}',
+                status='pending',
+                due_date=reschedule_date if reschedule_date else date.today() + timedelta(days=1),
+                created_by=created_by
+            )
+            db.add(task)
+    
+    await db.flush()  # Flush but don't commit yet - let the main update commit
+
+
 @router.get("", response_model=schemas.ServiceCallWorkflow)
 async def get_workflow(
     service_call_id: UUID,
@@ -97,7 +200,12 @@ async def update_workflow(
     
     # Update workflow fields
     old_completed = workflow.completed
-    for field, value in workflow_in.model_dump(exclude_unset=True).items():
+    update_dict = workflow_in.model_dump(exclude_unset=True)
+    
+    # Auto-create tasks based on workflow steps
+    await auto_create_tasks_from_workflow(db, service_call, workflow, update_dict, current_user.username)
+    
+    for field, value in update_dict.items():
         setattr(workflow, field, value)
     
     # Set completed_at if workflow is being marked as completed

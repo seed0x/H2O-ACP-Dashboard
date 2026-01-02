@@ -8,6 +8,7 @@ from .. schemas import (
     BidCreate, BidOut, BidUpdate, BidLineItemCreate, BidLineItemOut, BidLineItemUpdate,
     JobCreate, JobOut, JobUpdate,
     ServiceCallCreate, ServiceCallOut, ServiceCallUpdate,
+    ServiceCallTaskCreate, ServiceCallTask, ServiceCallTaskUpdate,
     AuditLogOut,
     ReviewRequestCreate, ReviewRequestOut, ReviewRequestUpdate,
     ReviewOut, ReviewUpdate,
@@ -583,6 +584,78 @@ async def delete_service_call(id: UUID, db: AsyncSession = Depends(get_session),
     if not sc:
         raise HTTPException(status_code=404, detail='Service call not found')
     await crud.delete_service_call(db, sc, current_user.username)
+    return {"deleted": True}
+
+# Service Call Tasks/Check-offs
+@router.post('/service-calls/{service_call_id}/tasks', response_model=ServiceCallTask)
+async def create_service_call_task(
+    service_call_id: UUID,
+    task_in: ServiceCallTaskCreate,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    # Verify service call exists
+    sc = await crud.get_service_call(db, service_call_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail='Service call not found')
+    
+    # Set created_by to current user
+    task_dict = task_in.dict()
+    task_dict['service_call_id'] = service_call_id
+    task_dict['created_by'] = current_user.username
+    
+    task = await crud.create_service_call_task(db, task_dict, current_user.username)
+    return task
+
+@router.get('/service-calls/{service_call_id}/tasks', response_model=list[ServiceCallTask])
+async def list_service_call_tasks(
+    service_call_id: UUID,
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_session)
+):
+    tasks = await crud.list_service_call_tasks(db, service_call_id, status)
+    return tasks
+
+@router.get('/service-calls/tasks/pending', response_model=list[ServiceCallTask])
+async def list_pending_tasks(
+    tenant_id: Optional[str] = 'h2o',
+    assigned_to: Optional[str] = None,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    """Get all pending tasks for office staff dashboard"""
+    tasks = await crud.list_pending_service_call_tasks(db, tenant_id, assigned_to)
+    return tasks
+
+@router.patch('/service-calls/tasks/{task_id}', response_model=ServiceCallTask)
+async def update_service_call_task(
+    task_id: UUID,
+    task_in: ServiceCallTaskUpdate,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    task = await crud.get_service_call_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail='Task not found')
+    
+    # If marking as completed, set completed_by and completed_at
+    if task_in.status == 'completed' and task.status != 'completed':
+        task_in.completed_by = current_user.username
+        task_in.completed_at = datetime.now(timezone.utc)
+    
+    updated_task = await crud.update_service_call_task(db, task, task_in, current_user.username)
+    return updated_task
+
+@router.delete('/service-calls/tasks/{task_id}')
+async def delete_service_call_task(
+    task_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    task = await crud.get_service_call_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail='Task not found')
+    await crud.delete_service_call_task(db, task, current_user.username)
     return {"deleted": True}
 
 # Audit log

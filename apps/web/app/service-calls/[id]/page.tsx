@@ -21,6 +21,15 @@ import UilEnvelope from '@iconscout/react-unicons/icons/uil-envelope'
 import UilExclamationTriangle from '@iconscout/react-unicons/icons/uil-exclamation-triangle'
 import UilClock from '@iconscout/react-unicons/icons/uil-clock'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+import UilCreditCard from '@iconscout/react-unicons/icons/uil-credit-card'
+import UilInvoice from '@iconscout/react-unicons/icons/uil-invoice'
+import UilUsersAlt from '@iconscout/react-unicons/icons/uil-users-alt'
+import UilClipboardNotes from '@iconscout/react-unicons/icons/uil-clipboard-notes'
+import UilCheckCircle from '@iconscout/react-unicons/icons/uil-check-circle'
+import UilShoppingCart from '@iconscout/react-unicons/icons/uil-shopping-cart'
+import UilEnvelopeSend from '@iconscout/react-unicons/icons/uil-envelope-send'
+import UilPhoneAlt from '@iconscout/react-unicons/icons/uil-phone-alt'
+import UilCheck from '@iconscout/react-unicons/icons/uil-check'
 
 // Icon component wrapper for consistent sizing
 function IconWrapper({ Icon, size = 20, color = 'var(--color-text-secondary)' }: { Icon: React.ComponentType<{ size?: number | string; color?: string }>, size?: number, color?: string }) {
@@ -43,8 +52,16 @@ interface ServiceCall {
   priority: string
   notes?: string
   assigned_to?: string
+  additional_techs?: string
   scheduled_start?: string
   scheduled_end?: string
+  payment_status?: string
+  payment_method?: string
+  payment_amount?: number
+  payment_date?: string
+  billing_writeup_status?: string
+  billing_writeup_assigned_to?: string
+  paperwork_turned_in?: boolean
   created_at: string
   updated_at: string
 }
@@ -77,11 +94,19 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
+  const [additionalTechs, setAdditionalTechs] = useState('')
   const [scheduledStartDate, setScheduledStartDate] = useState('')
   const [scheduledStartTime, setScheduledStartTime] = useState('')
   const [scheduledEndDate, setScheduledEndDate] = useState('')
   const [scheduledEndTime, setScheduledEndTime] = useState('')
   const [notes, setNotes] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentDate, setPaymentDate] = useState('')
+  const [billingWriteupStatus, setBillingWriteupStatus] = useState('')
+  const [billingWriteupAssignedTo, setBillingWriteupAssignedTo] = useState('')
+  const [paperworkTurnedIn, setPaperworkTurnedIn] = useState(false)
   const [suggestedPortals, setSuggestedPortals] = useState<any[]>([])
   const [loadingPortals, setLoadingPortals] = useState(false)
 
@@ -117,6 +142,7 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       setStatus(scData.status || '')
       setPriority(scData.priority || '')
       setAssignedTo(scData.assigned_to || '')
+      setAdditionalTechs(scData.additional_techs || '')
       
       // Parse scheduled_start with time
       if (scData.scheduled_start) {
@@ -139,6 +165,13 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       }
       
       setNotes(scData.notes || '')
+      setPaymentStatus(scData.payment_status || '')
+      setPaymentMethod(scData.payment_method || '')
+      setPaymentAmount(scData.payment_amount?.toString() || '')
+      setPaymentDate(scData.payment_date || '')
+      setBillingWriteupStatus(scData.billing_writeup_status || '')
+      setBillingWriteupAssignedTo(scData.billing_writeup_assigned_to || '')
+      setPaperworkTurnedIn(scData.paperwork_turned_in || false)
       
       // Load builder
       if (scData.builder_id) {
@@ -231,9 +264,17 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
         status,
         priority,
         assigned_to: assignedTo || null,
+        additional_techs: additionalTechs || null,
         notes,
         scheduled_start: combineDateTime(scheduledStartDate, scheduledStartTime),
         scheduled_end: combineDateTime(scheduledEndDate, scheduledEndTime),
+        payment_status: paymentStatus || null,
+        payment_method: paymentMethod || null,
+        payment_amount: paymentAmount ? parseFloat(paymentAmount) : null,
+        payment_date: paymentDate || null,
+        billing_writeup_status: billingWriteupStatus || null,
+        billing_writeup_assigned_to: billingWriteupAssignedTo || null,
+        paperwork_turned_in: paperworkTurnedIn,
       }
       
       await axios.patch(`${API_BASE_URL}/service-calls/${id}`, updateData, { headers, withCredentials: true })
@@ -386,7 +427,7 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
         {/* Status & Priority */}
         <Card>
           <CardHeader title="Status & Priority" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <div>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
                 Status
@@ -417,16 +458,6 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
                   { value: 'High', label: 'High' },
                   { value: 'Emergency', label: 'Emergency' }
                 ]}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
-                Assigned To (Owner)
-              </label>
-              <Input
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="Owner/assignee name"
               />
             </div>
           </div>
@@ -608,15 +639,243 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
         </div>
       </Card>
 
-      {/* Notes Section */}
+      {/* Payment & Billing Section */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+        {/* Payment Tracking */}
+        <Card>
+          <CardHeader 
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UilCreditCard size={18} color="var(--color-text-primary)" />
+                Payment Tracking
+              </div>
+            }
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Payment Status
+              </label>
+              <Select
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value)}
+                options={[
+                  { value: '', label: 'Not Set' },
+                  { value: 'Unpaid', label: 'Unpaid' },
+                  { value: 'Partial', label: 'Partial' },
+                  { value: 'Paid', label: 'Paid' },
+                  { value: 'Pending', label: 'Pending' }
+                ]}
+              />
+            </div>
+            {paymentStatus && (
+              <>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                    Payment Method
+                  </label>
+                  <Select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    options={[
+                      { value: '', label: 'Select method' },
+                      { value: 'Cash', label: 'Cash' },
+                      { value: 'Check', label: 'Check' },
+                      { value: 'Card', label: 'Card' },
+                      { value: 'Invoice', label: 'Invoice' },
+                      { value: 'Other', label: 'Other' }
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                    Payment Amount ($)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                    Payment Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* Billing Write-up */}
+        <Card>
+          <CardHeader 
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UilInvoice size={18} color="var(--color-text-primary)" />
+                Billing Write-up
+              </div>
+            }
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Write-up Status
+              </label>
+              <Select
+                value={billingWriteupStatus}
+                onChange={(e) => setBillingWriteupStatus(e.target.value)}
+                options={[
+                  { value: '', label: 'Not Set' },
+                  { value: 'Needs Write-up', label: 'Needs Write-up' },
+                  { value: 'In Progress', label: 'In Progress' },
+                  { value: 'Written Up', label: 'Written Up' }
+                ]}
+              />
+            </div>
+            {billingWriteupStatus && (
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                  Assigned To
+                </label>
+                <Input
+                  value={billingWriteupAssignedTo}
+                  onChange={(e) => setBillingWriteupAssignedTo(e.target.value)}
+                  placeholder="Who's writing it up?"
+                />
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Tech Assignments & Paperwork */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+        {/* Tech Assignments */}
+        <Card>
+          <CardHeader 
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UilUsersAlt size={18} color="var(--color-text-primary)" />
+                Tech Assignments
+              </div>
+            }
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Primary Tech
+              </label>
+              <Input
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                placeholder="Primary tech name"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Additional Techs (comma-separated)
+              </label>
+              <Input
+                value={additionalTechs}
+                onChange={(e) => setAdditionalTechs(e.target.value)}
+                placeholder="e.g., shawn, mikeal"
+              />
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                Separate multiple techs with commas
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Paperwork Status */}
+        <Card>
+          <CardHeader title="📄 Paperwork Status" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={paperworkTurnedIn}
+                  onChange={(e) => setPaperworkTurnedIn(e.target.checked)}
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    cursor: 'pointer',
+                    accentColor: 'var(--color-primary)'
+                  }}
+                />
+                <span style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                  Paperwork Turned In
+                </span>
+              </label>
+              {paperworkTurnedIn && (
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '12px', 
+                  backgroundColor: 'rgba(34, 197, 94, 0.1)', 
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-text-primary)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <UilCheckCircle size={16} color="rgb(34, 197, 94)" />
+                    Paperwork has been turned in
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Notes Section - Improved */}
       <Card className="mb-6">
-        <CardHeader title="Notes" />
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Service call notes and updates..."
-          rows={6}
+        <CardHeader 
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <UilClipboardNotes size={18} color="var(--color-text-primary)" />
+              Notes & Updates
+            </div>
+          }
         />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add notes, updates, or important information about this service call..."
+            rows={8}
+            style={{
+              fontFamily: 'inherit',
+              fontSize: 'var(--text-sm)',
+              lineHeight: 1.6,
+              resize: 'vertical'
+            }}
+          />
+          {notes && (
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: 'var(--color-surface-elevated)', 
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>💡</span>
+              <span>Your notes are saved automatically when you click "Save Changes"</span>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Completion Workflow */}
@@ -631,6 +890,9 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
           />
         </div>
       )}
+
+      {/* Service Call Tasks/Check-offs */}
+      <ServiceCallTasksSection serviceCallId={id} />
 
       {/* Suggested Portals */}
       {suggestedPortals.length > 0 && (
@@ -737,5 +999,395 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
         )}
       </Card>
     </div>
+  )
+}
+
+// Service Call Tasks Section Component
+function ServiceCallTasksSection({ serviceCallId }: { serviceCallId: string }) {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  
+  // Form state
+  const [taskType, setTaskType] = useState('')
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDescription, setTaskDescription] = useState('')
+  const [assignedTo, setAssignedTo] = useState('')
+  const [dueDate, setDueDate] = useState('')
+
+  useEffect(() => {
+    loadTasks()
+  }, [serviceCallId])
+
+  async function loadTasks() {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      const response = await axios.get(
+        `${API_BASE_URL}/service-calls/${serviceCallId}/tasks`,
+        { headers, withCredentials: true }
+      )
+      setTasks(Array.isArray(response.data) ? response.data : [])
+    } catch (error) {
+      logError(error, 'loadServiceCallTasks')
+      setTasks([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCreateTask() {
+    if (!taskType || !taskTitle) {
+      showToast('Please select a task type and enter a title', 'error')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      
+      await axios.post(
+        `${API_BASE_URL}/service-calls/${serviceCallId}/tasks`,
+        {
+          tenant_id: 'h2o',
+          task_type: taskType,
+          title: taskTitle,
+          description: taskDescription || null,
+          assigned_to: assignedTo || null,
+          due_date: dueDate || null,
+          status: 'pending'
+        },
+        { headers, withCredentials: true }
+      )
+      
+      showToast('Task created! Office staff will be notified.', 'success')
+      setShowAddForm(false)
+      setTaskType('')
+      setTaskTitle('')
+      setTaskDescription('')
+      setAssignedTo('')
+      setDueDate('')
+      await loadTasks()
+    } catch (error: any) {
+      logError(error, 'createServiceCallTask')
+      showToast(handleApiError(error), 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleCompleteTask(taskId: string) {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      
+      await axios.patch(
+        `${API_BASE_URL}/service-calls/tasks/${taskId}`,
+        { status: 'completed' },
+        { headers, withCredentials: true }
+      )
+      
+      showToast('Task marked as completed', 'success')
+      await loadTasks()
+    } catch (error: any) {
+      logError(error, 'completeServiceCallTask')
+      showToast(handleApiError(error), 'error')
+    }
+  }
+
+  const taskTypeOptions = [
+    { value: 'pull_permit', label: 'Pull Permit', icon: UilFileAlt },
+    { value: 'order_parts', label: 'Order Parts', icon: UilShoppingCart },
+    { value: 'send_bid', label: 'Send Bid', icon: UilEnvelopeSend },
+    { value: 'call_back_schedule', label: 'Call Back to Schedule', icon: UilPhoneAlt },
+    { value: 'write_up_billing', label: 'Write Up Billing', icon: UilInvoice },
+    { value: 'other', label: 'Other', icon: UilClipboardNotes }
+  ]
+
+  const officeStaff = ['sandi', 'skylee']
+
+  const pendingTasks = tasks.filter(t => t.status === 'pending')
+  const completedTasks = tasks.filter(t => t.status === 'completed')
+
+  return (
+    <Card className="mb-6">
+      <CardHeader 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UilClipboardNotes size={18} color="var(--color-text-primary)" />
+            Follow-up Tasks for Office Staff
+          </div>
+        }
+        action={
+          !showAddForm && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowAddForm(true)}
+            >
+              + Add Task
+            </Button>
+          )
+        }
+      />
+
+      {showAddForm && (
+        <div style={{ marginBottom: '20px', padding: '20px', backgroundColor: 'var(--color-surface-elevated)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Task Type *
+              </label>
+              <Select
+                value={taskType}
+                onChange={(e) => {
+                  setTaskType(e.target.value)
+                  const option = taskTypeOptions.find(opt => opt.value === e.target.value)
+                  if (option && !taskTitle) {
+                    setTaskTitle(option.label)
+                  }
+                }}
+                options={[
+                  { value: '', label: 'Select task type...' }, 
+                  ...taskTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))
+                ]}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Title *
+              </label>
+              <Input
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                placeholder="e.g., Pull permit for kitchen remodel"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                Description
+              </label>
+              <Textarea
+                value={taskDescription}
+                onChange={(e) => setTaskDescription(e.target.value)}
+                placeholder="Additional details..."
+                rows={3}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                  Assign To
+                </label>
+                <Select
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  options={[
+                    { value: '', label: 'Anyone' },
+                    ...officeStaff.map(staff => ({ value: staff, label: staff.charAt(0).toUpperCase() + staff.slice(1) }))
+                  ]}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                  Due Date
+                </label>
+                <Input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShowAddForm(false)
+                  setTaskType('')
+                  setTaskTitle('')
+                  setTaskDescription('')
+                  setAssignedTo('')
+                  setDueDate('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleCreateTask}
+                disabled={submitting || !taskType || !taskTitle}
+              >
+                {submitting ? 'Creating...' : 'Create Task'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>
+          Loading tasks...
+        </div>
+      ) : (
+        <>
+          {pendingTasks.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
+                Pending ({pendingTasks.length})
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {pendingTasks.map((task) => {
+                  const isOverdue = task.due_date && new Date(task.due_date) < new Date()
+                  return (
+                    <div
+                      key={task.id}
+                      style={{
+                        padding: '12px',
+                        backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.05)' : 'var(--color-surface-elevated)',
+                        border: `1px solid ${isOverdue ? '#ef4444' : 'var(--color-border)'}`,
+                        borderRadius: '6px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'start',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          marginBottom: '4px'
+                        }}>
+                          <span style={{ fontSize: '16px' }}>
+                            {(() => {
+                              const option = taskTypeOptions.find(opt => opt.value === task.task_type)
+                              const Icon = option?.icon || UilClipboardNotes
+                              return <Icon size={16} color="var(--color-text-primary)" />
+                            })()}
+                          </span>
+                          <span style={{ 
+                            fontSize: '14px', 
+                            fontWeight: 600, 
+                            color: 'var(--color-text-primary)'
+                          }}>
+                            {task.title}
+                          </span>
+                          {isOverdue && (
+                            <span style={{
+                              padding: '2px 6px',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              color: '#ef4444',
+                              borderRadius: '4px',
+                              fontSize: '9px',
+                              fontWeight: 600
+                            }}>
+                              OVERDUE
+                            </span>
+                          )}
+                        </div>
+                        {task.description && (
+                          <div style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--color-text-secondary)',
+                            marginTop: '4px'
+                          }}>
+                            {task.description}
+                          </div>
+                        )}
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '12px', 
+                          marginTop: '6px',
+                          fontSize: '11px',
+                          color: 'var(--color-text-tertiary)'
+                        }}>
+                          {task.assigned_to && (
+                            <span>Assigned to: <strong>{task.assigned_to}</strong></span>
+                          )}
+                          {task.due_date && (
+                            <span style={{ color: isOverdue ? '#ef4444' : undefined }}>
+                              Due: <strong>{new Date(task.due_date).toLocaleDateString()}</strong>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleCompleteTask(task.id)}
+                      >
+                        Mark Done
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          
+          {completedTasks.length > 0 && (
+            <div>
+              <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '12px' }}>
+                Completed ({completedTasks.length})
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {completedTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: 'rgba(34, 197, 94, 0.05)',
+                      border: '1px solid rgba(34, 197, 94, 0.2)',
+                      borderRadius: '6px',
+                      opacity: 0.7
+                    }}
+                  >
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px'
+                    }}>
+                      <UilCheckCircle size={16} color="rgb(34, 197, 94)" />
+                      <span style={{ 
+                        fontSize: '14px', 
+                        fontWeight: 500, 
+                        color: 'var(--color-text-primary)',
+                        textDecoration: 'line-through'
+                      }}>
+                        {task.title}
+                      </span>
+                      {task.completed_by && (
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>
+                          by {task.completed_by}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {tasks.length === 0 && (
+            <div style={{ 
+              padding: '20px', 
+              backgroundColor: 'var(--color-surface-elevated)', 
+              borderRadius: '8px',
+              textAlign: 'center',
+              color: 'var(--color-text-secondary)',
+              fontSize: 'var(--text-sm)'
+            }}>
+              No follow-up tasks yet. Add one above if office staff needs to do something.
+            </div>
+          )}
+        </>
+      )}
+    </Card>
   )
 }

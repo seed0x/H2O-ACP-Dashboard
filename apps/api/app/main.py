@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _startup_complete = False
 
 async def ensure_admin_user():
-    """Create or update admin user - can be called on startup or first request"""
+    """Create or update admin user with dev password - can be called on startup or first request"""
     try:
         from .db.session import AsyncSessionLocal
         from .models import User
@@ -29,31 +29,36 @@ async def ensure_admin_user():
             )
             admin_user = result.scalar_one_or_none()
             
+            # Use dev password: admin121
+            dev_password = "admin121"
+            
             if admin_user:
-                # Update password if needed
-                admin_user.hashed_password = hash_password(settings.admin_password)
+                # Update password to dev password
+                admin_user.hashed_password = hash_password(dev_password)
                 admin_user.role = "admin"
                 admin_user.is_active = True
+                admin_user.tenant_id = None  # Admin has access to all tenants
             else:
                 # Create admin user
                 admin_user = User(
                     username="admin",
-                    email="admin@example.com",
-                    hashed_password=hash_password(settings.admin_password),
+                    email="admin@h2oplumbers.com",
+                    hashed_password=hash_password(dev_password),
                     role="admin",
+                    tenant_id=None,
                     is_active=True
                 )
                 db.add(admin_user)
             
             await db.commit()
-            logger.info("✓ Admin user ready")
+            logger.info("✓ Admin user ready (dev password: admin121)")
             return True
     except Exception as e:
         logger.warning(f"⚠ Could not create admin user: {e}", exc_info=True)
         return False
 
 async def ensure_default_users():
-    """Create default users (max and northwynd) if they don't exist"""
+    """Create default users (office staff and techs) if they don't exist"""
     try:
         from .db.session import AsyncSessionLocal
         from .models import User
@@ -61,8 +66,16 @@ async def ensure_default_users():
         from sqlalchemy import select
         
         default_users = [
+            # Office Staff (Admin)
+            {"username": "sandi", "password": "sandi121", "full_name": "Sandi", "role": "admin", "tenant_id": None},
+            {"username": "skylee", "password": "skylee121", "full_name": "Skylee", "role": "admin", "tenant_id": None},
+            # Tech Users
             {"username": "max", "password": "max123", "full_name": "Max", "role": "user", "tenant_id": "h2o"},
-            {"username": "northwynd", "password": "user123", "full_name": "Northwynd", "role": "user", "tenant_id": "h2o"}
+            {"username": "mikeal", "password": "mikeal123", "full_name": "Mikeal", "role": "user", "tenant_id": "h2o"},
+            {"username": "shawn", "password": "shawn123", "full_name": "Shawn", "role": "user", "tenant_id": "h2o"},
+            {"username": "william", "password": "william123", "full_name": "William", "role": "user", "tenant_id": "h2o"},
+            # Dev Admin
+            {"username": "admin", "password": "admin121", "full_name": "Developer", "role": "admin", "tenant_id": None}
         ]
         
         async with AsyncSessionLocal() as db:
@@ -84,12 +97,25 @@ async def ensure_default_users():
                         is_active=True
                     )
                     db.add(new_user)
-                    logger.info(f"✓ Created user: {user_data['username']}")
+                    logger.info(f"✓ Created user: {user_data['username']} (role: {user_data['role']})")
                 else:
-                    # Update password if user exists
+                    # Update password and role if user exists (ensures correct permissions)
                     existing_user.hashed_password = hash_password(user_data["password"])
+                    existing_user.role = user_data["role"]
+                    existing_user.tenant_id = user_data["tenant_id"]
                     existing_user.is_active = True
-                    logger.info(f"✓ Updated user: {user_data['username']}")
+                    logger.info(f"✓ Updated user: {user_data['username']} (role: {user_data['role']})")
+            
+            # Delete fake/hardcoded users that should no longer exist
+            fake_users_to_delete = ["northwynd"]
+            for fake_username in fake_users_to_delete:
+                result = await db.execute(
+                    select(User).where(User.username == fake_username)
+                )
+                fake_user = result.scalar_one_or_none()
+                if fake_user:
+                    await db.delete(fake_user)
+                    logger.info(f"✓ Deleted fake user: {fake_username}")
             
             await db.commit()
             return True

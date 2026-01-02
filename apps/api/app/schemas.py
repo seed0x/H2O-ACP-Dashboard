@@ -237,6 +237,14 @@ class ServiceCallBase(BaseModel):
     scheduled_end: Optional[datetime]
     notes: Optional[str]
     assigned_to: Optional[str] = None
+    additional_techs: Optional[str] = None  # Comma-separated list
+    payment_status: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_amount: Optional[float] = None
+    payment_date: Optional[date] = None
+    billing_writeup_status: Optional[str] = None
+    billing_writeup_assigned_to: Optional[str] = None
+    paperwork_turned_in: Optional[bool] = None
 
 class ServiceCallCreate(ServiceCallBase):
     pass
@@ -247,6 +255,14 @@ class ServiceCallUpdate(BaseModel):
     scheduled_end: Optional[datetime]
     notes: Optional[str]
     assigned_to: Optional[str] = None
+    additional_techs: Optional[str] = None
+    payment_status: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_amount: Optional[float] = None
+    payment_date: Optional[date] = None
+    billing_writeup_status: Optional[str] = None
+    billing_writeup_assigned_to: Optional[str] = None
+    paperwork_turned_in: Optional[bool] = None
 
 class ServiceCallWorkflowBase(BaseModel):
     current_step: int = 0
@@ -294,6 +310,38 @@ class ServiceCallWorkflow(ServiceCallWorkflowBase):
     service_call_id: UUID
     tenant_id: str
     completed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Service Call Tasks/Check-offs
+class ServiceCallTaskBase(BaseModel):
+    service_call_id: UUID
+    tenant_id: str
+    task_type: str  # 'pull_permit', 'order_parts', 'send_bid', 'call_back_schedule', 'write_up_billing', 'other'
+    title: str
+    description: Optional[str] = None
+    status: str = 'pending'
+    assigned_to: Optional[str] = None
+    due_date: Optional[date] = None
+    created_by: Optional[str] = None
+
+class ServiceCallTaskCreate(ServiceCallTaskBase):
+    pass
+
+class ServiceCallTaskUpdate(BaseModel):
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[date] = None
+    description: Optional[str] = None
+    completed_by: Optional[str] = None
+
+class ServiceCallTask(ServiceCallTaskBase):
+    id: UUID
+    completed_at: Optional[datetime] = None
+    completed_by: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

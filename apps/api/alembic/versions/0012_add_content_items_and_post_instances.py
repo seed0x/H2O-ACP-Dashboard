@@ -88,3 +88,7 @@ def downgrade():
     op.drop_table('content_items')
 
 
+
+
+
+

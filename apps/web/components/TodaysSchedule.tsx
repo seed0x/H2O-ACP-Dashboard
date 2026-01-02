@@ -1,4 +1,5 @@
 'use client'
+import UilMapMarker from '@iconscout/react-unicons/icons/uil-map-marker'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -424,7 +425,7 @@ function ScheduleItemCard({ item, onClick }: { item: ScheduleItem; onClick: () =
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap'
       }}>
-        <span>📍</span>
+        <UilMapMarker size={14} color="var(--color-text-secondary)" />
         <span>{item.location}</span>
       </div>
     </div>

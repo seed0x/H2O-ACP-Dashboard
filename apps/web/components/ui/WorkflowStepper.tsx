@@ -7,6 +7,13 @@ import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
 import { showToast } from '../Toast'
 import { handleApiError } from '../../lib/error-handler'
+import UilCamera from '@iconscout/react-unicons/icons/uil-camera'
+import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
+import UilCalendarAlt from '@iconscout/react-unicons/icons/uil-calendar-alt'
+import UilShoppingCart from '@iconscout/react-unicons/icons/uil-shopping-cart'
+import UilEnvelopeSend from '@iconscout/react-unicons/icons/uil-envelope-send'
+import UilDollarSign from '@iconscout/react-unicons/icons/uil-dollar-sign'
+import UilCheckCircle from '@iconscout/react-unicons/icons/uil-check-circle'
 
 interface WorkflowData {
   id: string
@@ -34,13 +41,13 @@ interface WorkflowStepperProps {
 }
 
 const STEPS = [
-  { id: 0, title: 'Upload Paperwork', icon: '📸' },
-  { id: 1, title: 'Permit Check', icon: '📋' },
-  { id: 2, title: 'Reschedule?', icon: '📅' },
-  { id: 3, title: 'Parts Order', icon: '🔧' },
-  { id: 4, title: 'Send Bid?', icon: '💼' },
-  { id: 5, title: 'Price It', icon: '💰' },
-  { id: 6, title: 'Price Approval', icon: '✅' },
+  { id: 0, title: 'Upload Paperwork', icon: UilCamera },
+  { id: 1, title: 'Permit Check', icon: UilFileAlt },
+  { id: 2, title: 'Reschedule?', icon: UilCalendarAlt },
+  { id: 3, title: 'Parts Order', icon: UilShoppingCart },
+  { id: 4, title: 'Send Bid?', icon: UilEnvelopeSend },
+  { id: 5, title: 'Price It', icon: UilDollarSign },
+  { id: 6, title: 'Price Approval', icon: UilCheckCircle },
 ]
 
 export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperProps) {
@@ -180,7 +187,7 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
       if (onComplete) {
         onComplete()
       }
-      showToast('Workflow completed! 🎉', 'success')
+      showToast('Workflow completed!', 'success')
     }
   }
 
@@ -205,7 +212,9 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
     return (
       <div className="bg-[var(--color-card)] border-2 border-green-500/30 rounded-xl p-6">
         <div className="text-center">
-          <div className="text-4xl mb-4">✅</div>
+          <div className="mb-4 flex justify-center">
+            <UilCheckCircle size={48} color="rgb(34, 197, 94)" />
+          </div>
           <div className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
             Workflow Completed!
           </div>
@@ -237,7 +246,11 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
                     : 'bg-[var(--color-hover)] text-[var(--color-text-secondary)]'
                 }`}
               >
-                {idx < currentStep ? '✓' : step.icon}
+                {idx < currentStep ? (
+                  <UilCheckCircle size={20} color="white" />
+                ) : (
+                  <step.icon size={20} color={idx === currentStep ? 'white' : 'var(--color-text-secondary)'} />
+                )}
               </div>
               <div className={`text-xs mt-2 text-center max-w-[80px] ${
                 idx === currentStep ? 'font-semibold text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'

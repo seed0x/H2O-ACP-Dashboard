@@ -11,8 +11,8 @@ function getRedirectPath(token: string): string {
     if (parts.length === 3) {
       const payload = JSON.parse(atob(parts[1]))
       const username = payload.username || null
-      // Tech users (max and northwynd) go to tech schedule
-      if (username === 'max' || username === 'northwynd') {
+      // Tech users (max) go to tech schedule
+      if (username === 'max') {
         return '/tech-schedule'
       }
     }

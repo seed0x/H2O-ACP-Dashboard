@@ -1,11 +1,6 @@
-import axios, { AxiosError } from 'axios'
+import { apiGet, apiPost, apiPatch, apiDelete, apiClient } from './client'
 import { API_BASE_URL } from '../config'
-import { handleApiError, getErrorMessage } from '../error-handler'
-
-function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token')
-  return token ? { 'Authorization': `Bearer ${token}` } : {}
-}
+import { handleApiError } from '../error-handler'
 
 // Types
 export interface ContentItem {
@@ -118,11 +113,7 @@ export const marketingApi = {
       if (filters?.limit) params.append('limit', String(filters.limit))
       if (filters?.offset) params.append('offset', String(filters.offset))
       
-      const res = await axios.get(`${API_BASE_URL}/marketing/content-items?${params}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<ContentItem[]>(`/marketing/content-items?${params}`)
     } catch (error) {
       handleApiError(error, 'Load content items')
       throw error
@@ -131,11 +122,7 @@ export const marketingApi = {
 
   getContentItem: async (itemId: string): Promise<ContentItem> => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/marketing/content-items/${itemId}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<ContentItem>(`/marketing/content-items/${itemId}`)
     } catch (error) {
       handleApiError(error, 'Load content item')
       throw error
@@ -144,11 +131,7 @@ export const marketingApi = {
 
   createContentItem: async (data: CreateContentItemRequest): Promise<ContentItem> => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/marketing/content-items`, data, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiPost<ContentItem>('/marketing/content-items', data)
     } catch (error) {
       handleApiError(error, 'Create content item')
       throw error
@@ -157,11 +140,7 @@ export const marketingApi = {
 
   updateContentItem: async (itemId: string, data: UpdateContentItemRequest): Promise<ContentItem> => {
     try {
-      const res = await axios.patch(`${API_BASE_URL}/marketing/content-items/${itemId}`, data, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiPatch<ContentItem>(`/marketing/content-items/${itemId}`, data)
     } catch (error) {
       handleApiError(error, 'Update content item')
       throw error
@@ -170,10 +149,7 @@ export const marketingApi = {
 
   deleteContentItem: async (itemId: string): Promise<void> => {
     try {
-      await axios.delete(`${API_BASE_URL}/marketing/content-items/${itemId}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
+      await apiDelete(`/marketing/content-items/${itemId}`)
     } catch (error) {
       handleApiError(error, 'Delete content item')
       throw error
@@ -194,11 +170,7 @@ export const marketingApi = {
       if (filters?.limit) params.append('limit', String(filters.limit))
       if (filters?.offset) params.append('offset', String(filters.offset))
       
-      const res = await axios.get(`${API_BASE_URL}/marketing/post-instances?${params}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<PostInstance[]>(`/marketing/post-instances?${params}`)
     } catch (error) {
       handleApiError(error, 'Load post instances')
       throw error
@@ -207,11 +179,7 @@ export const marketingApi = {
 
   getPostInstance: async (instanceId: string): Promise<PostInstance> => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/marketing/post-instances/${instanceId}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<PostInstance>(`/marketing/post-instances/${instanceId}`)
     } catch (error) {
       handleApiError(error, 'Load post instance')
       throw error
@@ -220,11 +188,7 @@ export const marketingApi = {
 
   updatePostInstance: async (instanceId: string, data: UpdatePostInstanceRequest): Promise<PostInstance> => {
     try {
-      const res = await axios.patch(`${API_BASE_URL}/marketing/post-instances/${instanceId}`, data, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiPatch<PostInstance>(`/marketing/post-instances/${instanceId}`, data)
     } catch (error) {
       handleApiError(error, 'Update post instance')
       throw error
@@ -233,11 +197,7 @@ export const marketingApi = {
 
   createPostInstances: async (tenantId: string, data: CreatePostInstancesRequest): Promise<PostInstance[]> => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/marketing/post-instances/bulk?tenant_id=${tenantId}`, data, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiPost<PostInstance[]>(`/marketing/post-instances/bulk?tenant_id=${tenantId}`, data)
     } catch (error) {
       handleApiError(error, 'Create post instances')
       throw error
@@ -251,11 +211,7 @@ export const marketingApi = {
     posted_manually: boolean
   }): Promise<PostInstance> => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/marketing/post-instances/${instanceId}/mark-posted`, data, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiPost<PostInstance>(`/marketing/post-instances/${instanceId}/mark-posted`, data)
     } catch (error) {
       handleApiError(error, 'Mark post as posted')
       throw error
@@ -276,12 +232,10 @@ export const marketingApi = {
       const params = new URLSearchParams({ tenant_id: tenantId })
       if (contentItemId) params.append('content_item_id', contentItemId)
       
-      const res = await axios.post(`${API_BASE_URL}/marketing/media/upload?${params}`, formData, {
+      const res = await apiClient.post<MediaAsset>(`/marketing/media/upload?${params}`, formData, {
         headers: {
-          ...getAuthHeaders(),
           'Content-Type': 'multipart/form-data'
         },
-        withCredentials: true,
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
@@ -311,11 +265,7 @@ export const marketingApi = {
       })
       if (includeUnscheduled) params.append('include_unscheduled', 'true')
       
-      const res = await axios.get(`${API_BASE_URL}/marketing/calendar?${params}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<Record<string, PostInstance[]>>(`/marketing/calendar?${params}`)
     } catch (error) {
       handleApiError(error, 'Load calendar')
       throw error
@@ -325,11 +275,7 @@ export const marketingApi = {
   // Channel Accounts
   listChannelAccounts: async (tenantId: string): Promise<ChannelAccount[]> => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=${tenantId}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<ChannelAccount[]>(`/marketing/channel-accounts?tenant_id=${tenantId}`)
     } catch (error) {
       handleApiError(error, 'Load channel accounts')
       throw error
@@ -339,11 +285,7 @@ export const marketingApi = {
   // Channels
   listChannels: async (tenantId: string): Promise<MarketingChannel[]> => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/marketing/channels?tenant_id=${tenantId}`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiGet<MarketingChannel[]>(`/marketing/channels?tenant_id=${tenantId}`)
     } catch (error) {
       handleApiError(error, 'Load channels')
       throw error
@@ -357,11 +299,7 @@ export const marketingApi = {
     accounts_processed: number
   }> => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/marketing/scheduler/topoff?tenant_id=${tenantId}&days=${days}`, {}, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      return res.data
+      return await apiPost(`/marketing/scheduler/topoff?tenant_id=${tenantId}&days=${days}`, {})
     } catch (error) {
       handleApiError(error, 'Top off scheduler')
       throw error
