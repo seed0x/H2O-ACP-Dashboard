@@ -169,7 +169,8 @@ export function CalendarView() {
         tenant_id: 'h2o',
         title: formTitle.trim(),
         base_caption: formCaption.trim(),
-        status: 'Draft'
+        status: 'Draft',
+        owner: 'admin'
       })
 
       // Create post instance
