@@ -73,7 +73,7 @@ export default function TechSchedulePage() {
         setTechUsername('tech') // Fallback
       }
     } catch (error) {
-      console.error('Failed to parse token for username:', error)
+      logError(error, 'Parse token for username')
       setTechUsername('tech') // Fallback
     }
   }, [])

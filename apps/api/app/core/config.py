@@ -50,28 +50,55 @@ class Settings(BaseSettings):
     
     @property
     def cors_origins(self) -> str:
-        """Get CORS origins, ensuring https://dataflow-eta.vercel.app is included"""
-        required_origin = "https://dataflow-eta.vercel.app"
+        """Get CORS origins, ensuring required origins are included"""
+        # Required origins that must always be included
+        required_origins = [
+            "https://dataflow-eta.vercel.app",
+            "http://localhost:3000"
+        ]
+        
+        # Parse origins from environment variable
         origins_list = [origin.strip() for origin in self._cors_origins_raw.split(",") if origin.strip()]
         
-        # Add required origin if not present
-        if required_origin not in origins_list:
-            origins_list.append(required_origin)
+        # Add required origins if not present (case-insensitive check)
+        origins_lower = [origin.lower() for origin in origins_list]
+        for required in required_origins:
+            if required.lower() not in origins_lower:
+                origins_list.append(required)
         
-        result = ",".join(origins_list)
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_origins = []
+        for origin in origins_list:
+            origin_lower = origin.lower()
+            if origin_lower not in seen:
+                seen.add(origin_lower)
+                unique_origins.append(origin)
+        
+        result = ",".join(unique_origins)
         # #region agent log
         import logging
-        logging.getLogger(__name__).info(f"CORS origins computed: raw={self._cors_origins_raw}, final={result}, list={origins_list}")
+        logging.getLogger(__name__).info(f"CORS origins computed: raw={self._cors_origins_raw}, final={result}, list={unique_origins}")
         # #endregion
         return result
     
     @property
     def cors_origins_list(self):
-        result = [origin.strip() for origin in self.cors_origins.split(",")]
+        """Get CORS origins as a list, ensuring required origins are included"""
+        origins_str = self.cors_origins
+        result = [origin.strip() for origin in origins_str.split(",") if origin.strip()]
+        # Remove duplicates
+        seen = set()
+        unique_result = []
+        for origin in result:
+            origin_lower = origin.lower()
+            if origin_lower not in seen:
+                seen.add(origin_lower)
+                unique_result.append(origin)
         # #region agent log
         import logging
-        logging.getLogger(__name__).info(f"CORS origins_list: {result}")
+        logging.getLogger(__name__).info(f"CORS origins_list: {unique_result}")
         # #endregion
-        return result
+        return unique_result
 
 settings = Settings()

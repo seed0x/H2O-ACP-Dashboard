@@ -231,6 +231,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # #region agent log
 logger.info(f"CORS Configuration: allow_origins={settings.cors_origins_list}, cors_origins_raw={settings._cors_origins_raw}")
+logger.info(f"CORS allowed origins count: {len(settings.cors_origins_list)}")
+for origin in settings.cors_origins_list:
+    logger.info(f"  - {origin}")
 # #endregion
 app.add_middleware(
     CORSMiddleware,
