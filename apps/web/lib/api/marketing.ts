@@ -637,3 +637,40 @@ export interface FlaggedReview {
   created_at: string
 }
 
+// OAuth API
+export const oauthApi = {
+  // Get Google authorization URL
+  getGoogleAuthUrl: async (channelAccountId: string): Promise<{ authorization_url: string; state: string }> => {
+    try {
+      return await apiGet<{ authorization_url: string; state: string }>(
+        `/oauth/google/authorize?channel_account_id=${channelAccountId}`
+      )
+    } catch (error) {
+      handleApiError(error, 'Get Google auth URL')
+      throw error
+    }
+  },
+
+  // Disconnect Google OAuth
+  disconnectGoogle: async (channelAccountId: string): Promise<void> => {
+    try {
+      await apiPost(`/oauth/google/disconnect/${channelAccountId}`, {})
+    } catch (error) {
+      handleApiError(error, 'Disconnect Google')
+      throw error
+    }
+  },
+
+  // Get Google Business locations
+  getGoogleLocations: async (channelAccountId: string): Promise<{ locations: Array<{ id: string; name: string; address: any }> }> => {
+    try {
+      return await apiGet<{ locations: Array<{ id: string; name: string; address: any }> }>(
+        `/oauth/google/locations/${channelAccountId}`
+      )
+    } catch (error) {
+      handleApiError(error, 'Get Google locations')
+      throw error
+    }
+  }
+}
+

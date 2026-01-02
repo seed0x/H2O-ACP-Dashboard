@@ -6,7 +6,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
 import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
-import { marketingApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset, type LocalSEOTopic, type Offer } from '../../lib/api/marketing'
+import { marketingApi, oauthApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset, type LocalSEOTopic, type Offer } from '../../lib/api/marketing'
 import { apiGet, apiPost } from '../../lib/api/client'
 import { PhotoUpload } from '../../components/marketing/PhotoUpload'
 import { handleApiError, showSuccess } from '../../lib/error-handler'
@@ -4306,12 +4306,49 @@ function AccountsView() {
   const [editingAccount, setEditingAccount] = useState<any>(null)
   const [formError, setFormError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
+  const [connectingAccountId, setConnectingAccountId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     channel_id: '',
     account_name: '',
     account_email: '',
     credential_vault_ref: ''
   })
+
+  // Check if account is Google Business Profile
+  const isGoogleAccount = (account: any, channel: any) => {
+    const channelKey = channel?.key?.toLowerCase() || ''
+    const channelName = channel?.name?.toLowerCase() || ''
+    const accountName = account?.name?.toLowerCase() || ''
+    return channelKey.includes('google') || channelKey.includes('gbp') || 
+           channelName.includes('google') || accountName.includes('google')
+  }
+
+  // Handle Google OAuth connection
+  async function handleConnectGoogle(accountId: string) {
+    setConnectingAccountId(accountId)
+    try {
+      const result = await oauthApi.getGoogleAuthUrl(accountId)
+      // Redirect to Google OAuth
+      window.location.href = result.authorization_url
+    } catch (error: any) {
+      console.error('Failed to start OAuth:', error)
+      showToast(error.message || 'Failed to connect Google. Make sure OAuth is configured.', 'error')
+      setConnectingAccountId(null)
+    }
+  }
+
+  // Handle disconnect
+  async function handleDisconnectGoogle(accountId: string) {
+    if (!confirm('Disconnect this Google account? Auto-posting will stop working.')) return
+    try {
+      await oauthApi.disconnectGoogle(accountId)
+      showToast('Google account disconnected', 'success')
+      loadData()
+    } catch (error: any) {
+      console.error('Failed to disconnect:', error)
+      showToast(error.message || 'Failed to disconnect', 'error')
+    }
+  }
 
   useEffect(() => {
     loadData()
@@ -4739,6 +4776,46 @@ function AccountsView() {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {/* Connect/Disconnect Google button for Google accounts */}
+                  {isGoogleAccount(account, channel) && (
+                    account.oauth_connected ? (
+                      <button
+                        onClick={() => handleDisconnectGoogle(account.id)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                          border: '1px solid #EF5350',
+                          borderRadius: '8px',
+                          color: '#EF5350',
+                          fontSize: '14px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Disconnect Google
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConnectGoogle(account.id)}
+                        disabled={connectingAccountId === account.id}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#4285F4',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: connectingAccountId === account.id ? 'wait' : 'pointer',
+                          opacity: connectingAccountId === account.id ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {connectingAccountId === account.id ? 'Connecting...' : 'Connect Google'}
+                      </button>
+                    )
+                  )}
                   <button
                     onClick={() => handleEdit(account)}
                     style={{
