@@ -1091,6 +1091,47 @@ async def create_local_seo_topic(
     return topic
 
 
+@router.get("/local-seo-topics/coverage-gaps", response_model=Dict[str, Any])
+async def get_coverage_gaps(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get coverage gaps - topics that need content or haven't been posted recently"""
+    # Topics that haven't been started
+    not_started = await db.execute(
+        select(func.count(models.LocalSEOTopic.id)).where(
+            and_(
+                models.LocalSEOTopic.tenant_id == tenant_id,
+                models.LocalSEOTopic.status == 'not_started'
+            )
+        )
+    )
+    not_started_count = not_started.scalar() or 0
+    
+    # Topics that need update (published but old)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    needs_update = await db.execute(
+        select(func.count(models.LocalSEOTopic.id)).where(
+            and_(
+                models.LocalSEOTopic.tenant_id == tenant_id,
+                models.LocalSEOTopic.status == 'published',
+                or_(
+                    models.LocalSEOTopic.last_posted_at.is_(None),
+                    models.LocalSEOTopic.last_posted_at < thirty_days_ago
+                )
+            )
+        )
+    )
+    needs_update_count = needs_update.scalar() or 0
+    
+    return {
+        "not_started": not_started_count,
+        "needs_update": needs_update_count,
+        "total_gaps": not_started_count + needs_update_count
+    }
+
+
 @router.get("/local-seo-topics/{topic_id}", response_model=schemas_marketing.LocalSEOTopic)
 async def get_local_seo_topic(
     topic_id: UUID,
@@ -1134,47 +1175,6 @@ async def update_local_seo_topic(
     await db.commit()
     await db.refresh(topic)
     return topic
-
-
-@router.get("/local-seo-topics/coverage-gaps", response_model=Dict[str, Any])
-async def get_coverage_gaps(
-    tenant_id: str = Query(..., description="Tenant ID"),
-    db: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user)
-):
-    """Get coverage gaps - topics that need content or haven't been posted recently"""
-    # Topics that haven't been started
-    not_started = await db.execute(
-        select(func.count(models.LocalSEOTopic.id)).where(
-            and_(
-                models.LocalSEOTopic.tenant_id == tenant_id,
-                models.LocalSEOTopic.status == 'not_started'
-            )
-        )
-    )
-    not_started_count = not_started.scalar() or 0
-    
-    # Topics that need update (published but old)
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    needs_update = await db.execute(
-        select(func.count(models.LocalSEOTopic.id)).where(
-            and_(
-                models.LocalSEOTopic.tenant_id == tenant_id,
-                models.LocalSEOTopic.status == 'published',
-                or_(
-                    models.LocalSEOTopic.last_posted_at.is_(None),
-                    models.LocalSEOTopic.last_posted_at < thirty_days_ago
-                )
-            )
-        )
-    )
-    needs_update_count = needs_update.scalar() or 0
-    
-    return {
-        "not_started": not_started_count,
-        "needs_update": needs_update_count,
-        "total_gaps": not_started_count + needs_update_count
-    }
 
 
 # Offers / Promo Manager (Priority 2)
@@ -1315,4 +1315,441 @@ async def delete_offer(
     await db.delete(offer)
     await db.commit()
     return {"deleted": True}
+
+
+# Content Mix Tracking (Phase 2)
+
+def get_week_start(d: date) -> date:
+    """Get the Monday of the week containing the given date"""
+    return d - timedelta(days=d.weekday())
+
+
+@router.get("/content-mix/summary", response_model=List[schemas_marketing.ContentMixSummary])
+async def get_content_mix_summary(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    weeks: int = Query(4, ge=1, le=12, description="Number of weeks to include"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get content mix summary for all channel accounts over the specified weeks"""
+    from datetime import date as date_type
+    
+    today = date_type.today()
+    start_week = get_week_start(today - timedelta(weeks=weeks-1))
+    
+    # Get all channel accounts for tenant
+    accounts_result = await db.execute(
+        select(models.ChannelAccount).where(models.ChannelAccount.tenant_id == tenant_id)
+    )
+    accounts = accounts_result.scalars().all()
+    
+    summaries = []
+    for account in accounts:
+        # Calculate actual counts from PostInstances for current week
+        current_week_start = get_week_start(today)
+        current_week_end = current_week_start + timedelta(days=6)
+        
+        # Get post instances with content items for the current week
+        posts_result = await db.execute(
+            select(models.PostInstance)
+            .join(models.ContentItem, models.PostInstance.content_item_id == models.ContentItem.id, isouter=True)
+            .where(
+                and_(
+                    models.PostInstance.tenant_id == tenant_id,
+                    models.PostInstance.channel_account_id == account.id,
+                    models.PostInstance.scheduled_for >= datetime.combine(current_week_start, datetime.min.time()),
+                    models.PostInstance.scheduled_for <= datetime.combine(current_week_end, datetime.max.time())
+                )
+            )
+            .options(joinedload(models.PostInstance.content_item))
+        )
+        posts = posts_result.unique().scalars().all()
+        
+        # Count by category
+        educational_count = 0
+        authority_count = 0
+        promo_count = 0
+        local_count = 0
+        
+        for post in posts:
+            if post.content_item:
+                category = post.content_item.content_category or ''
+                if category in ['diy', 'blog_post', 'educational']:
+                    educational_count += 1
+                elif category in ['team_post', 'authority']:
+                    authority_count += 1
+                elif category in ['coupon', 'promo', 'offer']:
+                    promo_count += 1
+                elif category in ['local', 'local_relevance']:
+                    local_count += 1
+        
+        # Get or default targets (could be stored in tracking table or account config)
+        target_educational = 2
+        target_authority = 1
+        target_promo = 1
+        target_local = 1
+        
+        # Calculate health and warnings
+        warnings = []
+        if promo_count > target_promo + 1:
+            warnings.append(f"Too many promo posts ({promo_count} vs target {target_promo})")
+        if educational_count < target_educational:
+            warnings.append(f"Need more educational content ({educational_count}/{target_educational})")
+        if authority_count < target_authority:
+            warnings.append(f"Need more authority/team content ({authority_count}/{target_authority})")
+        
+        total_actual = educational_count + authority_count + promo_count + local_count
+        total_target = target_educational + target_authority + target_promo + target_local
+        
+        if len(warnings) == 0:
+            overall_health = 'good'
+        elif len(warnings) <= 2:
+            overall_health = 'warning'
+        else:
+            overall_health = 'critical'
+        
+        summary = schemas_marketing.ContentMixSummary(
+            channel_account_id=account.id,
+            channel_account_name=account.name,
+            week_start_date=current_week_start,
+            educational={
+                'actual': educational_count,
+                'target': target_educational,
+                'percentage': (educational_count / target_educational * 100) if target_educational > 0 else 0
+            },
+            authority={
+                'actual': authority_count,
+                'target': target_authority,
+                'percentage': (authority_count / target_authority * 100) if target_authority > 0 else 0
+            },
+            promo={
+                'actual': promo_count,
+                'target': target_promo,
+                'percentage': (promo_count / target_promo * 100) if target_promo > 0 else 0
+            },
+            local_relevance={
+                'actual': local_count,
+                'target': target_local,
+                'percentage': (local_count / target_local * 100) if target_local > 0 else 0
+            },
+            overall_health=overall_health,
+            warnings=warnings
+        )
+        summaries.append(summary)
+    
+    return summaries
+
+
+# Seasonal Events (Phase 3)
+
+@router.get("/seasonal-events", response_model=List[schemas_marketing.SeasonalEvent])
+async def list_seasonal_events(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    start_date: Optional[date] = Query(None, description="Filter events starting from this date"),
+    end_date: Optional[date] = Query(None, description="Filter events ending before this date"),
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    city: Optional[str] = Query(None, description="Filter by city"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """List seasonal events with optional filters"""
+    query = select(models.SeasonalEvent).where(
+        models.SeasonalEvent.tenant_id == tenant_id
+    )
+    
+    if start_date:
+        query = query.where(models.SeasonalEvent.end_date >= start_date)
+    if end_date:
+        query = query.where(models.SeasonalEvent.start_date <= end_date)
+    if event_type:
+        query = query.where(models.SeasonalEvent.event_type == event_type)
+    if city:
+        query = query.where(models.SeasonalEvent.city.ilike(f"%{city}%"))
+    
+    query = query.order_by(
+        models.SeasonalEvent.start_date.asc()
+    ).limit(limit).offset(offset)
+    
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/seasonal-events/upcoming", response_model=List[schemas_marketing.SeasonalEvent])
+async def get_upcoming_events(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    days: int = Query(30, ge=1, le=90, description="Number of days to look ahead"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get events happening in the next N days"""
+    from datetime import date as date_type
+    today = date_type.today()
+    future_date = today + timedelta(days=days)
+    
+    result = await db.execute(
+        select(models.SeasonalEvent).where(
+            and_(
+                models.SeasonalEvent.tenant_id == tenant_id,
+                models.SeasonalEvent.start_date <= future_date,
+                models.SeasonalEvent.end_date >= today
+            )
+        ).order_by(models.SeasonalEvent.start_date.asc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/seasonal-events", response_model=schemas_marketing.SeasonalEvent, status_code=status.HTTP_201_CREATED)
+async def create_seasonal_event(
+    event_in: schemas_marketing.SeasonalEventCreate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Create a new seasonal event"""
+    event = models.SeasonalEvent(**event_in.model_dump())
+    db.add(event)
+    await db.flush()
+    
+    await crud.write_audit(
+        db, event.tenant_id, 'seasonal_event', event.id, 'create', current_user.username
+    )
+    
+    await db.commit()
+    await db.refresh(event)
+    return event
+
+
+@router.get("/seasonal-events/{event_id}", response_model=schemas_marketing.SeasonalEvent)
+async def get_seasonal_event(
+    event_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get a seasonal event by ID"""
+    result = await db.execute(
+        select(models.SeasonalEvent).where(models.SeasonalEvent.id == event_id)
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Seasonal event not found")
+    return event
+
+
+@router.patch("/seasonal-events/{event_id}", response_model=schemas_marketing.SeasonalEvent)
+async def update_seasonal_event(
+    event_id: UUID,
+    event_update: schemas_marketing.SeasonalEventUpdate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update a seasonal event"""
+    result = await db.execute(
+        select(models.SeasonalEvent).where(models.SeasonalEvent.id == event_id)
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Seasonal event not found")
+    
+    update_data = event_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(event, field)
+        setattr(event, field, value)
+        await crud.write_audit(
+            db, event.tenant_id, 'seasonal_event', event.id, 'update', current_user.username,
+            field, str(old_value) if old_value is not None else None, str(value) if value is not None else None
+        )
+    
+    await db.commit()
+    await db.refresh(event)
+    return event
+
+
+@router.delete("/seasonal-events/{event_id}")
+async def delete_seasonal_event(
+    event_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Delete a seasonal event"""
+    result = await db.execute(
+        select(models.SeasonalEvent).where(models.SeasonalEvent.id == event_id)
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Seasonal event not found")
+    
+    await crud.write_audit(
+        db, event.tenant_id, 'seasonal_event', event.id, 'delete', current_user.username
+    )
+    
+    await db.delete(event)
+    await db.commit()
+    return {"deleted": True}
+
+
+# Review-to-Content Pipeline (Phase 3)
+
+@router.post("/reviews/{review_id}/flag-for-content")
+async def flag_review_for_content(
+    review_id: UUID,
+    flag: bool = Query(True, description="True to flag, False to unflag"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Flag or unflag a review as potential marketing content"""
+    result = await db.execute(
+        select(models.Review).where(models.Review.id == review_id)
+    )
+    review = result.scalar_one_or_none()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    review.can_be_content = flag
+    
+    await crud.write_audit(
+        db, None, 'review', review.id, 'update', current_user.username,
+        'can_be_content', str(not flag), str(flag)
+    )
+    
+    await db.commit()
+    return {"flagged": flag, "review_id": str(review_id)}
+
+
+@router.get("/reviews/flagged-for-content")
+async def get_reviews_flagged_for_content(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    include_converted: bool = Query(False, description="Include reviews already converted to content"),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get all reviews flagged for potential content use"""
+    query = select(models.Review).join(
+        models.ReviewRequest, models.Review.review_request_id == models.ReviewRequest.id
+    ).where(
+        and_(
+            models.ReviewRequest.tenant_id == tenant_id,
+            models.Review.can_be_content == True,
+            models.Review.rating >= 4  # Only 4+ star reviews
+        )
+    )
+    
+    if not include_converted:
+        query = query.where(models.Review.content_item_id.is_(None))
+    
+    query = query.order_by(models.Review.created_at.desc()).limit(limit)
+    
+    result = await db.execute(query)
+    reviews = result.scalars().all()
+    
+    return [
+        {
+            "id": str(review.id),
+            "rating": review.rating,
+            "comment": review.comment,
+            "customer_name": review.customer_name,
+            "is_converted": review.content_item_id is not None,
+            "content_item_id": str(review.content_item_id) if review.content_item_id else None,
+            "created_at": review.created_at.isoformat()
+        }
+        for review in reviews
+    ]
+
+
+@router.post("/reviews/{review_id}/convert-to-content", response_model=schemas_marketing.ContentItem)
+async def convert_review_to_content(
+    review_id: UUID,
+    request: schemas_marketing.ReviewToContentRequest,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Convert a flagged review into marketing content with scheduled posts"""
+    # Get the review
+    result = await db.execute(
+        select(models.Review)
+        .join(models.ReviewRequest)
+        .where(models.Review.id == review_id)
+        .options(joinedload(models.Review.review_request))
+    )
+    review = result.scalar_one_or_none()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    if review.rating < 4:
+        raise HTTPException(status_code=400, detail="Only 4+ star reviews can be converted to content")
+    
+    if review.content_item_id:
+        raise HTTPException(status_code=400, detail="Review has already been converted to content")
+    
+    # Get tenant_id from review request
+    tenant_id = review.review_request.tenant_id
+    
+    # Generate caption from review
+    if request.custom_caption:
+        caption = request.custom_caption
+    else:
+        # Auto-generate a testimonial post caption
+        first_name = review.customer_name.split()[0] if review.customer_name else "A customer"
+        stars = "⭐" * review.rating
+        quote = review.comment[:200] + "..." if review.comment and len(review.comment) > 200 else (review.comment or "")
+        caption = f'{stars}\n\n"{quote}"\n\n— {first_name}\n\nThank you for trusting us with your plumbing needs! 🔧💙\n\n#CustomerReview #5StarService #PlumbingExperts #Testimonial'
+    
+    # Create ContentItem
+    content_item = models.ContentItem(
+        tenant_id=tenant_id,
+        title=f"Customer Review: {review.customer_name}",
+        base_caption=caption,
+        content_category='authority',  # Reviews build authority
+        status='Draft',
+        owner=current_user.username,
+        source_type='review',
+        source_ref=str(review_id)
+    )
+    db.add(content_item)
+    await db.flush()
+    
+    # Link review to content item
+    review.content_item_id = content_item.id
+    
+    # Create PostInstances for each channel
+    instances = []
+    for channel_account_id in request.channel_account_ids:
+        # Verify channel account exists
+        account_result = await db.execute(
+            select(models.ChannelAccount).where(models.ChannelAccount.id == channel_account_id)
+        )
+        account = account_result.scalar_one_or_none()
+        if not account:
+            raise HTTPException(status_code=404, detail=f"Channel account {channel_account_id} not found")
+        
+        instance = models.PostInstance(
+            tenant_id=tenant_id,
+            content_item_id=content_item.id,
+            channel_account_id=channel_account_id,
+            scheduled_for=request.scheduled_for,
+            status='Scheduled' if request.scheduled_for else 'Draft'
+        )
+        db.add(instance)
+        instances.append(instance)
+    
+    # Audit logs
+    await crud.write_audit(
+        db, tenant_id, 'content_item', content_item.id, 'create', current_user.username
+    )
+    await crud.write_audit(
+        db, None, 'review', review.id, 'update', current_user.username,
+        'content_item_id', None, str(content_item.id)
+    )
+    
+    await db.commit()
+    
+    # Re-query with relationships
+    result = await db.execute(
+        select(models.ContentItem)
+        .where(models.ContentItem.id == content_item.id)
+        .options(selectinload(models.ContentItem.media_assets))
+    )
+    content_item = result.scalar_one()
+    return content_item
 

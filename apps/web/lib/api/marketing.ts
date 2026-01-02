@@ -454,6 +454,115 @@ export const marketingApi = {
       handleApiError(error, 'Delete offer')
       throw error
     }
+  },
+
+  // Content Mix Tracking
+  getContentMixSummary: async (tenantId: string, weeks: number = 4): Promise<ContentMixSummary[]> => {
+    try {
+      return await apiGet<ContentMixSummary[]>(`/marketing/content-mix/summary?tenant_id=${tenantId}&weeks=${weeks}`)
+    } catch (error) {
+      handleApiError(error, 'Load content mix summary')
+      throw error
+    }
+  },
+
+  // Seasonal Events
+  listSeasonalEvents: async (tenantId: string, filters?: {
+    start_date?: string
+    end_date?: string
+    event_type?: string
+    city?: string
+  }): Promise<SeasonalEvent[]> => {
+    try {
+      const params = new URLSearchParams({ tenant_id: tenantId })
+      if (filters?.start_date) params.append('start_date', filters.start_date)
+      if (filters?.end_date) params.append('end_date', filters.end_date)
+      if (filters?.event_type) params.append('event_type', filters.event_type)
+      if (filters?.city) params.append('city', filters.city)
+      
+      return await apiGet<SeasonalEvent[]>(`/marketing/seasonal-events?${params}`)
+    } catch (error) {
+      handleApiError(error, 'Load seasonal events')
+      throw error
+    }
+  },
+
+  getUpcomingEvents: async (tenantId: string, days: number = 30): Promise<SeasonalEvent[]> => {
+    try {
+      return await apiGet<SeasonalEvent[]>(`/marketing/seasonal-events/upcoming?tenant_id=${tenantId}&days=${days}`)
+    } catch (error) {
+      handleApiError(error, 'Load upcoming events')
+      throw error
+    }
+  },
+
+  createSeasonalEvent: async (data: {
+    tenant_id: string
+    event_type: string
+    name: string
+    start_date: string
+    end_date: string
+    city?: string
+    content_suggestions?: string
+    is_recurring?: boolean
+  }): Promise<SeasonalEvent> => {
+    try {
+      return await apiPost<SeasonalEvent>('/marketing/seasonal-events', data)
+    } catch (error) {
+      handleApiError(error, 'Create seasonal event')
+      throw error
+    }
+  },
+
+  updateSeasonalEvent: async (eventId: string, data: Partial<SeasonalEvent>): Promise<SeasonalEvent> => {
+    try {
+      return await apiPatch<SeasonalEvent>(`/marketing/seasonal-events/${eventId}`, data)
+    } catch (error) {
+      handleApiError(error, 'Update seasonal event')
+      throw error
+    }
+  },
+
+  deleteSeasonalEvent: async (eventId: string): Promise<void> => {
+    try {
+      await apiDelete(`/marketing/seasonal-events/${eventId}`)
+    } catch (error) {
+      handleApiError(error, 'Delete seasonal event')
+      throw error
+    }
+  },
+
+  // Review-to-Content Pipeline
+  getFlaggedReviews: async (tenantId: string, includeConverted: boolean = false): Promise<FlaggedReview[]> => {
+    try {
+      return await apiGet<FlaggedReview[]>(`/marketing/reviews/flagged-for-content?tenant_id=${tenantId}&include_converted=${includeConverted}`)
+    } catch (error) {
+      handleApiError(error, 'Load flagged reviews')
+      throw error
+    }
+  },
+
+  flagReviewForContent: async (reviewId: string, flag: boolean = true): Promise<void> => {
+    try {
+      await apiPost(`/marketing/reviews/${reviewId}/flag-for-content?flag=${flag}`, {})
+    } catch (error) {
+      handleApiError(error, flag ? 'Flag review' : 'Unflag review')
+      throw error
+    }
+  },
+
+  convertReviewToContent: async (reviewId: string, data: {
+    review_id: string
+    channel_account_ids: string[]
+    scheduled_for?: string
+    custom_caption?: string
+  }): Promise<ContentItem> => {
+    try {
+      return await apiPost<ContentItem>(`/marketing/reviews/${reviewId}/convert-to-content`, data)
+    } catch (error) {
+      handleApiError(error, 'Convert review to content')
+      throw error
+    }
   }
 }
 
@@ -490,5 +599,41 @@ export interface Offer {
   external_id?: string
   created_at: string
   updated_at: string
+}
+
+export interface ContentMixSummary {
+  channel_account_id: string
+  channel_account_name: string
+  week_start_date: string
+  educational: { actual: number; target: number; percentage: number }
+  authority: { actual: number; target: number; percentage: number }
+  promo: { actual: number; target: number; percentage: number }
+  local_relevance: { actual: number; target: number; percentage: number }
+  overall_health: 'good' | 'warning' | 'critical'
+  warnings: string[]
+}
+
+export interface SeasonalEvent {
+  id: string
+  tenant_id: string
+  event_type: string
+  name: string
+  start_date: string
+  end_date: string
+  city?: string
+  content_suggestions?: string
+  is_recurring: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FlaggedReview {
+  id: string
+  rating: number
+  comment?: string
+  customer_name: string
+  is_converted: boolean
+  content_item_id?: string
+  created_at: string
 }
 

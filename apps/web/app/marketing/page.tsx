@@ -17,6 +17,9 @@ import { Select } from '../../components/ui/Select'
 import { Textarea } from '../../components/ui/Textarea'
 import { LocalSEOView } from './LocalSEOView'
 import { OffersView } from './OffersView'
+import { ContentMixWidget } from './ContentMixWidget'
+import { SeasonalEventsView } from './SeasonalEventsView'
+import { ReviewsToContentView } from './ReviewsToContentView'
 
 const styles = `
   @media (max-width: 768px) {
@@ -45,6 +48,8 @@ function MarketingContent() {
     { id: 'posts', label: 'Posts' },
     { id: 'local-seo', label: 'Local SEO' },
     { id: 'offers', label: 'Offers' },
+    { id: 'events', label: 'Events' },
+    { id: 'reviews', label: 'Reviews → Content' },
     { id: 'accounts', label: 'Accounts' }
   ]
 
@@ -105,8 +110,17 @@ function MarketingContent() {
           {activeTab === 'posts' && <PostsView />}
           {activeTab === 'local-seo' && <LocalSEOView />}
           {activeTab === 'offers' && <OffersView />}
+          {activeTab === 'events' && <SeasonalEventsView />}
+          {activeTab === 'reviews' && <ReviewsToContentView />}
           {activeTab === 'accounts' && <AccountsView />}
         </div>
+        
+        {/* Content Mix Widget - shows on calendar tab */}
+        {activeTab === 'calendar' && (
+          <div style={{ marginTop: '24px' }}>
+            <ContentMixWidget />
+          </div>
+        )}
       </div>
     </>
   )

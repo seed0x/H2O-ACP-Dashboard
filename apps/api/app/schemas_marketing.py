@@ -320,3 +320,92 @@ class LocalSEOTopic(LocalSEOTopicBase):
     
     class Config:
         from_attributes = True
+
+# Content Mix Tracking Schemas
+
+class ContentMixTrackingBase(BaseModel):
+    tenant_id: str
+    channel_account_id: UUID
+    week_start_date: date
+    educational_count: int = 0
+    authority_count: int = 0
+    promo_count: int = 0
+    local_relevance_count: int = 0
+    target_educational: int = 2
+    target_authority: int = 1
+    target_promo: int = 1
+    target_local: int = 1
+
+class ContentMixTrackingCreate(ContentMixTrackingBase):
+    pass
+
+class ContentMixTrackingUpdate(BaseModel):
+    educational_count: Optional[int] = None
+    authority_count: Optional[int] = None
+    promo_count: Optional[int] = None
+    local_relevance_count: Optional[int] = None
+    target_educational: Optional[int] = None
+    target_authority: Optional[int] = None
+    target_promo: Optional[int] = None
+    target_local: Optional[int] = None
+
+class ContentMixTracking(ContentMixTrackingBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ContentMixSummary(BaseModel):
+    """Summary of content mix for a channel account"""
+    channel_account_id: UUID
+    channel_account_name: str
+    week_start_date: date
+    educational: dict  # { actual: int, target: int, percentage: float }
+    authority: dict
+    promo: dict
+    local_relevance: dict
+    overall_health: str  # 'good', 'warning', 'critical'
+    warnings: List[str]  # List of issues e.g., "Too many promo posts"
+
+# Seasonal Events Schemas
+
+class SeasonalEventBase(BaseModel):
+    tenant_id: str
+    event_type: str  # 'freeze', 'heat_wave', 'holiday', 'city_event'
+    name: str
+    start_date: date
+    end_date: date
+    city: Optional[str] = None
+    content_suggestions: Optional[str] = None
+    is_recurring: bool = False
+
+class SeasonalEventCreate(SeasonalEventBase):
+    pass
+
+class SeasonalEventUpdate(BaseModel):
+    event_type: Optional[str] = None
+    name: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    city: Optional[str] = None
+    content_suggestions: Optional[str] = None
+    is_recurring: Optional[bool] = None
+
+class SeasonalEvent(SeasonalEventBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Review-to-Content Schemas
+
+class ReviewToContentRequest(BaseModel):
+    """Request to convert a review into marketing content"""
+    review_id: UUID
+    channel_account_ids: List[UUID]  # Which channels to schedule on
+    scheduled_for: Optional[datetime] = None
+    custom_caption: Optional[str] = None  # Override auto-generated caption

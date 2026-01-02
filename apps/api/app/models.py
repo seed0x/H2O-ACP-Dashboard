@@ -492,10 +492,16 @@ class Review(Base):
     customer_name = Column(Text, nullable=False)
     customer_email = Column(Text, nullable=True)
     is_public = Column(Boolean, nullable=False, default=False)  # Whether to show on public page
+    
+    # Review-to-Content Pipeline fields
+    can_be_content = Column(Boolean, nullable=False, default=False)  # Flag for potential content use
+    content_item_id = Column(UUID(as_uuid=True), ForeignKey("content_items.id", ondelete="SET NULL"), nullable=True)  # Link to created content
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     review_request = relationship("ReviewRequest", back_populates="review")
+    content_item = relationship("ContentItem", foreign_keys=[content_item_id])
 
 # Marketing Enhancement Models
 
@@ -545,59 +551,52 @@ class LocalSEOTopic(Base):
         UniqueConstraint('tenant_id', 'service_type', 'city', name='uq_local_seo_topic'),
     )
 
-# Marketing Enhancement Models
-
-class Offer(Base):
-    """Decoupled offer/promo manager - can be reused across multiple posts"""
-    __tablename__ = "offers"
+class ContentMixTracking(Base):
+    """Track weekly content mix to ensure balanced posting (educational, authority, promo, local)"""
+    __tablename__ = "content_mix_tracking"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(Text, nullable=False)
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    service_type = Column(String, nullable=True)  # e.g., "Water Heater", "Drain Cleaning"
-    valid_from = Column(Date, nullable=False)
-    valid_to = Column(Date, nullable=False)
-    discount_type = Column(String, nullable=False)  # 'percentage', 'fixed_amount', 'free_service'
-    discount_value = Column(Numeric(10, 2), nullable=True)
-    terms = Column(Text, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True)
+    channel_account_id = Column(UUID(as_uuid=True), ForeignKey("channel_accounts.id", ondelete="CASCADE"), nullable=False)
+    week_start_date = Column(Date, nullable=False)
     
-    # Website integration fields
-    coupon_code = Column(String, nullable=True)  # Code for website redemption
-    website_url = Column(String, nullable=True)  # Link to coupon landing page
-    sync_source = Column(String, nullable=True, default='manual')  # 'manual', 'website_file', 'api_sync'
-    external_id = Column(String, nullable=True)  # ID from website system if synced
+    # Actual counts (auto-calculated from PostInstance + ContentItem.content_category)
+    educational_count = Column(Integer, nullable=False, default=0)
+    authority_count = Column(Integer, nullable=False, default=0)
+    promo_count = Column(Integer, nullable=False, default=0)
+    local_relevance_count = Column(Integer, nullable=False, default=0)
+    
+    # Target counts (configurable per account)
+    target_educational = Column(Integer, nullable=False, default=2)
+    target_authority = Column(Integer, nullable=False, default=1)
+    target_promo = Column(Integer, nullable=False, default=1)
+    target_local = Column(Integer, nullable=False, default=1)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
-    # Relationships
-    content_items = relationship("ContentItem", foreign_keys="ContentItem.offer_id", backref="linked_offer")
-
-class LocalSEOTopic(Base):
-    """Track local SEO content coverage - city + service combinations"""
-    __tablename__ = "local_seo_topics"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(Text, nullable=False)
-    service_type = Column(String, nullable=False)  # e.g., "Water Heater Repair"
-    city = Column(String, nullable=False)  # e.g., "Vancouver WA"
-    status = Column(String, nullable=False, default='not_started')  # 'not_started', 'in_progress', 'published', 'needs_update'
-    last_posted_at = Column(DateTime(timezone=True), nullable=True)
-    last_post_instance_id = Column(UUID(as_uuid=True), ForeignKey("post_instances.id", ondelete="SET NULL"), nullable=True)
-    target_url = Column(String, nullable=True)  # Link to landing page if exists
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Unique constraint: one topic per service+city+tenant
+    # Unique constraint: one tracking record per account per week
     __table_args__ = (
-        UniqueConstraint('tenant_id', 'service_type', 'city', name='uq_local_seo_topic'),
+        UniqueConstraint('tenant_id', 'channel_account_id', 'week_start_date', name='uq_content_mix_week'),
     )
     
-    # Relationships
-    last_post_instance = relationship("PostInstance", foreign_keys=[last_post_instance_id])
+    channel_account = relationship("ChannelAccount")
+
+class SeasonalEvent(Base):
+    """Track seasonal events that should trigger content creation (freeze warnings, holidays, etc.)"""
+    __tablename__ = "seasonal_events"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    event_type = Column(String, nullable=False)  # 'freeze', 'heat_wave', 'holiday', 'city_event'
+    name = Column(String, nullable=False)  # e.g., "Vancouver Freeze Warning"
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    city = Column(String, nullable=True)  # Optional city targeting
+    content_suggestions = Column(Text, nullable=True)  # Suggested content ideas
+    is_recurring = Column(Boolean, nullable=False, default=False)  # Does this repeat yearly?
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class RecoveryTicket(Base):
     __tablename__ = "recovery_tickets"
