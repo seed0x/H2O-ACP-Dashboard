@@ -20,6 +20,7 @@ import { OffersView } from './OffersView'
 import { ContentMixWidget } from './ContentMixWidget'
 import { SeasonalEventsView } from './SeasonalEventsView'
 import { ReviewsToContentView } from './ReviewsToContentView'
+import { CalendarView } from './CalendarView'
 
 const styles = `
   @media (max-width: 768px) {
@@ -1497,55 +1498,102 @@ function AutoGeneratePanel({ onContentAdded }: { onContentAdded: () => void }) {
   )
 }
 
-function CalendarView() {
-  const [calendarData, setCalendarData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  
-  // Initialize view mode from localStorage or default to week on mobile
-  const [viewMode, setViewMode] = useState<'week' | 'month'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('calendarViewMode')
-      if (saved === 'week' || saved === 'month') return saved
-      // Default to week view on mobile
-      return window.innerWidth < 768 ? 'week' : 'month'
-    }
-    return 'month'
-  })
-  
-  // Default to current week (Monday) on load
-  const [currentDate, setCurrentDate] = useState(() => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
-    const monday = new Date(today)
-    monday.setDate(today.getDate() + daysToMonday)
-    return monday
-  })
-  const [showOnlyPlanned, setShowOnlyPlanned] = useState(false)
-  const [selectedPost, setSelectedPost] = useState<any>(null)
+// CalendarView is now in CalendarView.tsx
+
+function AccountsView() {
+  const [accounts, setAccounts] = useState<any[]>([])
   const [channels, setChannels] = useState<any[]>([])
-  const [showNewPostModal, setShowNewPostModal] = useState(false)
-  const [channelAccounts, setChannelAccounts] = useState<any[]>([])
-  const [postForm, setPostForm] = useState({
-    title: '',
-    base_caption: '',
-    scheduled_for: '',
-    channel_account_ids: [] as string[],
-    status: 'Idea',
-    owner: 'admin',
-    content_category: '',
-    media_urls: [] as string[],
-    cta_type: '',
-    cta_url: ''
-  })
-  const [mediaUrlInput, setMediaUrlInput] = useState('')
-  const [error, setError] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<any>(null)
+  const [formError, setFormError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
-  const [topoffLoading, setTopoffLoading] = useState(false)
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
-  
-  // Get this week and next week dates (Mon-Fri only)
-  const getThisWeekStart = () => {
+  const [connectingAccountId, setConnectingAccountId] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    channel_id: '',
+    account_name: '',
+    account_email: '',
+    credential_vault_ref: ''
+  })
+
+  // Check if account is Google Business Profile
+  const isGoogleAccount = (account: any, channel: any) => {
+    const channelKey = channel?.key?.toLowerCase() || ''
+    const channelName = channel?.name?.toLowerCase() || ''
+    const accountName = account?.name?.toLowerCase() || ''
+    return channelKey.includes('google') || channelKey.includes('gbp') || 
+           channelName.includes('google') || accountName.includes('google')
+  }
+
+  // Handle Google OAuth connection
+  async function handleConnectGoogle(accountId: string) {
+    setConnectingAccountId(accountId)
+    try {
+      const result = await oauthApi.getGoogleAuthUrl(accountId)
+      window.location.href = result.authorization_url
+    } catch (error: any) {
+      console.error('Failed to start OAuth:', error)
+      showToast(error.message || 'Failed to connect Google. Make sure OAuth is configured.', 'error')
+      setConnectingAccountId(null)
+    }
+  }
+
+  // Handle disconnect
+  async function handleDisconnectGoogle(accountId: string) {
+    if (!confirm('Disconnect this Google account? Auto-posting will stop working.')) return
+    try {
+      await oauthApi.disconnectGoogle(accountId)
+      showToast('Google account disconnected', 'success')
+      loadData()
+    } catch (error: any) {
+      console.error('Failed to disconnect:', error)
+      showToast(error.message || 'Failed to disconnect', 'error')
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const [accountsRes, channelsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, { 
+          headers,
+          credentials: 'include' 
+        }),
+        fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, { 
+          headers,
+          credentials: 'include' 
+        })
+      ])
+      
+      if (!accountsRes.ok || !channelsRes.ok) {
+        throw new Error('Failed to load data')
+      }
+      
+      const accountsData = await accountsRes.json()
+      const channelsData = await channelsRes.json()
+      setAccounts(Array.isArray(accountsData) ? accountsData : [])
+      setChannels(Array.isArray(channelsData) ? channelsData : [])
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to load accounts:', error)
+      setAccounts([])
+      setChannels([])
+      setLoading(false)
+    }
+  }
+
+  async function handleAddAccount(e: React.FormEvent) {
     const today = new Date()
     const dayOfWeek = today.getDay()
     const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
