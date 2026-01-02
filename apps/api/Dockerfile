@@ -16,7 +16,6 @@ COPY . /app
 
 # Make scripts executable
 RUN chmod +x /app/docker-entrypoint.sh
-RUN chmod +x /app/wait_for_db.py
 RUN chmod +x /app/fix_admin.py
 
 # Expose port
