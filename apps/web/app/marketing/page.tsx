@@ -6,6 +6,12 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
 import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
+import { marketingApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset } from '../../lib/api/marketing'
+import { PhotoUpload } from '../../components/marketing/PhotoUpload'
+import { handleApiError, showSuccess } from '../../lib/error-handler'
+import { CalendarSkeleton } from '../../components/marketing/CalendarSkeleton'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
 
 const styles = `
   @media (max-width: 768px) {
@@ -1543,20 +1549,8 @@ function CalendarView() {
 
   async function loadChannelAccounts() {
     try {
-      const token = localStorage.getItem('token')
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts?tenant_id=h2o`, {
-        headers,
-        credentials: 'include'
-      })
-      const data = await response.json()
-      setChannelAccounts(Array.isArray(data) ? data : [])
+      const accounts = await marketingApi.listChannelAccounts('h2o')
+      setChannelAccounts(accounts)
     } catch (error) {
       console.error('Failed to load channel accounts:', error)
       setChannelAccounts([])
@@ -1565,33 +1559,17 @@ function CalendarView() {
 
   async function loadChannels() {
     try {
-      const token = localStorage.getItem('token')
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/marketing/channels?tenant_id=h2o`, {
-        headers,
-        credentials: 'include'
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to load channels: ${response.statusText}`)
-      }
-      const data = await response.json()
-      setChannels(Array.isArray(data) ? data : [])
+      const channelsData = await marketingApi.listChannels('h2o')
+      setChannels(channelsData)
     } catch (error) {
       console.error('Failed to load channels:', error)
-      setChannels([]) // Set to empty array on error
+      setChannels([])
     }
   }
 
   async function loadCalendar() {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
       let start: Date
       let end: Date
 
@@ -1612,47 +1590,20 @@ function CalendarView() {
         end.setDate(end.getDate() + 60)
       }
 
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const params = new URLSearchParams({
-        tenant_id: 'h2o',
-        start_date: start.toISOString(),
-        end_date: end.toISOString()
-      })
-      
-      const response = await fetch(`${API_BASE_URL}/marketing/calendar?${params}`, {
-        headers,
-        credentials: 'include'
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to load calendar: ${response.statusText}`)
-      }
-      const data = await response.json()
+      const data = await marketingApi.getCalendar('h2o', start, end)
       
       // Transform object format { "2024-12-18": [...] } to array format [{ date: "2024-12-18", instances: [...] }]
-      let calendarArray: any[]
-      if (Array.isArray(data)) {
-        calendarArray = data
-      } else if (data && typeof data === 'object') {
-        // API returns object with date keys - transform to array
-        calendarArray = Object.entries(data).map(([date, instances]) => ({
-          date,
-          instances: Array.isArray(instances) ? instances : []
-        }))
-      } else {
-        calendarArray = []
-      }
+      const calendarArray = Object.entries(data).map(([date, instances]) => ({
+        date,
+        instances: Array.isArray(instances) ? instances : []
+      }))
       
       setCalendarData(calendarArray)
       setLoading(false)
     } catch (error) {
       console.error('Failed to load calendar:', error)
-      setCalendarData([]) // Set to empty array on error
+      handleApiError(error, 'Load calendar')
+      setCalendarData([])
       setLoading(false)
     }
   }
@@ -1934,79 +1885,45 @@ function CalendarView() {
           {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button
+        <div className="flex gap-3 items-center flex-wrap">
+          <Button
             onClick={() => setShowNewPostModal(true)}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: 'var(--color-primary)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}
+            variant="primary"
+            className="min-h-[44px]"
           >
             + New Post
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleTopoff}
             disabled={topoffLoading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: topoffLoading ? 'var(--color-hover)' : 'rgba(156, 39, 176, 0.8)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: topoffLoading ? 'not-allowed' : 'pointer',
-              opacity: topoffLoading ? 0.6 : 1
-            }}
+            variant="primary"
+            className="min-h-[44px] bg-purple-600/80 hover:bg-purple-600 disabled:opacity-60 disabled:cursor-not-allowed"
             title="Generate planned slots for the next 28 days"
           >
             {topoffLoading ? 'Generating...' : '📅 Top off 28 days'}
-          </button>
-          <div style={{
-            display: 'flex',
-            backgroundColor: 'var(--color-hover)',
-            borderRadius: '8px',
-            padding: '4px'
-          }}>
-          <button
-            onClick={() => handleViewModeChange('week')}
-            style={{
-              padding: '6px 16px',
-              backgroundColor: viewMode === 'week' ? 'var(--color-primary)' : 'transparent',
-              border: 'none',
-              borderRadius: '6px',
-              color: viewMode === 'week' ? '#ffffff' : 'var(--color-text-primary)',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Week
-          </button>
-          <button
-            onClick={() => handleViewModeChange('month')}
-            style={{
-              padding: '6px 16px',
-              backgroundColor: viewMode === 'month' ? 'var(--color-primary)' : 'transparent',
-              border: 'none',
-              borderRadius: '6px',
-              color: viewMode === 'month' ? '#ffffff' : 'var(--color-text-primary)',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Month
-          </button>
-        </div>
+          </Button>
+          <div className="flex bg-[var(--color-hover)] rounded-lg p-1">
+            <button
+              onClick={() => handleViewModeChange('week')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all min-h-[44px] ${
+                viewMode === 'week'
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-transparent text-[var(--color-text-primary)] hover:bg-white/5'
+              }`}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => handleViewModeChange('month')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all min-h-[44px] ${
+                viewMode === 'month'
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-transparent text-[var(--color-text-primary)] hover:bg-white/5'
+              }`}
+            >
+              Month
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2017,32 +1934,16 @@ function CalendarView() {
       <AutoGeneratePanel onContentAdded={loadCalendar} />
 
       {/* Calendar Grid */}
-      <div className="marketing-calendar-grid" style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '1px',
-          backgroundColor: 'var(--color-border)',
-          minWidth: viewMode === 'month' ? '700px' : 'auto'
-        }}>
+      {loading ? (
+        <CalendarSkeleton viewMode={viewMode} />
+      ) : (
+        <div className="marketing-calendar-grid bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg overflow-hidden">
+        <div className={`grid grid-cols-7 gap-px bg-[var(--color-border)] ${viewMode === 'month' ? 'min-w-[700px]' : ''}`}>
           {/* Day Headers */}
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <div
               key={day}
-              style={{
-                padding: '12px',
-                backgroundColor: 'var(--color-hover)',
-                textAlign: 'center',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: 'var(--color-text-secondary)',
-                textTransform: 'uppercase'
-              }}
+              className="p-3 bg-[var(--color-hover)] text-center text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider"
             >
               {day}
             </div>
@@ -2058,21 +1959,12 @@ function CalendarView() {
             return (
               <div
                 key={day.toISOString()}
-                className="marketing-calendar-day-cell"
+                className={`marketing-calendar-day-cell bg-[var(--color-card)] relative p-3 ${isOtherMonth ? 'opacity-40' : ''}`}
                 style={{
-                  backgroundColor: 'var(--color-card)',
-                  minHeight: viewMode === 'month' ? '100px' : '120px',
-                  padding: '12px',
-                  position: 'relative',
-                  opacity: isOtherMonth ? 0.4 : 1
+                  minHeight: viewMode === 'month' ? '100px' : '120px'
                 }}
               >
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: isToday ? '700' : '500',
-                  color: isToday ? 'var(--color-primary)' : (isOtherMonth ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)'),
-                  marginBottom: '8px'
-                }}>
+                <div className={`text-sm mb-2 ${isToday ? 'font-bold text-[var(--color-primary)]' : isOtherMonth ? 'font-medium text-[var(--color-text-tertiary)]' : 'font-medium text-[var(--color-text-primary)]'}`}>
                   {day.getDate()}
                 </div>
                 
@@ -2086,7 +1978,7 @@ function CalendarView() {
                   const hiddenCount = Math.max(0, instances.length - MAX_VISIBLE)
                   
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="flex flex-col gap-1.5">
                       {visibleInstances.map((instance: any) => {
                         const contentItem = instance.content_item
                         const channelAccount = instance.channel_account
@@ -2128,12 +2020,21 @@ function CalendarView() {
                               )}
                             </div>
                             {contentItem?.media_assets && contentItem.media_assets.length > 0 && (
-                              <div style={{
-                                fontSize: '9px',
-                                color: 'var(--color-text-secondary)',
-                                marginTop: '2px'
-                              }}>
-                                📷 {contentItem.media_assets.length}
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {contentItem.media_assets[0]?.file_type === 'image' && (
+                                  <img
+                                    src={contentItem.media_assets[0].file_url}
+                                    alt=""
+                                    className="w-4 h-4 rounded object-cover border border-white/20"
+                                    onError={(e) => {
+                                      // Fallback if image fails to load
+                                      e.currentTarget.style.display = 'none'
+                                    }}
+                                  />
+                                )}
+                                <span className="text-[9px] text-[var(--color-text-secondary)] font-medium">
+                                  📷 {contentItem.media_assets.length}
+                                </span>
                               </div>
                             )}
                             {viewMode === 'week' && (
@@ -2228,6 +2129,7 @@ function CalendarView() {
           })}
         </div>
       </div>
+      )}
 
       {/* Post Instance Detail Modal */}
       {selectedPost && <PostInstanceDetailModal instance={selectedPost} onClose={() => setSelectedPost(null)} onUpdate={() => { loadCalendar(); setSelectedPost(null); }} />}
@@ -3286,36 +3188,6 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
     { value: 'blog_post', label: 'Blog Post' }
   ]
 
-  async function handleMediaUpload(file: File, contentItemId?: string): Promise<any> {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      throw new Error('Not authenticated')
-    }
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    let url = `${API_BASE_URL}/marketing/media/upload?tenant_id=${instance.tenant_id}`
-    if (contentItemId) {
-      url += `&content_item_id=${contentItemId}`
-    }
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include',
-      body: formData
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Failed to upload media' }))
-      throw new Error(errorData.detail || 'Failed to upload media')
-    }
-
-    return await response.json()
-  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
@@ -3345,44 +3217,24 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
 
     setSubmitting(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('Not authenticated')
-      }
-
       // If content_item_id is null (planned slot), create a new content item and link it
       // Otherwise, update the existing content item
       if (!instance.content_item_id || !contentItem) {
         // Create new content item for planned slot
-        const newItemResponse = await fetch(`${API_BASE_URL}/marketing/content-items`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            tenant_id: instance.tenant_id,
-            title: title.trim(),
-            base_caption: baseCaption.trim(),
-            content_category: contentCategory || instance.suggested_category || null,
-            status: 'Draft',
-            owner: 'admin'
-          })
+        const newItem = await marketingApi.createContentItem({
+          tenant_id: instance.tenant_id,
+          title: title.trim(),
+          base_caption: baseCaption.trim(),
+          content_category: contentCategory || instance.suggested_category || null,
+          status: 'Draft',
+          owner: 'admin'
         })
-
-        if (!newItemResponse.ok) {
-          const errorData = await newItemResponse.json().catch(() => ({ detail: 'Failed to create content' }))
-          throw new Error(errorData.detail || 'Failed to create content')
-        }
-
-        const newItem = await newItemResponse.json()
 
         // Upload media files and attach to content item
         if (mediaFiles.length > 0) {
           for (const file of mediaFiles) {
             try {
-              await handleMediaUpload(file, newItem.id)
+              await marketingApi.uploadMedia(file, instance.tenant_id, newItem.id)
             } catch (err) {
               console.warn('Failed to upload media:', err)
             }
@@ -3390,48 +3242,24 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         }
 
         // Update the post instance to use the new content item
-        const updateResponse = await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            content_item_id: newItem.id,
-            status: 'Draft'
-          })
+        await marketingApi.updatePostInstance(instance.id, {
+          content_item_id: newItem.id,
+          status: 'Draft'
         })
-
-        if (!updateResponse.ok) {
-          throw new Error('Failed to update post instance')
-        }
       } else {
         // Update existing content item
-        const updateResponse = await fetch(`${API_BASE_URL}/marketing/content-items/${contentItem.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            title: title.trim(),
-            base_caption: baseCaption.trim(),
-            status: 'Draft'
-          })
+        await marketingApi.updateContentItem(contentItem.id, {
+          title: title.trim(),
+          base_caption: baseCaption.trim(),
+          content_category: contentCategory || undefined,
+          status: 'Draft'
         })
-
-        if (!updateResponse.ok) {
-          const errorData = await updateResponse.json().catch(() => ({ detail: 'Failed to update content' }))
-          throw new Error(errorData.detail || 'Failed to update content')
-        }
 
         // Upload and attach media to existing content item
         if (mediaFiles.length > 0) {
           for (const file of mediaFiles) {
             try {
-              await handleMediaUpload(file, contentItem.id)
+              await marketingApi.uploadMedia(file, instance.tenant_id, contentItem.id)
             } catch (err) {
               console.warn('Failed to upload media:', err)
             }
@@ -3439,92 +3267,43 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         }
 
         // Update post instance status
-        await fetch(`${API_BASE_URL}/marketing/post-instances/${instance.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            status: 'Draft'
-          })
+        await marketingApi.updatePostInstance(instance.id, {
+          status: 'Draft'
         })
       }
 
-      showToast('Content added successfully', 'success')
+      showSuccess('Content added successfully')
       onSuccess()
     } catch (error: any) {
       console.error('Failed to add content:', error)
-      setError(error.message || 'Failed to add content')
-      showToast(error.message || 'Failed to add content', 'error')
+      const errorMessage = handleApiError(error)
+      setError(errorMessage)
+      handleApiError(error, 'Add content to planned slot')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="marketing-modal" style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1001,
-      padding: '20px'
-    }}>
-      <div className="marketing-modal-content" style={{
-        backgroundColor: 'var(--color-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '12px',
-        padding: '24px',
-        maxWidth: '600px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflow: 'auto'
-      }}>
-        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/70 backdrop-blur-sm">
+      <div className="bg-[var(--color-card)]/50 border border-white/[0.08] backdrop-blur-sm shadow-xl rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
+        <h3 className="mb-5 text-lg font-semibold text-[var(--color-text-primary)] uppercase tracking-widest text-xs">
           Add Content to Planned Slot
         </h3>
         {error && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: 'rgba(239, 83, 80, 0.1)',
-            border: '1px solid #EF5350',
-            borderRadius: '8px',
-            color: '#EF5350',
-            fontSize: '14px',
-            marginBottom: '16px'
-          }}>
+          <div className="p-3 mb-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 text-sm">
             {error}
           </div>
         )}
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
-                Title *
-              </label>
-              <input
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Post title"
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  backgroundColor: 'var(--color-hover)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '8px',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
+          <div className="grid gap-4">
+            <Input
+              label="Title *"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Post title"
+            />
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
                 Content Category {instance.suggested_category && <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: '400' }}>(Suggested: {instance.suggested_category.replace('_', ' ')})</span>}
@@ -3674,39 +3453,23 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-            <button
+          <div className="flex gap-3 mt-6">
+            <Button
               type="submit"
               disabled={submitting}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: submitting ? 'var(--color-hover)' : 'var(--color-primary)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.6 : 1
-              }}
+              variant="primary"
+              className="min-h-[44px] flex-1"
             >
               {submitting ? 'Saving...' : 'Save Content'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onClose}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: 'var(--color-hover)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                color: 'var(--color-text-primary)',
-                fontSize: '14px',
-                cursor: 'pointer'
-              }}
+              variant="secondary"
+              className="min-h-[44px]"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       </div>

@@ -370,7 +370,8 @@ class PostInstance(Base):
     scheduled_for = Column(DateTime(timezone=True), nullable=True)
     
     # Posting status
-    status = Column(String, nullable=False, default='Draft')  # Draft → Scheduled → Posted → Failed
+    status = Column(String, nullable=False, default='Draft')  # Planned → Draft → Needs Approval → Approved → Scheduled → Posted → Failed
+    reviewer = Column(String, nullable=True)  # Who approved/reviewed this post instance
     
     # Posting metadata
     posted_at = Column(DateTime(timezone=True), nullable=True)

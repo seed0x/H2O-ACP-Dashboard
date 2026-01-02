@@ -179,6 +179,7 @@ class PostInstanceBase(BaseModel):
     caption_override: Optional[str] = None
     scheduled_for: Optional[datetime] = None
     status: str = 'Draft'
+    reviewer: Optional[str] = None  # Who approved/reviewed this post instance
     suggested_category: Optional[str] = None  # Category hint: 'ad_content', 'team_post', 'coupon', 'diy', 'blog_post'
     posted_at: Optional[datetime] = None
     post_url: Optional[str] = None
@@ -190,7 +191,7 @@ class PostInstanceBase(BaseModel):
 
     @validator('status')
     def validate_status(cls, v):
-        valid_statuses = ['Planned', 'Draft', 'Scheduled', 'Posted', 'Failed']
+        valid_statuses = ['Planned', 'Draft', 'Needs Approval', 'Approved', 'Scheduled', 'Posted', 'Failed']
         if v not in valid_statuses:
             raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
         return v
@@ -203,6 +204,7 @@ class PostInstanceUpdate(BaseModel):
     caption_override: Optional[str] = None
     scheduled_for: Optional[datetime] = None
     status: Optional[str] = None
+    reviewer: Optional[str] = None
     posted_at: Optional[datetime] = None
     post_url: Optional[str] = None
     posted_manually: Optional[bool] = None
