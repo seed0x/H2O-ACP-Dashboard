@@ -153,11 +153,15 @@ def compute_schedule_datetimes(
             target_datetime_local = tz.localize(
                 datetime.combine(target_date, datetime.min.time().replace(hour=hour, minute=minute))
             )
-            # Convert to UTC for storage
+            # Convert to UTC for storage (timezone-naive for database)
             target_datetime_utc = target_datetime_local.astimezone(pytz.utc).replace(tzinfo=None)
             
-            # Only include if within range (all should be timezone-naive now)
-            if start_date <= target_datetime_utc <= end_date:
+            # Compare using naive datetimes (strip tzinfo for comparison)
+            start_naive = start_date.replace(tzinfo=None) if start_date.tzinfo else start_date
+            end_naive = end_date.replace(tzinfo=None) if end_date.tzinfo else end_date
+            
+            # Only include if within range
+            if start_naive <= target_datetime_utc <= end_naive:
                 datetimes.append(target_datetime_utc)
         except (ValueError, AttributeError) as e:
             # Skip invalid time format
