@@ -1594,16 +1594,466 @@ function AccountsView() {
   }
 
   async function handleAddAccount(e: React.FormEvent) {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const daysToMonday = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 1 - dayOfWeek)
-    const monday = new Date(today)
-    monday.setDate(today.getDate() + daysToMonday)
-    monday.setHours(0, 0, 0, 0)
-    return monday
+    e.preventDefault()
+    setFormError('')
+    setSubmitting(true)
+    
+    // Validation
+    if (!formData.channel_id) {
+      setFormError('Please select a channel')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.account_name || !formData.account_name.trim()) {
+      setFormError('Account name is required')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.account_email || !formData.account_email.trim()) {
+      setFormError('Account email is required')
+      setSubmitting(false)
+      return
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.account_email)) {
+      setFormError('Please enter a valid email address')
+      setSubmitting(false)
+      return
+    }
+    
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const url = editingAccount 
+        ? `${API_BASE_URL}/marketing/channel-accounts/${editingAccount.id}`
+        : `${API_BASE_URL}/marketing/channel-accounts`
+      const method = editingAccount ? 'PATCH' : 'POST'
+      
+      // Map form data to API schema
+      const requestBody = {
+        tenant_id: 'h2o',
+        channel_id: formData.channel_id,
+        name: formData.account_name,
+        login_email: formData.account_email,
+        credential_vault_ref: formData.credential_vault_ref || null
+      }
+      
+      const response = await fetch(url, {
+        method,
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to save account' }))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      showToast(editingAccount ? 'Account updated successfully' : 'Account added successfully', 'success')
+      setShowAddForm(false)
+      setEditingAccount(null)
+      setFormData({ channel_id: '', account_name: '', account_email: '', credential_vault_ref: '' })
+      setFormError('')
+      loadData()
+    } catch (error: any) {
+      console.error('Failed to save account:', error)
+      setFormError(error.message || 'Failed to save account. Please try again.')
+      showToast(error.message || 'Failed to save account', 'error')
+    } finally {
+      setSubmitting(false)
+    }
   }
-  
-  const getThisWeekEnd = () => {
+
+  async function handleDelete(accountId: string) {
+    if (!confirm('Delete this channel account? This action cannot be undone.')) return
+    try {
+      const token = localStorage.getItem('token')
+      const headers: HeadersInit = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/marketing/channel-accounts/${accountId}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        showToast('Account deleted successfully', 'success')
+        loadData()
+      } else {
+        throw new Error('Failed to delete account')
+      }
+    } catch (error: any) {
+      console.error('Failed to delete account:', error)
+      showToast(error.message || 'Failed to delete account', 'error')
+    }
+  }
+
+  function handleEdit(account: any) {
+    setEditingAccount(account)
+    setFormData({
+      channel_id: account.channel_id,
+      account_name: account.name || account.account_name || '',
+      account_email: account.login_email || account.account_email || '',
+      credential_vault_ref: account.credential_vault_ref || ''
+    })
+    setShowAddForm(true)
+    setFormError('')
+  }
+
+  function handleCancelForm() {
+    setShowAddForm(false)
+    setEditingAccount(null)
+    setFormData({ channel_id: '', account_name: '', account_email: '', credential_vault_ref: '' })
+    setFormError('')
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
+        Loading accounts...
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+          Channel Accounts
+        </h2>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: 'var(--color-primary)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#ffffff',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer'
+          }}
+        >
+          + Add Account
+        </button>
+      </div>
+
+      {/* Add/Edit Account Form */}
+      {showAddForm && (
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          padding: '24px',
+          marginBottom: '24px'
+        }}>
+          <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+            {editingAccount ? 'Edit Channel Account' : 'Add Channel Account'}
+          </h3>
+          {formError && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: 'rgba(239, 83, 80, 0.1)',
+              border: '1px solid #EF5350',
+              borderRadius: '8px',
+              color: '#EF5350',
+              fontSize: '14px',
+              marginBottom: '16px'
+            }}>
+              {formError}
+            </div>
+          )}
+          <form onSubmit={handleAddAccount}>
+            <div style={{ display: 'grid', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                  Channel
+                </label>
+                <select
+                  required
+                  value={formData.channel_id}
+                  onChange={(e) => setFormData({ ...formData, channel_id: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    backgroundColor: 'var(--color-hover)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="">Select a channel</option>
+                  {Array.isArray(channels) && channels.map(ch => (
+                    <option key={ch.id} value={ch.id}>{ch.display_name || ch.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                  Account Name
+                </label>
+                <input
+                  required
+                  value={formData.account_name}
+                  onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
+                  placeholder="e.g., H2O Plumbers GBP"
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    backgroundColor: 'var(--color-hover)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                  Account Email
+                </label>
+                <input
+                  required
+                  type="email"
+                  value={formData.account_email}
+                  onChange={(e) => setFormData({ ...formData, account_email: e.target.value })}
+                  placeholder="email@example.com"
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    backgroundColor: 'var(--color-hover)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                  Credential Vault Reference
+                </label>
+                <input
+                  value={formData.credential_vault_ref}
+                  onChange={(e) => setFormData({ ...formData, credential_vault_ref: e.target.value })}
+                  placeholder="e.g., 1Password: Business/H2O GBP Login"
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    backgroundColor: 'var(--color-hover)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '8px',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '14px'
+                  }}
+                />
+                <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                  Store password reference only (no plain-text passwords)
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: submitting ? 'var(--color-hover)' : 'var(--color-primary)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1
+                }}
+              >
+                {submitting ? 'Saving...' : (editingAccount ? 'Update Account' : 'Save Account')}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelForm}
+                disabled={submitting}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: 'var(--color-hover)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '8px',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '14px',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Accounts List */}
+      {!Array.isArray(accounts) || accounts.length === 0 ? (
+        <div style={{
+          backgroundColor: 'var(--color-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          padding: '48px',
+          textAlign: 'center',
+          color: 'var(--color-text-secondary)'
+        }}>
+          No channel accounts configured. Add one to get started.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '16px' }}>
+          {Array.isArray(accounts) && accounts.map(account => {
+            const channel = channels.find(ch => ch.id === account.channel_id)
+            return (
+              <div
+                key={account.id}
+                className="marketing-account-card"
+                style={{
+                  backgroundColor: 'var(--color-card)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                      {account.name || account.account_name}
+                    </h4>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      backgroundColor: account.oauth_connected ? 'rgba(76, 175, 80, 0.2)' : 'rgba(158, 158, 158, 0.2)',
+                      color: account.oauth_connected ? '#66BB6A' : '#BDBDBD'
+                    }}>
+                      {account.oauth_connected ? '✓ Connected' : 'Manual'}
+                    </span>
+                    {account.status && (
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        backgroundColor: account.status === 'active' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(158, 158, 158, 0.2)',
+                        color: account.status === 'active' ? '#66BB6A' : '#BDBDBD'
+                      }}>
+                        {account.status}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
+                    <strong>{channel?.display_name || channel?.name || 'Unknown Channel'}</strong> • {account.login_email || account.account_email}
+                  </div>
+                  {account.credential_vault_ref && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                      🔐 Vault: {account.credential_vault_ref}
+                    </div>
+                  )}
+                  {!account.oauth_connected && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
+                      Manual posting required - OAuth not connected
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {/* Connect/Disconnect Google button for Google accounts */}
+                  {isGoogleAccount(account, channel) && (
+                    account.oauth_connected ? (
+                      <button
+                        onClick={() => handleDisconnectGoogle(account.id)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                          border: '1px solid #EF5350',
+                          borderRadius: '8px',
+                          color: '#EF5350',
+                          fontSize: '14px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Disconnect Google
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConnectGoogle(account.id)}
+                        disabled={connectingAccountId === account.id}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#4285F4',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: connectingAccountId === account.id ? 'wait' : 'pointer',
+                          opacity: connectingAccountId === account.id ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {connectingAccountId === account.id ? 'Connecting...' : 'Connect Google'}
+                      </button>
+                    )
+                  )}
+                  <button
+                    onClick={() => handleEdit(account)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(account.id)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #EF5350',
+                      borderRadius: '8px',
+                      color: '#EF5350',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
     const monday = getThisWeekStart()
     const friday = new Date(monday)
     friday.setDate(monday.getDate() + 4) // Friday (4 days after Monday)
@@ -4345,24 +4795,6 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
     </div>
   )
 }
-
-function AccountsView() {
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [channels, setChannels] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [editingAccount, setEditingAccount] = useState<any>(null)
-  const [formError, setFormError] = useState<string>('')
-  const [submitting, setSubmitting] = useState(false)
-  const [connectingAccountId, setConnectingAccountId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    channel_id: '',
-    account_name: '',
-    account_email: '',
-    credential_vault_ref: ''
-  })
-
-  // Check if account is Google Business Profile
   const isGoogleAccount = (account: any, channel: any) => {
     const channelKey = channel?.key?.toLowerCase() || ''
     const channelName = channel?.name?.toLowerCase() || ''
