@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 # Marketing Channels
@@ -105,6 +105,7 @@ class ContentItemBase(BaseModel):
     notes: Optional[str] = None
     source_type: Optional[str] = None
     source_ref: Optional[str] = None
+    offer_id: Optional[UUID] = None  # Link to offer/promo
 
     @validator('status')
     def validate_status(cls, v):
@@ -141,6 +142,7 @@ class ContentItemUpdate(BaseModel):
     notes: Optional[str] = None
     source_type: Optional[str] = None
     source_ref: Optional[str] = None
+    offer_id: Optional[UUID] = None
 
 class MediaAssetBase(BaseModel):
     tenant_id: str
@@ -150,6 +152,7 @@ class MediaAssetBase(BaseModel):
     file_type: str  # 'image', 'video'
     file_size: Optional[int] = None
     mime_type: Optional[str] = None
+    intent_tags: Optional[List[str]] = None  # Tags like 'before_after', 'crew', 'job_site', 'emergency', 'water_heater', 'drain', 'sewer'
 
 class MediaAssetCreate(MediaAssetBase):
     pass
@@ -188,6 +191,10 @@ class PostInstanceBase(BaseModel):
     autopost_enabled: bool = False
     publish_job_id: Optional[UUID] = None
     last_error: Optional[str] = None
+    # GBP-specific fields
+    gbp_post_type: Optional[str] = None  # 'update', 'offer', 'event', 'whats_new'
+    gbp_cta_type: Optional[str] = None  # 'call', 'book', 'learn_more', 'order_online'
+    gbp_location_targeting: Optional[str] = None  # City/area if applicable
 
     @validator('status')
     def validate_status(cls, v):
@@ -212,6 +219,10 @@ class PostInstanceUpdate(BaseModel):
     autopost_enabled: Optional[bool] = None
     publish_job_id: Optional[UUID] = None
     last_error: Optional[str] = None
+    # GBP-specific fields
+    gbp_post_type: Optional[str] = None
+    gbp_cta_type: Optional[str] = None
+    gbp_location_targeting: Optional[str] = None
 
 class PostInstance(PostInstanceBase):
     id: UUID
@@ -235,3 +246,77 @@ class MarkPostInstancePostedRequest(BaseModel):
     post_url: Optional[str] = None
     screenshot_url: Optional[str] = None
     posted_manually: bool = True
+
+# Offer/Promo Manager Schemas
+
+class OfferBase(BaseModel):
+    tenant_id: str
+    title: str
+    description: Optional[str] = None
+    service_type: Optional[str] = None
+    valid_from: date
+    valid_to: date
+    discount_type: str  # 'percentage', 'fixed_amount', 'free_service'
+    discount_value: Optional[float] = None
+    terms: Optional[str] = None
+    is_active: bool = True
+    coupon_code: Optional[str] = None
+    website_url: Optional[str] = None
+    sync_source: Optional[str] = 'manual'  # 'manual', 'website_file', 'api_sync'
+    external_id: Optional[str] = None
+
+class OfferCreate(OfferBase):
+    pass
+
+class OfferUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    service_type: Optional[str] = None
+    valid_from: Optional[date] = None
+    valid_to: Optional[date] = None
+    discount_type: Optional[str] = None
+    discount_value: Optional[float] = None
+    terms: Optional[str] = None
+    is_active: Optional[bool] = None
+    coupon_code: Optional[str] = None
+    website_url: Optional[str] = None
+    sync_source: Optional[str] = None
+    external_id: Optional[str] = None
+
+class Offer(OfferBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Local SEO Topic Schemas
+
+class LocalSEOTopicBase(BaseModel):
+    tenant_id: str
+    service_type: str
+    city: str
+    status: str = 'not_started'  # 'not_started', 'in_progress', 'published', 'needs_update'
+    last_posted_at: Optional[datetime] = None
+    last_post_instance_id: Optional[UUID] = None
+    target_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class LocalSEOTopicCreate(LocalSEOTopicBase):
+    pass
+
+class LocalSEOTopicUpdate(BaseModel):
+    status: Optional[str] = None
+    last_posted_at: Optional[datetime] = None
+    last_post_instance_id: Optional[UUID] = None
+    target_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class LocalSEOTopic(LocalSEOTopicBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True

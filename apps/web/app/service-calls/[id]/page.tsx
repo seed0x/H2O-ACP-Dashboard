@@ -848,9 +848,9 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
           }
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
             placeholder="Add notes, updates, or important information about this service call..."
             rows={8}
             style={{

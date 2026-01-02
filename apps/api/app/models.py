@@ -368,11 +368,13 @@ class ContentItem(Base):
     notes = Column(Text, nullable=True)
     source_type = Column(String, nullable=True)
     source_ref = Column(String, nullable=True)
+    offer_id = Column(UUID(as_uuid=True), ForeignKey("offers.id", ondelete="SET NULL"), nullable=True)  # Link to offer/promo
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     post_instances = relationship("PostInstance", back_populates="content_item", cascade="all, delete-orphan")
     media_assets = relationship("MediaAsset", back_populates="content_item", cascade="all, delete-orphan")
+    offer = relationship("Offer", foreign_keys=[offer_id])
 
 class MediaAsset(Base):
     __tablename__ = "media_assets"
@@ -385,6 +387,7 @@ class MediaAsset(Base):
     file_type = Column(String, nullable=False)  # 'image', 'video'
     file_size = Column(Integer, nullable=True)  # Size in bytes
     mime_type = Column(String, nullable=True)
+    intent_tags = Column(ARRAY(Text), nullable=True)  # Tags like 'before_after', 'crew', 'job_site', 'emergency', 'water_heater', 'drain', 'sewer'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     content_item = relationship("ContentItem", back_populates="media_assets")
@@ -430,6 +433,11 @@ class PostInstance(Base):
 
     content_item = relationship("ContentItem", back_populates="post_instances")
     channel_account = relationship("ChannelAccount")
+    
+    # GBP-specific fields
+    gbp_post_type = Column(String, nullable=True)  # 'update', 'offer', 'event', 'whats_new'
+    gbp_cta_type = Column(String, nullable=True)  # 'call', 'book', 'learn_more', 'order_online'
+    gbp_location_targeting = Column(String, nullable=True)  # City/area if applicable
 
 # ContentPost model removed - using ContentItem and PostInstance instead
 # The content_posts table still exists in the database from previous migrations
@@ -488,6 +496,108 @@ class Review(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     review_request = relationship("ReviewRequest", back_populates="review")
+
+# Marketing Enhancement Models
+
+class Offer(Base):
+    """Decoupled offer/promo manager - can be reused across multiple posts"""
+    __tablename__ = "offers"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    service_type = Column(String, nullable=True)  # e.g., "Water Heater", "Drain Cleaning"
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=False)
+    discount_type = Column(String, nullable=False)  # 'percentage', 'fixed_amount', 'free_service'
+    discount_value = Column(Numeric(10, 2), nullable=True)
+    terms = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    
+    # Website integration fields
+    coupon_code = Column(String, nullable=True)  # Code for website redemption
+    website_url = Column(String, nullable=True)  # Link to coupon landing page
+    sync_source = Column(String, nullable=True, default='manual')  # 'manual', 'website_file', 'api_sync'
+    external_id = Column(String, nullable=True)  # ID from website system if synced
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class LocalSEOTopic(Base):
+    """Track local SEO content coverage - city + service combinations"""
+    __tablename__ = "local_seo_topics"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    service_type = Column(String, nullable=False)  # e.g., "Water Heater Repair"
+    city = Column(String, nullable=False)  # e.g., "Vancouver WA"
+    status = Column(String, nullable=False, default='not_started')  # 'not_started', 'in_progress', 'published', 'needs_update'
+    last_posted_at = Column(DateTime(timezone=True), nullable=True)
+    last_post_instance_id = Column(UUID(as_uuid=True), ForeignKey("post_instances.id", ondelete="SET NULL"), nullable=True)
+    target_url = Column(String, nullable=True)  # Link to landing page if exists
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Unique constraint: one topic per service+city+tenant
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'service_type', 'city', name='uq_local_seo_topic'),
+    )
+
+# Marketing Enhancement Models
+
+class Offer(Base):
+    """Decoupled offer/promo manager - can be reused across multiple posts"""
+    __tablename__ = "offers"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    service_type = Column(String, nullable=True)  # e.g., "Water Heater", "Drain Cleaning"
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=False)
+    discount_type = Column(String, nullable=False)  # 'percentage', 'fixed_amount', 'free_service'
+    discount_value = Column(Numeric(10, 2), nullable=True)
+    terms = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    
+    # Website integration fields
+    coupon_code = Column(String, nullable=True)  # Code for website redemption
+    website_url = Column(String, nullable=True)  # Link to coupon landing page
+    sync_source = Column(String, nullable=True, default='manual')  # 'manual', 'website_file', 'api_sync'
+    external_id = Column(String, nullable=True)  # ID from website system if synced
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    content_items = relationship("ContentItem", foreign_keys="ContentItem.offer_id", backref="linked_offer")
+
+class LocalSEOTopic(Base):
+    """Track local SEO content coverage - city + service combinations"""
+    __tablename__ = "local_seo_topics"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(Text, nullable=False)
+    service_type = Column(String, nullable=False)  # e.g., "Water Heater Repair"
+    city = Column(String, nullable=False)  # e.g., "Vancouver WA"
+    status = Column(String, nullable=False, default='not_started')  # 'not_started', 'in_progress', 'published', 'needs_update'
+    last_posted_at = Column(DateTime(timezone=True), nullable=True)
+    last_post_instance_id = Column(UUID(as_uuid=True), ForeignKey("post_instances.id", ondelete="SET NULL"), nullable=True)
+    target_url = Column(String, nullable=True)  # Link to landing page if exists
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Unique constraint: one topic per service+city+tenant
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'service_type', 'city', name='uq_local_seo_topic'),
+    )
+    
+    # Relationships
+    last_post_instance = relationship("PostInstance", foreign_keys=[last_post_instance_id])
 
 class RecoveryTicket(Base):
     __tablename__ = "recovery_tickets"

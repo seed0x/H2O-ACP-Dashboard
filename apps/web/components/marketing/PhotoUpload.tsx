@@ -20,7 +20,21 @@ interface FileWithPreview {
   uploadProgress?: number
   uploadedAsset?: MediaAsset
   error?: string
+  intentTags?: string[]
 }
+
+const INTENT_TAG_OPTIONS = [
+  { value: 'before_after', label: 'Before/After' },
+  { value: 'crew', label: 'Crew/Team' },
+  { value: 'job_site', label: 'Job Site' },
+  { value: 'emergency', label: 'Emergency' },
+  { value: 'water_heater', label: 'Water Heater' },
+  { value: 'drain', label: 'Drain' },
+  { value: 'sewer', label: 'Sewer' },
+  { value: 'repair', label: 'Repair' },
+  { value: 'installation', label: 'Installation' },
+  { value: 'customer', label: 'Customer' }
+]
 
 export function PhotoUpload({
   tenantId,
@@ -35,6 +49,7 @@ export function PhotoUpload({
   const [files, setFiles] = useState<FileWithPreview[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [editingTagsForIndex, setEditingTagsForIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Initialize with existing assets
@@ -138,6 +153,7 @@ export function PhotoUpload({
             fileWithPreview.file,
             tenantId,
             contentItemId,
+            fileWithPreview.intentTags,
             (progress) => {
               setFiles(prev => prev.map(f => 
                 f === fileWithPreview 
@@ -153,7 +169,8 @@ export function PhotoUpload({
                   ...f, 
                   uploadedAsset: asset,
                   preview: asset.file_url, // Use the uploaded URL
-                  uploadProgress: 100
+                  uploadProgress: 100,
+                  intentTags: asset.intent_tags || fileWithPreview.intentTags || []
                 }
               : f
           ))

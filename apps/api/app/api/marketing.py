@@ -3,11 +3,12 @@ Marketing module endpoints for content management and social media posting
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 import os
 
 from ..db.session import get_session
@@ -951,6 +952,7 @@ async def upload_media(
     file: UploadFile = File(...),
     tenant_id: str = Query(..., description="Tenant ID"),
     content_item_id: Optional[UUID] = Query(None, description="Optional content item ID to attach to"),
+    intent_tags: Optional[str] = Query(None, description="Comma-separated intent tags (e.g., 'before_after,crew,job_site')"),
     db: AsyncSession = Depends(get_session),
     current_user: CurrentUser = Depends(get_current_user)
 ):
@@ -989,6 +991,11 @@ async def upload_media(
             mime_type=mime_type
         )
         
+        # Parse intent tags from comma-separated string
+        tags_list = None
+        if intent_tags:
+            tags_list = [tag.strip() for tag in intent_tags.split(',') if tag.strip()]
+        
         # Create MediaAsset record
         media_asset = models.MediaAsset(
             tenant_id=tenant_id,
@@ -997,7 +1004,8 @@ async def upload_media(
             file_url=file_url,
             file_type=file_type,
             file_size=len(file_content),
-            mime_type=mime_type
+            mime_type=mime_type,
+            intent_tags=tags_list
         )
         db.add(media_asset)
         await db.flush()
@@ -1018,4 +1026,293 @@ async def upload_media(
             status_code=500,
             detail=f"Failed to upload media: {str(e)}"
         )
+
+
+# Local SEO Topics (Priority 1)
+
+@router.get("/local-seo-topics", response_model=List[schemas_marketing.LocalSEOTopic])
+async def list_local_seo_topics(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    service_type: Optional[str] = Query(None, description="Filter by service type"),
+    city: Optional[str] = Query(None, description="Filter by city"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """List local SEO topics (city + service combinations)"""
+    query = select(models.LocalSEOTopic).where(
+        models.LocalSEOTopic.tenant_id == tenant_id
+    )
+    
+    if status:
+        query = query.where(models.LocalSEOTopic.status == status)
+    if service_type:
+        query = query.where(models.LocalSEOTopic.service_type.ilike(f"%{service_type}%"))
+    if city:
+        query = query.where(models.LocalSEOTopic.city.ilike(f"%{city}%"))
+    
+    query = query.order_by(
+        models.LocalSEOTopic.status,
+        models.LocalSEOTopic.city,
+        models.LocalSEOTopic.service_type
+    ).limit(limit).offset(offset)
+    
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.post("/local-seo-topics", response_model=schemas_marketing.LocalSEOTopic, status_code=status.HTTP_201_CREATED)
+async def create_local_seo_topic(
+    topic_in: schemas_marketing.LocalSEOTopicCreate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Create a new local SEO topic"""
+    topic = models.LocalSEOTopic(**topic_in.model_dump())
+    db.add(topic)
+    await db.flush()
+    
+    await crud.write_audit(
+        db, topic.tenant_id, 'local_seo_topic', topic.id, 'create', current_user.username
+    )
+    
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="A topic with this service type and city already exists for this tenant"
+        )
+    
+    await db.refresh(topic)
+    return topic
+
+
+@router.get("/local-seo-topics/{topic_id}", response_model=schemas_marketing.LocalSEOTopic)
+async def get_local_seo_topic(
+    topic_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get a local SEO topic by ID"""
+    result = await db.execute(
+        select(models.LocalSEOTopic).where(models.LocalSEOTopic.id == topic_id)
+    )
+    topic = result.scalar_one_or_none()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Local SEO topic not found")
+    return topic
+
+
+@router.patch("/local-seo-topics/{topic_id}", response_model=schemas_marketing.LocalSEOTopic)
+async def update_local_seo_topic(
+    topic_id: UUID,
+    topic_update: schemas_marketing.LocalSEOTopicUpdate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update a local SEO topic"""
+    result = await db.execute(
+        select(models.LocalSEOTopic).where(models.LocalSEOTopic.id == topic_id)
+    )
+    topic = result.scalar_one_or_none()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Local SEO topic not found")
+    
+    update_data = topic_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(topic, field)
+        setattr(topic, field, value)
+        await crud.write_audit(
+            db, topic.tenant_id, 'local_seo_topic', topic.id, 'update', current_user.username,
+            field, str(old_value) if old_value is not None else None, str(value) if value is not None else None
+        )
+    
+    await db.commit()
+    await db.refresh(topic)
+    return topic
+
+
+@router.get("/local-seo-topics/coverage-gaps", response_model=Dict[str, Any])
+async def get_coverage_gaps(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get coverage gaps - topics that need content or haven't been posted recently"""
+    # Topics that haven't been started
+    not_started = await db.execute(
+        select(func.count(models.LocalSEOTopic.id)).where(
+            and_(
+                models.LocalSEOTopic.tenant_id == tenant_id,
+                models.LocalSEOTopic.status == 'not_started'
+            )
+        )
+    )
+    not_started_count = not_started.scalar() or 0
+    
+    # Topics that need update (published but old)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    needs_update = await db.execute(
+        select(func.count(models.LocalSEOTopic.id)).where(
+            and_(
+                models.LocalSEOTopic.tenant_id == tenant_id,
+                models.LocalSEOTopic.status == 'published',
+                or_(
+                    models.LocalSEOTopic.last_posted_at.is_(None),
+                    models.LocalSEOTopic.last_posted_at < thirty_days_ago
+                )
+            )
+        )
+    )
+    needs_update_count = needs_update.scalar() or 0
+    
+    return {
+        "not_started": not_started_count,
+        "needs_update": needs_update_count,
+        "total_gaps": not_started_count + needs_update_count
+    }
+
+
+# Offers / Promo Manager (Priority 2)
+
+@router.get("/offers", response_model=List[schemas_marketing.Offer])
+async def list_offers(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    service_type: Optional[str] = Query(None, description="Filter by service type"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """List offers/promos"""
+    query = select(models.Offer).where(
+        models.Offer.tenant_id == tenant_id
+    )
+    
+    if is_active is not None:
+        query = query.where(models.Offer.is_active == is_active)
+    if service_type:
+        query = query.where(models.Offer.service_type.ilike(f"%{service_type}%"))
+    
+    query = query.order_by(
+        models.Offer.valid_from.desc(),
+        models.Offer.created_at.desc()
+    ).limit(limit).offset(offset)
+    
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/offers/active", response_model=List[schemas_marketing.Offer])
+async def list_active_offers(
+    tenant_id: str = Query(..., description="Tenant ID"),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get all currently active offers (within valid date range)"""
+    today = date.today()
+    result = await db.execute(
+        select(models.Offer).where(
+            and_(
+                models.Offer.tenant_id == tenant_id,
+                models.Offer.is_active == True,
+                models.Offer.valid_from <= today,
+                models.Offer.valid_to >= today
+            )
+        ).order_by(models.Offer.valid_to.asc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/offers", response_model=schemas_marketing.Offer, status_code=status.HTTP_201_CREATED)
+async def create_offer(
+    offer_in: schemas_marketing.OfferCreate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Create a new offer/promo"""
+    offer = models.Offer(**offer_in.model_dump())
+    db.add(offer)
+    await db.flush()
+    
+    await crud.write_audit(
+        db, offer.tenant_id, 'offer', offer.id, 'create', current_user.username
+    )
+    
+    await db.commit()
+    await db.refresh(offer)
+    return offer
+
+
+@router.get("/offers/{offer_id}", response_model=schemas_marketing.Offer)
+async def get_offer(
+    offer_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get an offer by ID"""
+    result = await db.execute(
+        select(models.Offer).where(models.Offer.id == offer_id)
+    )
+    offer = result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    return offer
+
+
+@router.patch("/offers/{offer_id}", response_model=schemas_marketing.Offer)
+async def update_offer(
+    offer_id: UUID,
+    offer_update: schemas_marketing.OfferUpdate,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update an offer"""
+    result = await db.execute(
+        select(models.Offer).where(models.Offer.id == offer_id)
+    )
+    offer = result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    update_data = offer_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        old_value = getattr(offer, field)
+        setattr(offer, field, value)
+        await crud.write_audit(
+            db, offer.tenant_id, 'offer', offer.id, 'update', current_user.username,
+            field, str(old_value) if old_value is not None else None, str(value) if value is not None else None
+        )
+    
+    await db.commit()
+    await db.refresh(offer)
+    return offer
+
+
+@router.delete("/offers/{offer_id}")
+async def delete_offer(
+    offer_id: UUID,
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Delete an offer"""
+    result = await db.execute(
+        select(models.Offer).where(models.Offer.id == offer_id)
+    )
+    offer = result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    await crud.write_audit(
+        db, offer.tenant_id, 'offer', offer.id, 'delete', current_user.username
+    )
+    
+    await db.delete(offer)
+    await db.commit()
+    return {"deleted": True}
 

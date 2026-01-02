@@ -6,13 +6,17 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
 import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
-import { marketingApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset } from '../../lib/api/marketing'
+import { marketingApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset, type LocalSEOTopic, type Offer } from '../../lib/api/marketing'
 import { apiGet, apiPost } from '../../lib/api/client'
 import { PhotoUpload } from '../../components/marketing/PhotoUpload'
 import { handleApiError, showSuccess } from '../../lib/error-handler'
 import { CalendarSkeleton } from '../../components/marketing/CalendarSkeleton'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { Select } from '../../components/ui/Select'
+import { Textarea } from '../../components/ui/Textarea'
+import { LocalSEOView } from './LocalSEOView'
+import { OffersView } from './OffersView'
 
 const styles = `
   @media (max-width: 768px) {
@@ -39,6 +43,8 @@ function MarketingContent() {
   const tabs = [
     { id: 'calendar', label: 'Calendar' },
     { id: 'posts', label: 'Posts' },
+    { id: 'local-seo', label: 'Local SEO' },
+    { id: 'offers', label: 'Offers' },
     { id: 'accounts', label: 'Accounts' }
   ]
 
@@ -97,6 +103,8 @@ function MarketingContent() {
         <div className="flex-1">
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'posts' && <PostsView />}
+          {activeTab === 'local-seo' && <LocalSEOView />}
+          {activeTab === 'offers' && <OffersView />}
           {activeTab === 'accounts' && <AccountsView />}
         </div>
       </div>
@@ -3389,6 +3397,17 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   
+  // GBP-specific fields
+  const [gbpPostType, setGbpPostType] = useState(instance.gbp_post_type || '')
+  const [gbpCtaType, setGbpCtaType] = useState(instance.gbp_cta_type || '')
+  const [gbpLocationTargeting, setGbpLocationTargeting] = useState(instance.gbp_location_targeting || '')
+  
+  // Check if this is a GBP channel account
+  const isGBP = instance.channel_account?.channel?.key === 'google_business_profile' || 
+                instance.channel_account?.channel?.key === 'gbp' ||
+                instance.channel_account?.name?.toLowerCase().includes('gbp') ||
+                instance.channel_account?.name?.toLowerCase().includes('google business')
+  
   const categories = [
     { value: 'ad_content', label: 'Ad Content' },
     { value: 'team_post', label: 'Team Post' },
@@ -3445,10 +3464,19 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         // If there are uploaded assets, they're already associated with the content item via contentItemId prop
 
         // Update the post instance to use the new content item
-        await marketingApi.updatePostInstance(instance.id, {
+        const postInstanceUpdate: any = {
           content_item_id: newItem.id,
           status: 'Draft'
-        })
+        }
+        
+        // Add GBP-specific fields if this is a GBP channel
+        if (isGBP) {
+          if (gbpPostType) postInstanceUpdate.gbp_post_type = gbpPostType
+          if (gbpCtaType) postInstanceUpdate.gbp_cta_type = gbpCtaType
+          if (gbpLocationTargeting) postInstanceUpdate.gbp_location_targeting = gbpLocationTargeting
+        }
+        
+        await marketingApi.updatePostInstance(instance.id, postInstanceUpdate)
       } else {
         // Update existing content item
         if (!contentItem.id) {
@@ -3466,9 +3494,18 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         // The PhotoUpload component handles uploads and associates them with contentItemId
 
         // Update post instance status
-        await marketingApi.updatePostInstance(instance.id, {
+        const postInstanceUpdate: any = {
           status: 'Draft'
-        })
+        }
+        
+        // Add GBP-specific fields if this is a GBP channel
+        if (isGBP) {
+          if (gbpPostType) postInstanceUpdate.gbp_post_type = gbpPostType
+          if (gbpCtaType) postInstanceUpdate.gbp_cta_type = gbpCtaType
+          if (gbpLocationTargeting) postInstanceUpdate.gbp_location_targeting = gbpLocationTargeting
+        }
+        
+        await marketingApi.updatePostInstance(instance.id, postInstanceUpdate)
       }
 
       showSuccess('Content added successfully')
@@ -3590,6 +3627,85 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
                 className="mt-2"
               />
             </div>
+            
+            {/* GBP-specific fields - only show for GBP channel accounts */}
+            {isGBP && (
+              <>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '12px' }}>
+                    Google Business Profile Settings
+                  </h4>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Post Type
+                  </label>
+                  <select
+                    value={gbpPostType}
+                    onChange={(e) => setGbpPostType(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Select post type...</option>
+                    <option value="update">Update</option>
+                    <option value="offer">Offer</option>
+                    <option value="event">Event</option>
+                    <option value="whats_new">What's New</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Call-to-Action Type
+                  </label>
+                  <select
+                    value={gbpCtaType}
+                    onChange={(e) => setGbpCtaType(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Select CTA...</option>
+                    <option value="call">Call</option>
+                    <option value="book">Book</option>
+                    <option value="learn_more">Learn More</option>
+                    <option value="order_online">Order Online</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '500' }}>
+                    Location Targeting (City/Area)
+                  </label>
+                  <input
+                    type="text"
+                    value={gbpLocationTargeting}
+                    onChange={(e) => setGbpLocationTargeting(e.target.value)}
+                    placeholder="Vancouver WA, Camas WA, etc."
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'var(--color-hover)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '8px',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+              </>
+            )}
           </div>
           <div className="flex gap-3 mt-6">
             <Button

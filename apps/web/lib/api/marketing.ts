@@ -27,6 +27,7 @@ export interface MediaAsset {
   file_type: 'image' | 'video'
   file_size?: number
   mime_type?: string
+  intent_tags?: string[]
   created_at: string
 }
 
@@ -41,6 +42,9 @@ export interface PostInstance {
   suggested_category?: string
   posted_at?: string
   post_url?: string
+  gbp_post_type?: string
+  gbp_cta_type?: string
+  gbp_location_targeting?: string
   content_item?: ContentItem
   channel_account?: ChannelAccount
   created_at: string
@@ -95,6 +99,9 @@ export interface UpdatePostInstanceRequest {
   caption_override?: string
   scheduled_for?: string
   status?: string
+  gbp_post_type?: string
+  gbp_cta_type?: string
+  gbp_location_targeting?: string
 }
 
 // API Client
@@ -223,6 +230,7 @@ export const marketingApi = {
     file: File,
     tenantId: string,
     contentItemId?: string,
+    intentTags?: string[],
     onProgress?: (progress: number) => void
   ): Promise<MediaAsset> => {
     try {
@@ -231,6 +239,9 @@ export const marketingApi = {
       
       const params = new URLSearchParams({ tenant_id: tenantId })
       if (contentItemId) params.append('content_item_id', contentItemId)
+      if (intentTags && intentTags.length > 0) {
+        params.append('intent_tags', intentTags.join(','))
+      }
       
       const res = await apiClient.post<MediaAsset>(`/marketing/media/upload?${params}`, formData, {
         headers: {
@@ -304,6 +315,180 @@ export const marketingApi = {
       handleApiError(error, 'Top off scheduler')
       throw error
     }
+  },
+
+  // Local SEO Topics
+  listLocalSEOTopics: async (tenantId: string, filters?: {
+    status?: string
+    service_type?: string
+    city?: string
+    limit?: number
+    offset?: number
+  }): Promise<LocalSEOTopic[]> => {
+    try {
+      const params = new URLSearchParams({ tenant_id: tenantId })
+      if (filters?.status) params.append('status', filters.status)
+      if (filters?.service_type) params.append('service_type', filters.service_type)
+      if (filters?.city) params.append('city', filters.city)
+      if (filters?.limit) params.append('limit', String(filters.limit))
+      if (filters?.offset) params.append('offset', String(filters.offset))
+      
+      return await apiGet<LocalSEOTopic[]>(`/marketing/local-seo-topics?${params}`)
+    } catch (error) {
+      handleApiError(error, 'Load local SEO topics')
+      throw error
+    }
+  },
+
+  createLocalSEOTopic: async (data: {
+    tenant_id: string
+    service_type: string
+    city: string
+    status?: string
+    target_url?: string
+    notes?: string
+  }): Promise<LocalSEOTopic> => {
+    try {
+      return await apiPost<LocalSEOTopic>('/marketing/local-seo-topics', data)
+    } catch (error) {
+      handleApiError(error, 'Create local SEO topic')
+      throw error
+    }
+  },
+
+  updateLocalSEOTopic: async (topicId: string, data: {
+    status?: string
+    last_posted_at?: string
+    last_post_instance_id?: string
+    target_url?: string
+    notes?: string
+  }): Promise<LocalSEOTopic> => {
+    try {
+      return await apiPatch<LocalSEOTopic>(`/marketing/local-seo-topics/${topicId}`, data)
+    } catch (error) {
+      handleApiError(error, 'Update local SEO topic')
+      throw error
+    }
+  },
+
+  getCoverageGaps: async (tenantId: string): Promise<{
+    not_started: number
+    needs_update: number
+    total_gaps: number
+  }> => {
+    try {
+      return await apiGet(`/marketing/local-seo-topics/coverage-gaps?tenant_id=${tenantId}`)
+    } catch (error) {
+      handleApiError(error, 'Load coverage gaps')
+      throw error
+    }
+  },
+
+  // Offers
+  listOffers: async (tenantId: string, filters?: {
+    is_active?: boolean
+    service_type?: string
+    limit?: number
+    offset?: number
+  }): Promise<Offer[]> => {
+    try {
+      const params = new URLSearchParams({ tenant_id: tenantId })
+      if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active))
+      if (filters?.service_type) params.append('service_type', filters.service_type)
+      if (filters?.limit) params.append('limit', String(filters.limit))
+      if (filters?.offset) params.append('offset', String(filters.offset))
+      
+      return await apiGet<Offer[]>(`/marketing/offers?${params}`)
+    } catch (error) {
+      handleApiError(error, 'Load offers')
+      throw error
+    }
+  },
+
+  listActiveOffers: async (tenantId: string): Promise<Offer[]> => {
+    try {
+      return await apiGet<Offer[]>(`/marketing/offers/active?tenant_id=${tenantId}`)
+    } catch (error) {
+      handleApiError(error, 'Load active offers')
+      throw error
+    }
+  },
+
+  createOffer: async (data: {
+    tenant_id: string
+    title: string
+    description?: string
+    service_type?: string
+    valid_from: string
+    valid_to: string
+    discount_type: string
+    discount_value?: number
+    terms?: string
+    is_active?: boolean
+    coupon_code?: string
+    website_url?: string
+    sync_source?: string
+    external_id?: string
+  }): Promise<Offer> => {
+    try {
+      return await apiPost<Offer>('/marketing/offers', data)
+    } catch (error) {
+      handleApiError(error, 'Create offer')
+      throw error
+    }
+  },
+
+  updateOffer: async (offerId: string, data: Partial<Offer>): Promise<Offer> => {
+    try {
+      return await apiPatch<Offer>(`/marketing/offers/${offerId}`, data)
+    } catch (error) {
+      handleApiError(error, 'Update offer')
+      throw error
+    }
+  },
+
+  deleteOffer: async (offerId: string): Promise<void> => {
+    try {
+      await apiDelete(`/marketing/offers/${offerId}`)
+    } catch (error) {
+      handleApiError(error, 'Delete offer')
+      throw error
+    }
   }
+}
+
+// Additional Types
+export interface LocalSEOTopic {
+  id: string
+  tenant_id: string
+  service_type: string
+  city: string
+  status: 'not_started' | 'in_progress' | 'published' | 'needs_update'
+  last_posted_at?: string
+  last_post_instance_id?: string
+  target_url?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Offer {
+  id: string
+  tenant_id: string
+  title: string
+  description?: string
+  service_type?: string
+  valid_from: string
+  valid_to: string
+  discount_type: 'percentage' | 'fixed_amount' | 'free_service'
+  discount_value?: number
+  terms?: string
+  is_active: boolean
+  coupon_code?: string
+  website_url?: string
+  sync_source?: string
+  external_id?: string
+  created_at: string
+  updated_at: string
 }
 
