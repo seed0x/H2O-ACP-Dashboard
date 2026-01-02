@@ -132,6 +132,12 @@ try:
 except ImportError:
     customers_router = None
 
+# Import Google OAuth routes
+try:
+    from .oauth_google import router as oauth_google_router
+except ImportError:
+    oauth_google_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
@@ -196,6 +202,9 @@ if portals_router:
 # Include customers routes if available
 if customers_router:
     router.include_router(customers_router)
+
+if oauth_google_router:
+    router.include_router(oauth_google_router)
 
 class LoginRequest(BaseModel):
     username: str
