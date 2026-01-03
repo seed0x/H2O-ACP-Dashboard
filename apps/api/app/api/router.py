@@ -664,6 +664,35 @@ async def list_pending_tasks(
     tasks = await crud.list_pending_service_call_tasks(db, tenant_id, assigned_to)
     return tasks
 
+@router.post('/service-calls/{service_call_id}/tasks', response_model=ServiceCallTask)
+async def create_service_call_task(
+    service_call_id: UUID,
+    task_in: ServiceCallTaskCreate,
+    db: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user)
+):
+    # Verify service call exists
+    sc = await crud.get_service_call(db, service_call_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail='Service call not found')
+    
+    # Set created_by to current user
+    task_dict = task_in.dict()
+    task_dict['service_call_id'] = service_call_id
+    task_dict['created_by'] = current_user.username
+    
+    task = await crud.create_service_call_task(db, task_dict, current_user.username)
+    return task
+
+@router.get('/service-calls/{service_call_id}/tasks', response_model=list[ServiceCallTask])
+async def list_service_call_tasks(
+    service_call_id: UUID,
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_session)
+):
+    tasks = await crud.list_service_call_tasks(db, service_call_id, status)
+    return tasks
+
 @router.patch('/service-calls/tasks/{task_id}', response_model=ServiceCallTask)
 async def update_service_call_task(
     task_id: UUID,
