@@ -15,6 +15,7 @@ from ..db.session import get_session
 from .. import models
 from .. import schemas_marketing
 from ..core.auth import get_current_user, CurrentUser
+from ..core.tenant_config import validate_tenant_feature, TenantFeature
 from .. import crud
 
 router = APIRouter(prefix="/marketing", tags=["marketing"])
@@ -199,6 +200,7 @@ async def list_channel_accounts(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """List channel accounts for a tenant"""
+    validate_tenant_feature(tenant_id, TenantFeature.MARKETING)
     result = await db.execute(
         select(models.ChannelAccount)
         .where(models.ChannelAccount.tenant_id == tenant_id)
@@ -214,6 +216,7 @@ async def create_channel_account(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Create a new channel account"""
+    validate_tenant_feature(account_in.tenant_id, TenantFeature.MARKETING)
     # Verify channel exists
     channel_result = await db.execute(
         select(models.MarketingChannel).where(models.MarketingChannel.id == account_in.channel_id)
@@ -249,6 +252,7 @@ async def get_channel_account(
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Channel account not found")
+    validate_tenant_feature(account.tenant_id, TenantFeature.MARKETING)
     return account
 
 
@@ -266,6 +270,7 @@ async def update_channel_account(
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Channel account not found")
+    validate_tenant_feature(account.tenant_id, TenantFeature.MARKETING)
     
     update_data = account_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -294,6 +299,7 @@ async def delete_channel_account(
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Channel account not found")
+    validate_tenant_feature(account.tenant_id, TenantFeature.MARKETING)
     
     # Audit log
     await crud.write_audit(
@@ -318,6 +324,7 @@ async def list_content_items(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """List content items for a tenant"""
+    validate_tenant_feature(tenant_id, TenantFeature.MARKETING)
     query = select(models.ContentItem).where(models.ContentItem.tenant_id == tenant_id)
     
     if status:
@@ -340,6 +347,7 @@ async def create_content_item(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Create a new content item"""
+    validate_tenant_feature(item_in.tenant_id, TenantFeature.MARKETING)
     item = models.ContentItem(**item_in.model_dump())
     db.add(item)
     await db.flush()
@@ -376,6 +384,7 @@ async def get_content_item(
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Content item not found")
+    validate_tenant_feature(item.tenant_id, TenantFeature.MARKETING)
     return item
 
 
@@ -393,6 +402,7 @@ async def update_content_item(
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Content item not found")
+    validate_tenant_feature(item.tenant_id, TenantFeature.MARKETING)
     
     update_data = item_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -427,6 +437,7 @@ async def delete_content_item(
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Content item not found")
+    validate_tenant_feature(item.tenant_id, TenantFeature.MARKETING)
     
     # Audit log
     await crud.write_audit(
@@ -451,6 +462,7 @@ async def list_post_instances(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """List post instances for a tenant"""
+    validate_tenant_feature(tenant_id, TenantFeature.MARKETING)
     query = select(models.PostInstance).where(models.PostInstance.tenant_id == tenant_id)
     
     if content_item_id:
@@ -486,6 +498,7 @@ async def create_post_instance(
     content_item = content_result.scalar_one_or_none()
     if not content_item:
         raise HTTPException(status_code=404, detail="Content item not found")
+    validate_tenant_feature(content_item.tenant_id, TenantFeature.MARKETING)
     
     # Verify channel account exists
     account_result = await db.execute(
@@ -527,6 +540,7 @@ async def create_post_instances_bulk(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Create multiple post instances from a content item"""
+    validate_tenant_feature(tenant_id, TenantFeature.MARKETING)
     # Verify content item exists
     content_result = await db.execute(
         select(models.ContentItem).where(models.ContentItem.id == request.content_item_id)
@@ -534,6 +548,7 @@ async def create_post_instances_bulk(
     content_item = content_result.scalar_one_or_none()
     if not content_item:
         raise HTTPException(status_code=404, detail="Content item not found")
+    validate_tenant_feature(content_item.tenant_id, TenantFeature.MARKETING)
     
     instances = []
     for channel_account_id in request.channel_account_ids:
@@ -597,6 +612,7 @@ async def get_post_instance(
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=404, detail="Post instance not found")
+    validate_tenant_feature(instance.tenant_id, TenantFeature.MARKETING)
     # Explicitly serialize while still in async session context
     return schemas_marketing.PostInstance.model_validate(instance)
 
@@ -620,6 +636,7 @@ async def update_post_instance(
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=404, detail="Post instance not found")
+    validate_tenant_feature(instance.tenant_id, TenantFeature.MARKETING)
     
     update_data = instance_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -658,6 +675,7 @@ async def delete_post_instance(
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=404, detail="Post instance not found")
+    validate_tenant_feature(instance.tenant_id, TenantFeature.MARKETING)
     
     # Audit log
     await crud.write_audit(
@@ -688,6 +706,7 @@ async def mark_post_instance_posted(
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=404, detail="Post instance not found")
+    validate_tenant_feature(instance.tenant_id, TenantFeature.MARKETING)
     
     instance.status = 'Posted'
     instance.posted_at = request.posted_at or datetime.now(timezone.utc)
@@ -734,6 +753,7 @@ async def mark_post_instance_failed(
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=404, detail="Post instance not found")
+    validate_tenant_feature(instance.tenant_id, TenantFeature.MARKETING)
     
     old_status = instance.status
     instance.status = 'Failed'
@@ -771,6 +791,7 @@ async def get_calendar_view(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """Get calendar view of scheduled posts grouped by date, optionally including unscheduled posts"""
+    validate_tenant_feature(tenant_id, TenantFeature.MARKETING)
     from sqlalchemy import or_
     from sqlalchemy.orm import joinedload
     

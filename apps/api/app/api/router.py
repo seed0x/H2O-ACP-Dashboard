@@ -424,6 +424,11 @@ async def create_bid(bid_in: BidCreate, db: AsyncSession = Depends(get_session),
 
 @router.get('/bids')
 async def list_bids(tenant_id: Optional[str] = None, status: Optional[str] = None, builder_id: Optional[UUID] = None, search: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
+    if tenant_id:
+        try:
+            validate_tenant_feature(tenant_id, TenantFeature.BIDS)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     bids = await crud.list_bids(db, tenant_id, status, builder_id, search, limit, offset)
     return bids
 
@@ -432,6 +437,10 @@ async def get_bid(bid_id: UUID, db: AsyncSession = Depends(get_session)):
     bid = await crud.get_bid(db, bid_id)
     if not bid:
         raise HTTPException(status_code=404, detail='Bid not found')
+    try:
+        validate_tenant_feature(bid.tenant_id, TenantFeature.BIDS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return bid
 
 @router.patch('/bids/{bid_id}', response_model=BidOut)
@@ -439,6 +448,10 @@ async def patch_bid(bid_id: UUID, bid_in: BidUpdate, db: AsyncSession = Depends(
     bid = await crud.get_bid(db, bid_id)
     if not bid:
         raise HTTPException(status_code=404, detail='Bid not found')
+    try:
+        validate_tenant_feature(bid.tenant_id, TenantFeature.BIDS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     bid = await crud.update_bid(db, bid, bid_in, current_user.username)
     return bid
 
@@ -447,6 +460,10 @@ async def delete_bid(bid_id: UUID, db: AsyncSession = Depends(get_session), curr
     bid = await crud.get_bid(db, bid_id)
     if not bid:
         raise HTTPException(status_code=404, detail='Bid not found')
+    try:
+        validate_tenant_feature(bid.tenant_id, TenantFeature.BIDS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await crud.delete_bid(db, bid, current_user.username)
     return {"deleted": True}
 
@@ -495,6 +512,11 @@ async def create_job(job_in: JobCreate, db: AsyncSession = Depends(get_session),
 
 @router.get('/jobs')
 async def list_jobs(tenant_id: Optional[str] = 'all_county', status: Optional[str] = None, builder_id: Optional[UUID] = None, community: Optional[str] = None, lot: Optional[str] = None, search: Optional[str] = None, scheduled_date: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
+    if tenant_id:
+        try:
+            validate_tenant_feature(tenant_id, TenantFeature.JOBS)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     jobs = await crud.list_jobs(db, tenant_id, status, builder_id, community, lot, search, scheduled_date, limit, offset)
     return jobs
 
@@ -503,6 +525,10 @@ async def get_job(id: UUID, db: AsyncSession = Depends(get_session)):
     job = await crud.get_job(db, id)
     if not job:
         raise HTTPException(status_code=404, detail='Job not found')
+    try:
+        validate_tenant_feature(job.tenant_id, TenantFeature.JOBS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return job
 
 @router.patch('/jobs/{id}', response_model=JobOut)
@@ -510,6 +536,10 @@ async def patch_job(id: UUID, job_in: JobUpdate, db: AsyncSession = Depends(get_
     job = await crud.get_job(db, id)
     if not job:
         raise HTTPException(status_code=404, detail='Job not found')
+    try:
+        validate_tenant_feature(job.tenant_id, TenantFeature.JOBS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     job = await crud.update_job(db, job, job_in, current_user.username)
     return job
 
@@ -518,6 +548,10 @@ async def delete_job(id: UUID, db: AsyncSession = Depends(get_session), current_
     job = await crud.get_job(db, id)
     if not job:
         raise HTTPException(status_code=404, detail='Job not found')
+    try:
+        validate_tenant_feature(job.tenant_id, TenantFeature.JOBS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await crud.delete_job(db, job, current_user.username)
     return {"deleted": True}
 
@@ -553,6 +587,11 @@ async def create_service_call(sc_in: ServiceCallCreate, db: AsyncSession = Depen
 
 @router.get('/service-calls')
 async def list_service_calls(tenant_id: Optional[str] = 'h2o', status: Optional[str] = None, builder_id: Optional[UUID] = None, customer_id: Optional[UUID] = None, search: Optional[str] = None, assigned_to: Optional[str] = None, scheduled_date: Optional[str] = None, limit: int = 25, offset: int = 0, db: AsyncSession = Depends(get_session)):
+    if tenant_id:
+        try:
+            validate_tenant_feature(tenant_id, TenantFeature.SERVICE_CALLS)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     scs = await crud.list_service_calls(db, tenant_id, status, builder_id, search, assigned_to, scheduled_date, customer_id, limit, offset)
     return scs
 
@@ -561,6 +600,10 @@ async def get_service_call(id: UUID, db: AsyncSession = Depends(get_session)):
     sc = await crud.get_service_call(db, id)
     if not sc:
         raise HTTPException(status_code=404, detail='Service call not found')
+    try:
+        validate_tenant_feature(sc.tenant_id, TenantFeature.SERVICE_CALLS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return sc
 
 @router.patch('/service-calls/{id}', response_model=ServiceCallOut)
@@ -570,6 +613,10 @@ async def patch_service_call(id: UUID, sc_in: ServiceCallUpdate, db: AsyncSessio
     sc = await crud.get_service_call(db, id)
     if not sc:
         raise HTTPException(status_code=404, detail='Service call not found')
+    try:
+        validate_tenant_feature(sc.tenant_id, TenantFeature.SERVICE_CALLS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
     # Track old status to detect completion
     old_status = sc.status
@@ -592,6 +639,10 @@ async def delete_service_call(id: UUID, db: AsyncSession = Depends(get_session),
     sc = await crud.get_service_call(db, id)
     if not sc:
         raise HTTPException(status_code=404, detail='Service call not found')
+    try:
+        validate_tenant_feature(sc.tenant_id, TenantFeature.SERVICE_CALLS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await crud.delete_service_call(db, sc, current_user.username)
     return {"deleted": True}
 
@@ -633,6 +684,11 @@ async def list_pending_tasks(
     current_user=Depends(get_current_user)
 ):
     """Get all pending tasks for office staff dashboard"""
+    if tenant_id:
+        try:
+            validate_tenant_feature(tenant_id, TenantFeature.SERVICE_CALLS)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     tasks = await crud.list_pending_service_call_tasks(db, tenant_id, assigned_to)
     return tasks
 

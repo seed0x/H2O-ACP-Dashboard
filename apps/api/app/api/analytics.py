@@ -1,7 +1,7 @@
 """
 Analytics endpoints for business intelligence
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from datetime import datetime, timezone, timedelta
@@ -11,6 +11,7 @@ from uuid import UUID
 from ..db.session import get_session
 from .. import models
 from ..core.auth import get_current_user
+from ..core.tenant_config import is_valid_tenant
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -22,6 +23,8 @@ async def get_analytics_overview(
     current_user = Depends(get_current_user)
 ):
     """Get overview analytics for dashboard"""
+    if tenant_id and not is_valid_tenant(tenant_id):
+        raise HTTPException(status_code=400, detail=f"Invalid tenant_id: {tenant_id}")
     now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
@@ -153,6 +156,8 @@ async def get_review_analytics(
     current_user = Depends(get_current_user)
 ):
     """Get review analytics with trends"""
+    if tenant_id and not is_valid_tenant(tenant_id):
+        raise HTTPException(status_code=400, detail=f"Invalid tenant_id: {tenant_id}")
     now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
     
@@ -216,6 +221,8 @@ async def get_performance_analytics(
     current_user = Depends(get_current_user)
 ):
     """Get performance metrics (completion times, win rates)"""
+    if tenant_id and not is_valid_tenant(tenant_id):
+        raise HTTPException(status_code=400, detail=f"Invalid tenant_id: {tenant_id}")
     now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
     
