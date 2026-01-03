@@ -10,6 +10,7 @@ import { Select } from '../../components/ui/Select'
 import { showToast } from '../../components/Toast'
 import { handleApiError, logError } from '../../lib/error-handler'
 import { useMobile } from '../../lib/useMobile'
+import { useTenant } from '../../contexts/TenantContext'
 
 interface User {
   id: string
@@ -22,6 +23,16 @@ interface User {
   created_at: string
   updated_at: string
   last_login: string | null
+}
+
+interface UserFormData {
+  username: string
+  email: string
+  full_name: string
+  password: string
+  role: string
+  tenant_id: string
+  is_active: boolean
 }
 
 export default function UsersPage() {
@@ -39,7 +50,7 @@ export default function UsersPage() {
 
   // Form state - use current tenant, default to 'h2o' if 'both' is selected
   const defaultTenantId = currentTenant === 'both' ? 'h2o' : (currentTenant || 'h2o')
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<UserFormData>({
     username: '',
     email: '',
     full_name: '',
@@ -206,7 +217,7 @@ export default function UsersPage() {
       full_name: user.full_name || '',
       password: '', // Don't pre-fill password
       role: user.role,
-      tenant_id: user.tenant_id || defaultTenantId,
+      tenant_id: (user.tenant_id || defaultTenantId) as 'all_county' | 'h2o',
       is_active: user.is_active
     })
     setShowAddForm(true)

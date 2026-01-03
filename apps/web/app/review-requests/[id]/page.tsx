@@ -353,7 +353,7 @@ export default function ReviewRequestDetail({ params }: { params: Promise<{ id: 
                   href={`/jobs/${job.id}`}
                   style={{ fontSize: '14px', color: 'var(--color-primary)', textDecoration: 'none' }}
                 >
-                  View Job: {job.community} Lot {job.lot_number} →
+                  View Job: {job.builder?.name || 'Unknown'} Lot {job.lot_number || 'N/A'} →
                 </a>
               </div>
             )}

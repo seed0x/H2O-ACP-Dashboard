@@ -119,8 +119,9 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
       const updateData: Record<string, string | number | boolean | null> = {}
       
       // Save current step data
+      const updatePayload: Record<string, unknown> = { ...updateData }
       if (currentStep === 0) {
-        updateData.paperwork_photo_urls = paperworkPhotos
+        updatePayload.paperwork_photo_urls = paperworkPhotos
       } else if (currentStep === 1) {
         updateData.needs_permit = needsPermit
         updateData.permit_notes = permitNotes || undefined

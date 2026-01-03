@@ -301,12 +301,15 @@ export default function Dashboard() {
         ...overdueJobsData.map((j: Job) => ({ ...j, type: 'job' as const })),
         ...overdueCallsData.map((c: ServiceCall) => ({ ...c, type: 'service_call' as const })),
         ...overdueReviewsData.map((r: ReviewRequest) => ({ ...r, type: 'review_request' as const })),
-        ...overdueTicketsData.map((t) => ({ ...(t as Record<string, unknown>), type: 'recovery_ticket' as const }))
+        ...overdueTicketsData.map((t) => {
+          const ticket = t as Record<string, unknown> & { id: string | number }
+          return { ...ticket, type: 'recovery_ticket' as const }
+        })
       ].slice(0, 5)
       
       // Pending reviews = review requests not completed
       const pendingReviews = reviewRequests.filter((r: ReviewRequest) => 
-        r.status !== 'completed' && r.status !== 'review_received'
+        r.status !== 'completed'
       ).length
       
       // Load pending service call tasks
@@ -639,11 +642,11 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
                       {item.type === 'job' ? (
-                        <>{item.community || 'Unknown'} - Lot <span className="font-mono">{item.lot_number || 'N/A'}</span></>
-                      ) : (item.customer_name || 'Unknown Customer')}
+                        <>{(item.community as string) || 'Unknown'} - Lot <span className="font-mono">{(item.lot_number as string) || 'N/A'}</span></>
+                      ) : ((item.customer_name as string) || 'Unknown Customer')}
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                      {item.type === 'job' ? 'Job' : 'Service Call'} • {item.status || 'Unknown'}
+                      {item.type === 'job' ? 'Job' : 'Service Call'} • {(item.status as string) || 'Unknown'}
                     </div>
                   </div>
                   <span style={{
@@ -825,13 +828,13 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontWeight: 500, color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
                       {item.type === 'job' ? (
-                        <>{item.community || 'Unknown'} - Lot <span className="font-mono">{item.lot_number || 'N/A'}</span></>
-                      ) : item.type === 'service_call' ? (item.customer_name || 'Unknown Customer') :
-                       item.type === 'review_request' ? (item.customer_name || 'Unknown Customer') :
-                       `Recovery: ${item.customer_name || 'Unknown Customer'}`}
+                        <>{(item.community as string) || 'Unknown'} - Lot <span className="font-mono">{(item.lot_number as string) || 'N/A'}</span></>
+                      ) : item.type === 'service_call' ? ((item.customer_name as string) || 'Unknown Customer') :
+                       item.type === 'review_request' ? ((item.customer_name as string) || 'Unknown Customer') :
+                       `Recovery: ${(item.customer_name as string) || 'Unknown Customer'}`}
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>
-                      {item.days_overdue || 0} days overdue
+                      {(item.days_overdue as number) || 0} days overdue
                     </div>
                   </div>
                 </a>
