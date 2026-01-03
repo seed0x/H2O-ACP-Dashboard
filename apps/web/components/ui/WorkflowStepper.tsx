@@ -192,13 +192,65 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
     }
   }
 
-  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    // TODO: Implement actual photo upload to storage
-    // For now, just simulate with placeholder URLs
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
-    const newUrls = files.map((_, i) => `https://placeholder.com/photo-${Date.now()}-${i}.jpg`)
-    setPaperworkPhotos([...paperworkPhotos, ...newUrls])
-    showToast('Photo upload will be implemented with storage integration', 'info')
+    if (files.length === 0) return
+    
+    try {
+      setSaving(true)
+      const token = localStorage.getItem('token')
+      if (!token) {
+        showToast('Authentication required', 'error')
+        return
+      }
+      
+      // Create FormData for file upload
+      const formData = new FormData()
+      files.forEach((file) => {
+        formData.append('files', file)
+      })
+      
+      // Upload files to backend
+      // Note: This endpoint needs to be implemented in the backend
+      // Expected endpoint: POST /service-calls/{serviceCallId}/workflow/upload-paperwork
+      const uploadResponse = await axios.post(
+        `${API_BASE_URL}/service-calls/${serviceCallId}/workflow/upload-paperwork`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          },
+          withCredentials: true
+        }
+      )
+      
+      // Get uploaded URLs from response
+      const uploadedUrls = uploadResponse.data.urls || uploadResponse.data.photo_urls || []
+      if (uploadedUrls.length > 0) {
+        setPaperworkPhotos([...paperworkPhotos, ...uploadedUrls])
+        showToast(`Uploaded ${uploadedUrls.length} photo(s)`, 'success')
+      } else {
+        // Fallback: If endpoint doesn't exist yet, show helpful message
+        showToast('Photo upload endpoint not yet implemented. Please contact admin.', 'warning')
+      }
+    } catch (error: unknown) {
+      // If 404, the endpoint doesn't exist yet
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        showToast('Photo upload endpoint not yet implemented. Using placeholder URLs for now.', 'info')
+        // Fallback to placeholder URLs for development
+        const placeholderUrls = files.map((_, i) => `https://placeholder.com/photo-${Date.now()}-${i}.jpg`)
+        setPaperworkPhotos([...paperworkPhotos, ...placeholderUrls])
+      } else {
+        handleApiError(error, 'Upload paperwork photos')
+      }
+    } finally {
+      setSaving(false)
+      // Reset file input
+      if (e.target) {
+        e.target.value = ''
+      }
+    }
   }
 
   if (loading) {

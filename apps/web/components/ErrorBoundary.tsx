@@ -22,13 +22,29 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('ErrorBoundary caught an error:', error, errorInfo)
+    // Log error using centralized error handler
+    // This will log to console in development and can be extended to send to error tracking services
+    const errorContext = {
+      componentStack: errorInfo.componentStack,
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack
     }
     
-    // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
-    // Example: Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } })
+    // Log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('ErrorBoundary caught an error:', error, errorContext)
+    }
+    
+    // Error tracking service integration (Sentry, LogRocket, etc.)
+    // To integrate Sentry: import * as Sentry from '@sentry/react' and uncomment:
+    // Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } })
+    
+    // To integrate LogRocket: import LogRocket from 'logrocket' and uncomment:
+    // LogRocket.captureException(error, { extra: errorContext })
+    
+    // For now, errors are logged via console.error above
+    // Future: Add environment variable to enable error tracking service (e.g., NEXT_PUBLIC_SENTRY_DSN)
   }
 
   render() {
