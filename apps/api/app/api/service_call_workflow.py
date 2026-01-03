@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional, List
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 
 from ..db.session import get_session
 from .. import models
@@ -286,4 +286,58 @@ async def complete_step(
     )
     
     return workflow
+
+
+@router.post("/upload-paperwork", response_model=dict)
+async def upload_paperwork_photos(
+    service_call_id: UUID,
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_session),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Upload paperwork photos for a service call workflow"""
+    # Verify service call exists and user has access
+    result = await db.execute(select(models.ServiceCall).where(models.ServiceCall.id == service_call_id))
+    service_call = result.scalar_one_or_none()
+    if not service_call:
+        raise HTTPException(status_code=404, detail="Service call not found")
+    
+    # Verify tenant access
+    if current_user.tenant_id and service_call.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Access denied to this service call")
+    
+    try:
+        from ..core.storage import upload_file, validate_file
+        
+        uploaded_urls = []
+        
+        for file in files:
+            # Read file content
+            file_content = await file.read()
+            
+            # Validate file
+            is_valid, error_msg = validate_file(file_content, file.content_type)
+            if not is_valid:
+                raise HTTPException(status_code=400, detail=f"Invalid file {file.filename}: {error_msg}")
+            
+            # Upload to storage
+            file_url = upload_file(
+                file_content=file_content,
+                file_name=file.filename or "paperwork.jpg",
+                tenant_id=service_call.tenant_id,
+                folder="paperwork",
+                mime_type=file.content_type
+            )
+            
+            uploaded_urls.append(file_url)
+        
+        return {"urls": uploaded_urls, "photo_urls": uploaded_urls}  # Support both field names
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload paperwork photos: {str(e)}"
+        )
 
