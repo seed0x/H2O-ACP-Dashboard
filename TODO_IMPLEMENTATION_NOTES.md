@@ -28,49 +28,33 @@
 
 ## 2. Photo Upload in WorkflowStepper
 
-**Status:** ⚠️ Requires backend endpoint implementation
+**Status:** ✅ Complete (Frontend and Backend)
 
-**Location:** `apps/web/components/ui/WorkflowStepper.tsx`
+**Location:** 
+- Frontend: `apps/web/components/ui/WorkflowStepper.tsx`
+- Backend: `apps/api/app/api/service_call_workflow.py`
 
-**Current State:**
-- Photo upload UI exists (file input, preview grid, remove functionality)
-- Currently uses placeholder URLs
-- Saves `paperwork_photo_urls` array to workflow via PATCH endpoint
+**Implementation:**
+- ✅ Backend endpoint created: `POST /service-calls/{id}/workflow/upload-paperwork`
+- ✅ Frontend upload function implemented in `WorkflowStepper.tsx`
+- ✅ Files uploaded to storage (S3/R2) in `paperwork/` folder
+- ✅ Returns array of URLs for `paperwork_photo_urls`
+- ✅ Error handling with graceful fallback
 
-**Backend Requirements:**
-The backend needs a file upload endpoint for service call paperwork photos. Currently, the workflow endpoint accepts `paperwork_photo_urls` as an array of strings, but there's no upload endpoint to generate these URLs.
-
-**Recommended Implementation:**
-
-### Option A: Reuse Marketing Media Upload Endpoint
-If the marketing media upload endpoint can handle service call photos:
-1. Use `marketingApi.uploadMedia()` from `apps/web/lib/api/marketing.ts`
-2. Upload files and get URLs
-3. Store URLs in `paperwork_photo_urls` array
-
-**Pros:** Reuses existing infrastructure
-**Cons:** May not be semantically correct (marketing vs. service calls)
-
-### Option B: Create Service Call-Specific Upload Endpoint
-Create a new endpoint: `POST /service-calls/{id}/workflow/upload-paperwork`
-
-**Implementation Steps:**
-1. Backend: Add upload endpoint in `apps/api/app/api/service_call_workflow.py`
-2. Frontend: Create upload function similar to `marketingApi.uploadMedia()`
-3. Frontend: Replace `handlePhotoUpload` in `WorkflowStepper.tsx` to:
-   - Upload files via new endpoint
-   - Get URLs from response
-   - Update `paperworkPhotos` state with URLs
-   - Save to workflow via existing PATCH endpoint
-
-**Recommended:** Option B for better separation of concerns
+**How it works:**
+1. User selects files in WorkflowStepper
+2. Files are uploaded via POST to `/service-calls/{id}/workflow/upload-paperwork`
+3. Backend validates files and uploads to storage
+4. Returns URLs array
+5. Frontend updates `paperworkPhotos` state with URLs
+6. URLs are saved to workflow via existing PATCH endpoint when user saves step
 
 ---
 
 ## Summary
 
 1. **ErrorBoundary:** ✅ Enhanced and ready for error tracking service integration
-2. **Photo Upload:** ⚠️ Requires backend file upload endpoint implementation
+2. **Photo Upload:** ✅ Complete (Frontend and Backend endpoint implemented)
 
-Both TODOs have been addressed to the extent possible with current infrastructure. Error tracking is integration-ready, and photo upload is documented with implementation recommendations.
+Both TODOs are now fully complete! Error tracking is integration-ready, and photo upload has a fully functional backend endpoint that uploads files to storage and returns URLs.
 
