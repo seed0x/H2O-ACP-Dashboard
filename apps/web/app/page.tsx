@@ -301,7 +301,7 @@ export default function Dashboard() {
         ...overdueJobsData.map((j: Job) => ({ ...j, type: 'job' as const })),
         ...overdueCallsData.map((c: ServiceCall) => ({ ...c, type: 'service_call' as const })),
         ...overdueReviewsData.map((r: ReviewRequest) => ({ ...r, type: 'review_request' as const })),
-        ...overdueTicketsData.map((t: unknown) => ({ ...t, type: 'recovery_ticket' as const }))
+        ...overdueTicketsData.map((t) => ({ ...(t as Record<string, unknown>), type: 'recovery_ticket' as const }))
       ].slice(0, 5)
       
       // Pending reviews = review requests not completed
