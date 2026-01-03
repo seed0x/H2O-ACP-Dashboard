@@ -39,7 +39,7 @@ export default function BidsPage(){
   const [search, setSearch] = useState('')
   const [builderId, setBuilderId] = useState('')
   const [status, setStatus] = useState('')
-  const [builders, setBuilders] = useState<any[]>([])
+  const [builders, setBuilders] = useState<Array<{ id: string; name: string; tenant_id: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   
@@ -68,8 +68,8 @@ export default function BidsPage(){
           withCredentials: true 
         })
         setBids(Array.isArray(res.data) ? res.data : [])
-      } catch (err: any) {
-        console.error('Failed to load bids:', err)
+      } catch (err: unknown) {
+        handleApiError(err, 'Load bids')
         setBids([])
         setBuilders([])
       } finally {
@@ -149,8 +149,8 @@ export default function BidsPage(){
       setDraftingBids(drafting)
       setNeedsApprovalBids(needsApproval)
       setReadyToSendBids(readyToSend)
-    } catch (err: any) {
-      console.error('Failed to load pipeline:', err)
+    } catch (err: unknown) {
+      handleApiError(err, 'Load pipeline')
       setSentBids([])
       setDraftingBids([])
       setNeedsApprovalBids([])
@@ -172,9 +172,9 @@ export default function BidsPage(){
       setBids(Array.isArray(res.data) ? res.data : [])
       // Refresh pipeline when search changes
       await loadPipeline()
-    } catch (err: any) {
-      console.error('Failed to search bids:', err)
-      setError(handleApiError(err))
+    } catch (err: unknown) {
+      handleApiError(err, 'Search bids')
+      setError(err instanceof Error ? err.message : 'Failed to search bids')
       setBids([])
     }
   }
@@ -199,9 +199,9 @@ export default function BidsPage(){
       })
       await searchNow()
       await loadPipeline()
-    } catch (err: any){
-      console.error('Failed to create bid:', err)
-      setError(handleApiError(err))
+    } catch (err: unknown){
+      handleApiError(err, 'Create bid')
+      setError(err instanceof Error ? err.message : 'Failed to create bid')
     }
   }
 

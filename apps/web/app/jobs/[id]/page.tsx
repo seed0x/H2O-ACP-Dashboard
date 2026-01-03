@@ -224,9 +224,9 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
       
       // Load suggested portals
       await loadSuggestedPortals()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'loadJob')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Load job')
     } finally {
       setLoading(false)
     }
@@ -239,12 +239,12 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
     try {
       setLoadingPortals(true)
       const headers = getAuthHeaders()
-      const params: any = {
+      const params: Record<string, string> = {
         applies_to: 'job',
         tenant_id: currentJob.tenant_id,
       }
       if (currentJob.city) params.city = currentJob.city
-      if (currentJob.builder_id) params.builder_id = currentJob.builder_id
+      if (currentJob.builder_id) params.builder_id = String(currentJob.builder_id)
       if (currentJob.phase) params.phase = currentJob.phase.toLowerCase()
       
       const response = await axios.get(`${API_BASE_URL}/directory/suggested-portals`, {
@@ -287,7 +287,23 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
       }
       const headers = { 'Authorization': `Bearer ${token}` }
       
-      const updateData: any = {
+      // Combine date and time for scheduled dates
+      const startDT = combineDateTime(scheduledStartDate, scheduledStartTime)
+      const endDT = combineDateTime(scheduledEndDate, scheduledEndTime)
+      
+      const updateData: {
+        status?: string
+        phase?: string
+        notes?: string
+        tech_name?: string | null
+        assigned_to?: string | null
+        warranty_start_date?: string | null
+        warranty_end_date?: string | null
+        warranty_notes?: string | null
+        completion_date?: string | null
+        scheduled_start?: string | null
+        scheduled_end?: string | null
+      } = {
         status,
         phase,
         notes,
@@ -297,29 +313,16 @@ export default function JobDetail({ params }: { params: Promise<{ id: string }> 
         warranty_end_date: warrantyEnd || null,
         warranty_notes: warrantyNotes || null,
         completion_date: completionDate || null,
-      }
-      
-      // Combine date and time for scheduled dates
-      const startDT = combineDateTime(scheduledStartDate, scheduledStartTime)
-      if (startDT) {
-        updateData.scheduled_start = startDT
-      } else {
-        updateData.scheduled_start = null
-      }
-      
-      const endDT = combineDateTime(scheduledEndDate, scheduledEndTime)
-      if (endDT) {
-        updateData.scheduled_end = endDT
-      } else {
-        updateData.scheduled_end = null
+        scheduled_start: startDT || null,
+        scheduled_end: endDT || null,
       }
       
       await axios.patch(`${API_BASE_URL}/jobs/${id}`, updateData, { headers, withCredentials: true })
       showToast('Job updated successfully', 'success')
       await loadData()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'saveJob')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Save job')
     } finally {
       setSaving(false)
     }

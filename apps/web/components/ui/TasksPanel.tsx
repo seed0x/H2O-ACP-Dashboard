@@ -56,8 +56,8 @@ export function TasksPanel({ jobId, tasks, onUpdate }: TasksPanelProps) {
       setNewTaskDescription('')
       setShowAddTask(false)
       onUpdate()
-    } catch (error: any) {
-      showToast(handleApiError(error), 'error')
+    } catch (error: unknown) {
+      handleApiError(error, 'Task operation')
     } finally {
       setCreating(false)
     }
@@ -75,8 +75,8 @@ export function TasksPanel({ jobId, tasks, onUpdate }: TasksPanelProps) {
         }
       )
       onUpdate()
-    } catch (error: any) {
-      showToast(handleApiError(error), 'error')
+    } catch (error: unknown) {
+      handleApiError(error, 'Task operation')
     }
   }
 
@@ -94,8 +94,8 @@ export function TasksPanel({ jobId, tasks, onUpdate }: TasksPanelProps) {
       )
       showToast('Task deleted', 'success')
       onUpdate()
-    } catch (error: any) {
-      showToast(handleApiError(error), 'error')
+    } catch (error: unknown) {
+      handleApiError(error, 'Task operation')
     }
   }
 

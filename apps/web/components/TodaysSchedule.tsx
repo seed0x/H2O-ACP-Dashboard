@@ -56,7 +56,17 @@ export function TodaysSchedule() {
           )
           
           const jobs = Array.isArray(response.data) ? response.data : []
-          jobs.forEach((job: any) => {
+          jobs.forEach((job: {
+            id: string | number
+            builder?: { name?: string }
+            lot_number?: string
+            scheduled_start?: string
+            address_line1?: string
+            status?: string
+            tech_name?: string
+            assigned_to?: string
+            priority?: string
+          }) => {
             if (job.scheduled_start) {
               items.push({
                 id: job.id,
@@ -85,7 +95,16 @@ export function TodaysSchedule() {
           )
           
           const calls = Array.isArray(response.data) ? response.data : []
-          calls.forEach((call: any) => {
+          calls.forEach((call: {
+            id: string | number
+            customer_name?: string
+            scheduled_start?: string
+            address_line1?: string
+            city?: string
+            status?: string
+            assigned_to?: string
+            priority?: string
+          }) => {
             if (call.scheduled_start) {
               items.push({
                 id: call.id,

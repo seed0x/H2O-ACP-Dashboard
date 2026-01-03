@@ -6,7 +6,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { showToast } from '../../components/Toast'
 import { API_BASE_URL } from '../../lib/config'
 import { useTenant, TENANT_CONFIG } from '../../contexts/TenantContext'
-import { marketingApi, oauthApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset, type LocalSEOTopic, type Offer } from '../../lib/api/marketing'
+import { marketingApi, oauthApi, type PostInstance, type ContentItem, type ChannelAccount, type MediaAsset, type LocalSEOTopic, type Offer, type MarketingChannel, type CreateContentItemRequest, type UpdateContentItemRequest, type UpdatePostInstanceRequest } from '../../lib/api/marketing'
 import { PhotoUpload } from '../../components/marketing/PhotoUpload'
 import { handleApiError, showSuccess } from '../../lib/error-handler'
 import { Button } from '../../components/ui/Button'
@@ -137,14 +137,14 @@ export default function MarketingPage() {
 
 function PostsView() {
   const { currentTenant, getTenantName, getTenantColor, isTenantSelected } = useTenant()
-  const [postInstances, setPostInstances] = useState<any[]>([])
+  const [postInstances, setPostInstances] = useState<PostInstance[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [contentStatusFilter, setContentStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [showNewPostModal, setShowNewPostModal] = useState(false)
-  const [selectedPost, setSelectedPost] = useState<any>(null)
-  const [channelAccounts, setChannelAccounts] = useState<any[]>([])
+  const [selectedPost, setSelectedPost] = useState<PostInstance | null>(null)
+  const [channelAccounts, setChannelAccounts] = useState<ChannelAccount[]>([])
   const [error, setError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [generateItem, setGenerateItem] = useState<any>(null)
@@ -206,13 +206,13 @@ function PostsView() {
       
       // Filter by content item status if specified
       if (contentStatusFilter) {
-        data = data.filter((pi: any) => pi.content_item?.status === contentStatusFilter)
+        data = data.filter((pi) => pi.content_item?.status === contentStatusFilter)
       }
       
       // Filter by search term
       if (search) {
         const searchLower = search.toLowerCase()
-        data = data.filter((pi: any) => 
+        data = data.filter((pi) => 
           pi.content_item?.title?.toLowerCase().includes(searchLower) ||
           pi.content_item?.base_caption?.toLowerCase().includes(searchLower) ||
           pi.channel_account?.name?.toLowerCase().includes(searchLower)
@@ -250,7 +250,7 @@ function PostsView() {
       }
 
       // Step 1: Create ContentItem
-      const contentItemBody: any = {
+      const contentItemBody: CreateContentItemRequest = {
         tenant_id: currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o',
         title: postForm.title.trim(),
         base_caption: postForm.base_caption.trim(),
@@ -312,9 +312,9 @@ function PostsView() {
       setPostForm({ title: '', base_caption: '', scheduled_for: '', channel_account_ids: [], status: 'Idea', owner: 'admin', content_category: '', media_urls: [], cta_type: '', cta_url: '' })
       setMediaUrlInput('')
       await loadPostInstances()
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Create post')
-      setError(error.message || 'Failed to create post. Please try again.')
+      setError(error instanceof Error ? error.message : 'Failed to create post. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -884,9 +884,9 @@ function AccountsView() {
   })
 
   // Check if account is Google Business Profile
-  const isGoogleAccount = (account: any, channel: any) => {
+  const isGoogleAccount = (account: ChannelAccount, channel: MarketingChannel | undefined) => {
     const channelKey = channel?.key?.toLowerCase() || ''
-    const channelName = channel?.name?.toLowerCase() || ''
+    const channelName = channel?.display_name?.toLowerCase() || ''
     const accountName = account?.name?.toLowerCase() || ''
     return channelKey.includes('google') || channelKey.includes('gbp') || 
            channelName.includes('google') || accountName.includes('google')
@@ -898,9 +898,9 @@ function AccountsView() {
     try {
       const result = await oauthApi.getGoogleAuthUrl(accountId)
       window.location.href = result.authorization_url
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Start Google OAuth')
-      showToast(error.message || 'Failed to connect Google. Make sure OAuth is configured.', 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to connect Google. Make sure OAuth is configured.', 'error')
       setConnectingAccountId(null)
     }
   }
@@ -912,9 +912,9 @@ function AccountsView() {
       await oauthApi.disconnectGoogle(accountId)
       showToast('Google account disconnected', 'success')
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Disconnect Google')
-      showToast(error.message || 'Failed to disconnect', 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to disconnect', 'error')
     }
   }
 
@@ -1029,10 +1029,11 @@ function AccountsView() {
       setFormData({ channel_id: '', account_name: '', account_email: '', credential_vault_ref: '' })
       setFormError('')
       loadData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Save channel account')
-      setFormError(error.message || 'Failed to save account. Please try again.')
-      showToast(error.message || 'Failed to save account', 'error')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save account. Please try again.'
+      setFormError(errorMessage)
+      showToast(errorMessage, 'error')
     } finally {
       setSubmitting(false)
     }
@@ -1059,19 +1060,19 @@ function AccountsView() {
       } else {
         throw new Error('Failed to delete account')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Delete channel account')
-      showToast(error.message || 'Failed to delete account', 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to delete account', 'error')
     }
   }
 
-  function handleEdit(account: any) {
+  function handleEdit(account: ChannelAccount) {
     setEditingAccount(account)
     setFormData({
       channel_id: account.channel_id,
-      account_name: account.name || account.account_name || '',
-      account_email: account.login_email || account.account_email || '',
-      credential_vault_ref: account.credential_vault_ref || ''
+      account_name: account.name || '',
+      account_email: '',
+      credential_vault_ref: ''
     })
     setShowAddForm(true)
     setFormError('')
@@ -1422,15 +1423,15 @@ function AccountsView() {
   )
 }
 
-function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, channels: any[], onClose: () => void, onUpdate: () => void }) {
-  const [auditLogs, setAuditLogs] = useState<any[]>([])
+function PostDetailModal({ post, channels, onClose, onUpdate }: { post: ContentItem, channels: MarketingChannel[], onClose: () => void, onUpdate: () => void }) {
+  const [auditLogs, setAuditLogs] = useState<Array<{ id?: string; action: string; field?: string; old_value?: string; new_value?: string; changed_by?: string; changed_at?: string; user_name?: string; timestamp?: string; changes?: Record<string, { old: string; new: string }> }>>([])
   const [showAudit, setShowAudit] = useState(false)
   const [editForm, setEditForm] = useState({
     title: post.title || '',
-    body_text: post.body_text || '',
-    scheduled_for: post.scheduled_for && typeof post.scheduled_for === 'string' ? post.scheduled_for.slice(0, 16) : '',
+    body_text: post.base_caption || '',
+    scheduled_for: '',
     draft_due_date: post.draft_due_date && typeof post.draft_due_date === 'string' ? post.draft_due_date.slice(0, 16) : '',
-    channel_ids: Array.isArray(post.channel_ids) ? post.channel_ids : [],
+    channel_ids: [] as string[],
     status: post.status || 'Draft',
     owner: post.owner || 'admin',
     reviewer: post.reviewer || '',
@@ -1451,7 +1452,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
         throw new Error('Not authenticated')
       }
       
-      const updateData: any = {
+      const updateData: UpdateContentItemRequest = {
         title: editForm.title,
         base_caption: editForm.body_text,
         status: editForm.status,
@@ -1481,10 +1482,11 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
       
       onUpdate()
       showToast('Post updated successfully', 'success')
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Update post')
-      setUpdateError(error.message || 'Failed to update post. Please try again.')
-      showToast(error.message || 'Failed to update post', 'error')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update post. Please try again.'
+      setUpdateError(errorMessage)
+      showToast(errorMessage, 'error')
     } finally {
       setUpdating(false)
     }
@@ -1519,11 +1521,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
     }
   }, [showAudit])
 
-  const postChannels = Array.isArray(post.channel_ids) && Array.isArray(channels)
-    ? post.channel_ids.map((cid: string) => 
-        channels.find(ch => ch.id === cid)?.name
-      ).filter(Boolean).join(', ') || 'No channel'
-    : 'No channel'
+  const postChannels = 'No channel' // Channel association removed - posts are linked via post instances
 
   return (
     <div className="marketing-modal" style={{
@@ -1631,7 +1629,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
               </label>
               <select
                 value={editForm.status}
-                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value as ContentItem['status'] })}
                 style={{
                   width: '100%',
                   padding: '10px 16px',
@@ -1730,7 +1728,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {auditLogs.map((log: any, idx: number) => (
+                {auditLogs.map((log, idx: number) => (
                   <div key={idx} style={{
                     padding: '12px',
                     backgroundColor: 'var(--color-hover)',
@@ -1758,7 +1756,7 @@ function PostDetailModal({ post, channels, onClose, onUpdate }: { post: any, cha
 }
 
 // Content Item Detail Modal
-function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { item: any, channelAccounts: any[], onClose: () => void, onUpdate: () => void }) {
+function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { item: ContentItem, channelAccounts: ChannelAccount[], onClose: () => void, onUpdate: () => void }) {
   const { currentTenant } = useTenant()
   const [postInstances, setPostInstances] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -1880,7 +1878,7 @@ function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { 
             <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>No post instances yet</div>
           ) : (
             <div style={{ display: 'grid', gap: '12px' }}>
-              {postInstances.map((instance: any) => {
+              {postInstances.map((instance: PostInstance) => {
                 const account = channelAccounts.find(acc => acc.id === instance.channel_account_id)
                 return (
                   <div
@@ -1944,7 +1942,7 @@ function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { 
 }
 
 // Post Instance Detail Modal
-function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: any, onClose: () => void, onUpdate: () => void }) {
+function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: PostInstance, onClose: () => void, onUpdate: () => void }) {
   const contentItem = instance.content_item
   const channelAccount = instance.channel_account
   const [showMarkPostedModal, setShowMarkPostedModal] = useState(false)
@@ -2125,7 +2123,7 @@ function PostInstanceDetailModal({ instance, onClose, onUpdate }: { instance: an
 }
 
 // Edit Planned Slot Modal - Allows adding content to planned slots
-function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { instance: any, contentItem: any, onClose: () => void, onSuccess: () => void }) {
+function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { instance: PostInstance, contentItem: ContentItem | null, onClose: () => void, onSuccess: () => void }) {
   const [title, setTitle] = useState('')
   const [baseCaption, setBaseCaption] = useState('')
   const [contentCategory, setContentCategory] = useState(instance.suggested_category || '')
@@ -2201,16 +2199,14 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         // If there are uploaded assets, they're already associated with the content item via contentItemId prop
 
         // Update the post instance to use the new content item
-        const postInstanceUpdate: any = {
+        const postInstanceUpdate: UpdatePostInstanceRequest = {
           content_item_id: newItem.id,
-          status: 'Draft'
-        }
-        
-        // Add GBP-specific fields if this is a GBP channel
-        if (isGBP) {
-          if (gbpPostType) postInstanceUpdate.gbp_post_type = gbpPostType
-          if (gbpCtaType) postInstanceUpdate.gbp_cta_type = gbpCtaType
-          if (gbpLocationTargeting) postInstanceUpdate.gbp_location_targeting = gbpLocationTargeting
+          status: 'Draft',
+          ...(isGBP && {
+            ...(gbpPostType && { gbp_post_type: gbpPostType }),
+            ...(gbpCtaType && { gbp_cta_type: gbpCtaType }),
+            ...(gbpLocationTargeting && { gbp_location_targeting: gbpLocationTargeting })
+          })
         }
         
         await marketingApi.updatePostInstance(instance.id, postInstanceUpdate)
@@ -2231,7 +2227,7 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
         // The PhotoUpload component handles uploads and associates them with contentItemId
 
         // Update post instance status
-        const postInstanceUpdate: any = {
+        const postInstanceUpdate: UpdatePostInstanceRequest = {
           status: 'Draft'
         }
         
@@ -2247,9 +2243,9 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
 
       showSuccess('Content added successfully')
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Add content to post')
-      const errorMessage = error?.message || 'Failed to add content. Please try again.'
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add content. Please try again.'
       setError(errorMessage)
       handleApiError(error, 'Add content to planned slot')
     } finally {
@@ -2469,7 +2465,7 @@ function EditPlannedSlotModal({ instance, contentItem, onClose, onSuccess }: { i
 }
 
 // Mark Posted Modal - Requires proof
-function MarkPostedModal({ instance, onClose, onSuccess }: { instance: any, onClose: () => void, onSuccess: () => void }) {
+function MarkPostedModal({ instance, onClose, onSuccess }: { instance: PostInstance, onClose: () => void, onSuccess: () => void }) {
   const [postUrl, setPostUrl] = useState('')
   const [screenshotUrl, setScreenshotUrl] = useState('')
   const [postedManually, setPostedManually] = useState(false)
@@ -2518,9 +2514,9 @@ function MarkPostedModal({ instance, onClose, onSuccess }: { instance: any, onCl
       }
 
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Mark post as posted')
-      setError(error.message || 'Failed to mark as posted. Please try again.')
+      setError(error instanceof Error ? error.message : 'Failed to mark as posted. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -2679,7 +2675,7 @@ function MarkPostedModal({ instance, onClose, onSuccess }: { instance: any, onCl
 }
 
 // Generate Posts Modal
-function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }: { contentItem: any, channelAccounts: any[], onClose: () => void, onSuccess: () => void }) {
+function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }: { contentItem: ContentItem, channelAccounts: ChannelAccount[], onClose: () => void, onSuccess: () => void }) {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
   const [scheduledFor, setScheduledFor] = useState('')
   const [captionOverrides, setCaptionOverrides] = useState<Record<string, string>>({})
@@ -2780,9 +2776,9 @@ function GeneratePostsModal({ contentItem, channelAccounts, onClose, onSuccess }
       }
 
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       handleApiError(error, 'Generate posts')
-      setError(error.message || 'Failed to generate posts. Please try again.')
+      setError(error instanceof Error ? error.message : 'Failed to generate posts. Please try again.')
     } finally {
       setSubmitting(false)
     }

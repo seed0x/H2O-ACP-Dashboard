@@ -104,8 +104,8 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
       setEstimatedPrice(data.estimated_price?.toString() || '')
       setNeedsPriceApproval(data.needs_price_approval ?? null)
       setPriceApprovalNotes(data.price_approval_notes || '')
-    } catch (error: any) {
-      showToast(handleApiError(error), 'error')
+    } catch (error: unknown) {
+      handleApiError(error, 'Load workflow')
     } finally {
       setLoading(false)
     }
@@ -116,7 +116,7 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
       setSaving(true)
       const token = localStorage.getItem('token')
       
-      const updateData: any = {}
+      const updateData: Record<string, string | number | boolean | null> = {}
       
       // Save current step data
       if (currentStep === 0) {
@@ -155,8 +155,8 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
       
       showToast('Step saved', 'success')
       await loadWorkflow()
-    } catch (error: any) {
-      showToast(handleApiError(error), 'error')
+    } catch (error: unknown) {
+      handleApiError(error, 'Load workflow')
     } finally {
       setSaving(false)
     }
@@ -179,8 +179,8 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
         )
         setCurrentStep(currentStep + 1)
         await loadWorkflow()
-      } catch (error: any) {
-        showToast(handleApiError(error), 'error')
+      } catch (error: unknown) {
+        handleApiError(error, 'Complete workflow step')
       }
     } else {
       // Workflow complete

@@ -186,9 +186,9 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       
       // Load suggested portals
       await loadSuggestedPortals()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'loadServiceCall')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Load service call')
     } finally {
       setLoading(false)
     }
@@ -201,12 +201,12 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
     try {
       setLoadingPortals(true)
       const headers = getAuthHeaders()
-      const params: any = {
+      const params: Record<string, string> = {
         applies_to: 'service_call',
         tenant_id: currentSc.tenant_id,
       }
       if (currentSc.city) params.city = currentSc.city
-      if (currentSc.builder_id) params.builder_id = currentSc.builder_id
+      if (currentSc.builder_id) params.builder_id = String(currentSc.builder_id)
       
       const response = await axios.get(`${API_BASE_URL}/directory/suggested-portals`, {
         headers,
@@ -258,7 +258,22 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
         return new Date(date + 'T' + time + ':00').toISOString()
       }
       
-      const updateData: any = {
+      const updateData: {
+        status?: string
+        priority?: string
+        assigned_to?: string | null
+        additional_techs?: string | null
+        notes?: string
+        scheduled_start?: string | null
+        scheduled_end?: string | null
+        payment_status?: string | null
+        payment_method?: string | null
+        payment_amount?: number | null
+        payment_date?: string | null
+        billing_writeup_status?: string | null
+        billing_writeup_assigned_to?: string | null
+        paperwork_turned_in?: boolean
+      } = {
         status,
         priority,
         assigned_to: assignedTo || null,
@@ -278,9 +293,9 @@ export default function ServiceCallDetail({ params }: { params: Promise<{ id: st
       await axios.patch(`${API_BASE_URL}/service-calls/${id}`, updateData, { headers, withCredentials: true })
       showToast('Service call updated successfully', 'success')
       await loadData()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'saveServiceCall')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Save service call')
     } finally {
       setSaving(false)
     }
@@ -1074,9 +1089,9 @@ function ServiceCallTasksSection({ serviceCallId }: { serviceCallId: string }) {
       setAssignedTo('')
       setDueDate('')
       await loadTasks()
-    } catch (error: any) {
+    } catch (error: unknown) {
       logError(error, 'createServiceCallTask')
-      showToast(handleApiError(error), 'error')
+      handleApiError(error, 'Create service call task')
     } finally {
       setSubmitting(false)
     }
@@ -1095,9 +1110,9 @@ function ServiceCallTasksSection({ serviceCallId }: { serviceCallId: string }) {
       
       showToast('Task marked as completed', 'success')
       await loadTasks()
-    } catch (error: any) {
+    } catch (error: unknown) {
       logError(error, 'completeServiceCallTask')
-      showToast(handleApiError(error), 'error')
+      handleApiError(error, 'Complete service call task')
     }
   }
 

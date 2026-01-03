@@ -114,11 +114,11 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
       })
 
       if (response.ok) {
-        const signals = await response.json()
+        const signals = await response.json() as Array<{ type: string; count: number }>
         const counts = {
-          reviews: signals.filter((s: any) => s.type === 'reviews').reduce((sum: number, s: any) => sum + s.count, 0),
-          marketing: signals.filter((s: any) => s.type === 'marketing').reduce((sum: number, s: any) => sum + s.count, 0),
-          dispatch: signals.filter((s: any) => s.type === 'dispatch').reduce((sum: number, s: any) => sum + s.count, 0)
+          reviews: signals.filter((s) => s.type === 'reviews').reduce((sum: number, s) => sum + s.count, 0),
+          marketing: signals.filter((s) => s.type === 'marketing').reduce((sum: number, s) => sum + s.count, 0),
+          dispatch: signals.filter((s) => s.type === 'dispatch').reduce((sum: number, s) => sum + s.count, 0)
         }
         setSignalCounts(counts)
       }

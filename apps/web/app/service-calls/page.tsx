@@ -56,8 +56,8 @@ export default function ServiceCallsPage() {
       })
       setServiceCalls(Array.isArray(response.data) ? response.data : [])
       setLoading(false)
-    } catch (error) {
-      console.error('Failed to load service calls:', error)
+    } catch (error: unknown) {
+      handleApiError(error, 'Load service calls')
       setServiceCalls([])
       setLoading(false)
     }
@@ -84,9 +84,9 @@ export default function ServiceCallsPage() {
       )
       showToast('Service call marked as completed', 'success')
       await loadServiceCalls()
-    } catch (error: any) {
+    } catch (error: unknown) {
       logError(error, 'quickCompleteServiceCall')
-      showToast(handleApiError(error), 'error')
+      handleApiError(error, 'Complete service call')
     }
   }
 
@@ -108,13 +108,13 @@ export default function ServiceCallsPage() {
       }, { headers, withCredentials: true })
       showToast('Review request created successfully', 'success')
       await loadServiceCalls()
-    } catch (error: any) {
+    } catch (error: unknown) {
       logError(error, 'createReviewRequest')
-      showToast(handleApiError(error), 'error')
+      handleApiError(error, 'Create review request')
     }
   }
 
-  function formatTableCell(value: any): React.ReactNode {
+  function formatTableCell(value: unknown): React.ReactNode {
     if (!value || value === 'null' || value === 'undefined' || value === null || value === '') {
       return (
         <div className="flex items-center justify-center text-[var(--color-text-secondary)]/50" style={{ minHeight: '100%' }}>

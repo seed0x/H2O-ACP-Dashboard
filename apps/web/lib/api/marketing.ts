@@ -16,6 +16,16 @@ export interface ContentItem {
   created_at: string
   updated_at: string
   media_assets?: MediaAsset[]
+  cta_type?: string
+  cta_url?: string
+  tags?: string[]
+  target_city?: string
+  draft_due_date?: string
+  notes?: string
+  source_type?: string
+  source_ref?: string
+  offer_id?: string
+  template_id?: string
 }
 
 export interface MediaAsset {
@@ -78,6 +88,16 @@ export interface CreateContentItemRequest {
   status?: string
   owner: string
   media_urls?: string[]
+  cta_type?: string
+  cta_url?: string
+  tags?: string[]
+  target_city?: string
+  draft_due_date?: string
+  notes?: string
+  source_type?: string
+  source_ref?: string
+  offer_id?: string
+  template_id?: string
 }
 
 export interface UpdateContentItemRequest {
@@ -86,6 +106,18 @@ export interface UpdateContentItemRequest {
   content_category?: string
   status?: string
   reviewer?: string
+  owner?: string
+  cta_type?: string
+  cta_url?: string
+  tags?: string[]
+  target_city?: string
+  draft_due_date?: string
+  notes?: string
+  source_type?: string
+  source_ref?: string
+  offer_id?: string
+  template_id?: string
+  media_urls?: string[]
 }
 
 export interface CreatePostInstancesRequest {

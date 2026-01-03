@@ -86,13 +86,13 @@ export default function ProfilePage() {
         new_password: '',
         confirm_password: ''
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'loadUser')
-      if (err.response?.status === 403) {
+      if (err && typeof err === 'object' && 'response' in err && typeof err.response === 'object' && err.response && 'status' in err.response && err.response.status === 403) {
         showToast('Not authorized to view this profile', 'error')
         router.push('/')
       } else {
-        showToast(handleApiError(err), 'error')
+        handleApiError(err, 'Load user profile')
       }
     } finally {
       setLoading(false)
@@ -111,7 +111,10 @@ export default function ProfilePage() {
       }
       const headers = { 'Authorization': `Bearer ${token}` }
 
-      const updateData: any = {
+      const updateData: {
+        email?: string | null
+        full_name?: string | null
+      } = {
         email: formData.email || null,
         full_name: formData.full_name || null
       }
@@ -122,9 +125,16 @@ export default function ProfilePage() {
       })
       showToast('Profile updated successfully', 'success')
       await loadUser()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'handleUpdateProfile')
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to update profile'
+      let errorMsg = 'Failed to update profile'
+      if (err && typeof err === 'object') {
+        if ('response' in err && typeof err.response === 'object' && err.response && 'data' in err.response && typeof err.response.data === 'object' && err.response.data && 'detail' in err.response.data) {
+          errorMsg = String(err.response.data.detail)
+        } else if ('message' in err && typeof err.message === 'string') {
+          errorMsg = err.message
+        }
+      }
       setError(errorMsg)
       showToast(errorMsg, 'error')
     } finally {
@@ -171,8 +181,8 @@ export default function ProfilePage() {
           username: user?.username,
           password: formData.current_password
         }, { withCredentials: true })
-      } catch (loginErr: any) {
-        if (loginErr.response?.status === 401) {
+      } catch (loginErr: unknown) {
+        if (loginErr && typeof loginErr === 'object' && 'response' in loginErr && typeof loginErr.response === 'object' && loginErr.response && 'status' in loginErr.response && loginErr.response.status === 401) {
           setError('Current password is incorrect')
           setSubmitting(false)
           return
@@ -195,9 +205,16 @@ export default function ProfilePage() {
         new_password: '',
         confirm_password: ''
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'handleChangePassword')
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to change password'
+      let errorMsg = 'Failed to change password'
+      if (err && typeof err === 'object') {
+        if ('response' in err && typeof err.response === 'object' && err.response && 'data' in err.response && typeof err.response.data === 'object' && err.response.data && 'detail' in err.response.data) {
+          errorMsg = String(err.response.data.detail)
+        } else if ('message' in err && typeof err.message === 'string') {
+          errorMsg = err.message
+        }
+      }
       setError(errorMsg)
       showToast(errorMsg, 'error')
     } finally {

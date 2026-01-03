@@ -60,7 +60,7 @@ export default function UsersPage() {
     try {
       setLoading(true)
       const headers = getAuthHeaders()
-      const params: any = {}
+      const params: Record<string, string> = {}
       if (roleFilter) params.role = roleFilter
 
       const response = await axios.get(`${API_BASE_URL}/users`, {
@@ -69,13 +69,13 @@ export default function UsersPage() {
         withCredentials: true
       })
       setUsers(Array.isArray(response.data) ? response.data : [])
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'loadUsers')
-      if (err.response?.status === 403) {
+      if (err && typeof err === 'object' && 'response' in err && typeof err.response === 'object' && err.response && 'status' in err.response && err.response.status === 403) {
         showToast('Only admins can view users', 'error')
         router.push('/')
       } else {
-        showToast(handleApiError(err), 'error')
+        handleApiError(err, 'Load users')
       }
       setUsers([])
     } finally {
@@ -112,7 +112,14 @@ export default function UsersPage() {
 
       if (editingUser) {
         // Update existing user
-        const updateData: any = {
+        const updateData: {
+          email?: string | null
+          full_name?: string | null
+          role?: string
+          tenant_id?: string | null
+          is_active?: boolean
+          password?: string
+        } = {
           email: formData.email || null,
           full_name: formData.full_name || null,
           role: formData.role,
@@ -146,9 +153,16 @@ export default function UsersPage() {
 
       resetForm()
       await loadUsers()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'handleSubmit')
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to save user'
+      let errorMsg = 'Failed to save user'
+      if (err && typeof err === 'object') {
+        if ('response' in err && typeof err.response === 'object' && err.response && 'data' in err.response && typeof err.response.data === 'object' && err.response.data && 'detail' in err.response.data) {
+          errorMsg = String(err.response.data.detail)
+        } else if ('message' in err && typeof err.message === 'string') {
+          errorMsg = err.message
+        }
+      }
       setError(errorMsg)
       showToast(errorMsg, 'error')
     } finally {
@@ -174,9 +188,9 @@ export default function UsersPage() {
       })
       showToast('User deleted successfully', 'success')
       await loadUsers()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'handleDelete')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Delete user')
     }
   }
 

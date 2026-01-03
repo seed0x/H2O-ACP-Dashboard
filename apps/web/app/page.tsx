@@ -23,6 +23,94 @@ import UilEnvelopeSend from '@iconscout/react-unicons/icons/uil-envelope-send'
 import UilPhoneAlt from '@iconscout/react-unicons/icons/uil-phone-alt'
 import UilInvoice from '@iconscout/react-unicons/icons/uil-invoice'
 import UilClipboardNotes from '@iconscout/react-unicons/icons/uil-clipboard-notes'
+import type { ReviewRequest } from '../lib/api/reviews'
+
+// Type definitions
+interface Job {
+  id: string | number
+  tenant_id: string
+  builder_id: number
+  community: string
+  lot_number: string
+  phase: string
+  address_line1: string
+  city: string
+  status: string
+  scheduled_start: string | null
+  assigned_to?: string
+  updated_at: string
+}
+
+interface ServiceCall {
+  id: string | number
+  tenant_id: string
+  builder_id: number
+  customer_name: string
+  address_line1: string
+  city: string
+  phone: string
+  email?: string
+  issue_description: string
+  status: string
+  priority: string
+  created_at: string
+  assigned_to?: string
+  additional_techs?: string
+  payment_status?: string
+  billing_writeup_status?: string
+  paperwork_turned_in?: boolean
+  scheduled_start?: string
+}
+
+interface Bid {
+  id: string
+  project_name: string
+  status: string
+  amount_cents?: number
+  sent_date?: string
+  due_date?: string
+  builder_id?: string
+  tenant_id: string
+  updated_at: string
+}
+
+interface BidFollowUp extends Bid {
+  followUpReason: 'overdue' | 'sent_no_response' | 'approaching_due'
+  daysOverdue?: number
+  daysSinceSent?: number
+  daysUntilDue?: number
+  priority: 'high' | 'medium' | 'low'
+}
+
+interface ServiceCallTask {
+  id: string
+  service_call_id: string
+  tenant_id: string
+  task_type: 'pull_permit' | 'order_parts' | 'send_bid' | 'call_back_schedule' | 'write_up_billing' | 'other'
+  title: string
+  description?: string
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  assigned_to?: string
+  due_date?: string
+  completed_at?: string
+  completed_by?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+}
+
+interface OverdueItem {
+  id: string | number
+  type: 'job' | 'service_call' | 'review_request' | 'recovery_ticket'
+  [key: string]: unknown
+}
+
+interface OpenTask {
+  id: string | number
+  type: 'job' | 'service_call'
+  status: string
+  [key: string]: unknown
+}
 
 export default function Dashboard() {
   const router = useRouter()
@@ -36,10 +124,10 @@ export default function Dashboard() {
     marketingPosts: 0,
     pendingServiceCallTasks: 0
   })
-  const [overdueItems, setOverdueItems] = useState<any[]>([])
-  const [openTasks, setOpenTasks] = useState<any[]>([])
-  const [bidFollowUps, setBidFollowUps] = useState<any[]>([])
-  const [pendingServiceCallTasks, setPendingServiceCallTasks] = useState<any[]>([])
+  const [overdueItems, setOverdueItems] = useState<OverdueItem[]>([])
+  const [openTasks, setOpenTasks] = useState<OpenTask[]>([])
+  const [bidFollowUps, setBidFollowUps] = useState<BidFollowUp[]>([])
+  const [pendingServiceCallTasks, setPendingServiceCallTasks] = useState<ServiceCallTask[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -51,14 +139,14 @@ export default function Dashboard() {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       
-      let jobs: any[] = []
-      let serviceCalls: any[] = []
-      let bids: any[] = []
-      let reviewRequests: any[] = []
-      let overdueJobsData: any[] = []
-      let overdueCallsData: any[] = []
-      let overdueReviewsData: any[] = []
-      let overdueTicketsData: any[] = []
+      let jobs: Job[] = []
+      let serviceCalls: ServiceCall[] = []
+      let bids: Bid[] = []
+      let reviewRequests: ReviewRequest[] = []
+      let overdueJobsData: Job[] = []
+      let overdueCallsData: ServiceCall[] = []
+      let overdueReviewsData: ReviewRequest[] = []
+      let overdueTicketsData: unknown[] = []
       
       // Load jobs (All County)
       if (isTenantSelected('all_county')) {
@@ -87,7 +175,7 @@ export default function Dashboard() {
           const allCalls = res.data || []
           
           // Filter by date range
-          serviceCalls = allCalls.filter((call: any) => {
+          serviceCalls = allCalls.filter((call: ServiceCall) => {
             if (!call.scheduled_start) return false
             const callDate = new Date(call.scheduled_start)
             return callDate >= today && callDate <= nextWeekEnd
@@ -128,13 +216,13 @@ export default function Dashboard() {
       // Calculate sold this week (bids with status 'Won' updated this week)
       const weekAgo = new Date()
       weekAgo.setDate(weekAgo.getDate() - 7)
-      const soldThisWeek = bids.filter((b: any) => 
+      const soldThisWeek = bids.filter((b: Bid) => 
         b.status === 'Won' && new Date(b.updated_at) >= weekAgo
       ).length
       
       // Find bids that need follow-up
       const now = new Date()
-      const followUpBids: any[] = []
+      const followUpBids: BidFollowUp[] = []
       
       for (const bid of bids) {
         // Overdue bids (due_date passed, not Won/Lost)
@@ -197,11 +285,11 @@ export default function Dashboard() {
       setBidFollowUps(followUpBids.slice(0, 5))
       
       // Open tasks = jobs not completed + service calls not completed
-      const openJobTasks = jobs.filter((j: any) => j.status !== 'Completed')
-      const openCallTasks = serviceCalls.filter((c: any) => c.status !== 'Completed')
-      const allOpenTasks = [
-        ...openJobTasks.map((j: any) => ({ ...j, type: 'job' })),
-        ...openCallTasks.map((c: any) => ({ ...c, type: 'service_call' }))
+      const openJobTasks = jobs.filter((j: Job) => j.status !== 'Completed')
+      const openCallTasks = serviceCalls.filter((c: ServiceCall) => c.status !== 'Completed')
+      const allOpenTasks: OpenTask[] = [
+        ...openJobTasks.map((j: Job) => ({ ...j, type: 'job' as const })),
+        ...openCallTasks.map((c: ServiceCall) => ({ ...c, type: 'service_call' as const }))
       ].slice(0, 8)
       
       // Total overdue
@@ -209,15 +297,15 @@ export default function Dashboard() {
                           overdueReviewsData.length + overdueTicketsData.length
       
       // Combine all overdue items
-      const allOverdue = [
-        ...overdueJobsData.map((j: any) => ({ ...j, type: 'job' })),
-        ...overdueCallsData.map((c: any) => ({ ...c, type: 'service_call' })),
-        ...overdueReviewsData.map((r: any) => ({ ...r, type: 'review_request' })),
-        ...overdueTicketsData.map((t: any) => ({ ...t, type: 'recovery_ticket' }))
+      const allOverdue: OverdueItem[] = [
+        ...overdueJobsData.map((j: Job) => ({ ...j, type: 'job' as const })),
+        ...overdueCallsData.map((c: ServiceCall) => ({ ...c, type: 'service_call' as const })),
+        ...overdueReviewsData.map((r: ReviewRequest) => ({ ...r, type: 'review_request' as const })),
+        ...overdueTicketsData.map((t: unknown) => ({ ...t, type: 'recovery_ticket' as const }))
       ].slice(0, 5)
       
       // Pending reviews = review requests not completed
-      const pendingReviews = reviewRequests.filter((r: any) => 
+      const pendingReviews = reviewRequests.filter((r: ReviewRequest) => 
         r.status !== 'completed' && r.status !== 'review_received'
       ).length
       
@@ -349,7 +437,7 @@ export default function Dashboard() {
             }
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {pendingServiceCallTasks.slice(0, 5).map((task: any) => {
+            {pendingServiceCallTasks.slice(0, 5).map((task: ServiceCallTask) => {
               const taskTypeIcons: Record<string, React.ComponentType<{ size?: number | string; color?: string }>> = {
                 'pull_permit': UilFileAlt,
                 'order_parts': UilShoppingCart,
@@ -524,7 +612,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {openTasks.map((item: any) => (
+              {openTasks.map((item: OpenTask) => (
                 <a
                   key={item.id}
                   href={item.type === 'job' ? `/jobs/${item.id}` : `/service-calls/${item.id}`}
@@ -611,7 +699,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {bidFollowUps.map((bid: any) => {
+              {bidFollowUps.map((bid: BidFollowUp) => {
                 let reasonText = ''
                 let reasonColor = 'var(--color-text-secondary)'
                 let borderColor = 'var(--color-primary)'
@@ -705,7 +793,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {overdueItems.map((item: any) => (
+              {overdueItems.map((item: OverdueItem) => (
                 <a
                   key={item.id}
                   href={

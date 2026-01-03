@@ -14,9 +14,9 @@ import { API_BASE_URL } from '../../../lib/config'
 export default function ReviewRequestDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter()
   const [request, setRequest] = useState<ReviewRequest | null>(null)
-  const [serviceCall, setServiceCall] = useState<any>(null)
-  const [job, setJob] = useState<any>(null)
-  const [review, setReview] = useState<any>(null)
+  const [serviceCall, setServiceCall] = useState<{ id: string; customer_name?: string; address_line1?: string } | null>(null)
+  const [job, setJob] = useState<{ id: string; builder?: { name?: string }; lot_number?: string; address_line1?: string } | null>(null)
+  const [review, setReview] = useState<{ id: string; rating: number; comment?: string } | null>(null)
   const [id, setId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -69,7 +69,7 @@ export default function ReviewRequestDetail({ params }: { params: Promise<{ id: 
           // Try to find review by checking if completed_at is set
           // Note: We'd need an endpoint to get review by request_id, or we can list and filter
           const reviews = await reviewApi.listReviews(requestData.tenant_id)
-          const matchingReview = reviews.find((r: any) => r.review_request_id === requestData.id)
+          const matchingReview = reviews.find((r) => r.review_request_id === requestData.id)
           if (matchingReview) {
             setReview(matchingReview)
           }
@@ -77,9 +77,9 @@ export default function ReviewRequestDetail({ params }: { params: Promise<{ id: 
           logError(err, 'loadReview')
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'loadReviewRequest')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Load review request')
     } finally {
       setLoading(false)
     }
@@ -88,12 +88,12 @@ export default function ReviewRequestDetail({ params }: { params: Promise<{ id: 
   async function updateStatus(newStatus: string) {
     if (!id) return
     try {
-      await reviewApi.updateRequest(id, { status: newStatus as any })
+      await reviewApi.updateRequest(id, { status: newStatus as 'pending' | 'sent' | 'completed' | 'expired' | 'lost' })
       showToast('Status updated successfully', 'success')
       await loadData()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'updateRequestStatus')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Update review request status')
     }
   }
 
@@ -106,9 +106,9 @@ export default function ReviewRequestDetail({ params }: { params: Promise<{ id: 
       await reviewApi.updateRequest(id, { status: 'sent' })
       showToast('Review request sent successfully', 'success')
       await loadData()
-    } catch (err: any) {
+    } catch (err: unknown) {
       logError(err, 'sendReviewRequest')
-      showToast(handleApiError(err), 'error')
+      handleApiError(err, 'Send review request')
     } finally {
       setSending(false)
     }
