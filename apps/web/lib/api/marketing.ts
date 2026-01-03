@@ -715,6 +715,48 @@ export const oauthApi = {
       handleApiError(error, 'Get Google locations')
       throw error
     }
+  },
+
+  // Facebook OAuth
+  getFacebookAuthUrl: async (channelAccountId: string): Promise<{ authorization_url: string; state: string }> => {
+    try {
+      return await apiGet<{ authorization_url: string; state: string }>(
+        `/oauth/facebook/authorize?channel_account_id=${channelAccountId}`
+      )
+    } catch (error) {
+      handleApiError(error, 'Get Facebook auth URL')
+      throw error
+    }
+  },
+
+  disconnectFacebook: async (channelAccountId: string): Promise<void> => {
+    try {
+      await apiPost(`/oauth/facebook/disconnect/${channelAccountId}`, {})
+    } catch (error) {
+      handleApiError(error, 'Disconnect Facebook')
+      throw error
+    }
+  },
+
+  // Instagram OAuth
+  getInstagramAuthUrl: async (channelAccountId: string): Promise<{ authorization_url: string; state: string }> => {
+    try {
+      return await apiGet<{ authorization_url: string; state: string }>(
+        `/oauth/instagram/authorize?channel_account_id=${channelAccountId}`
+      )
+    } catch (error) {
+      handleApiError(error, 'Get Instagram auth URL')
+      throw error
+    }
+  },
+
+  disconnectInstagram: async (channelAccountId: string): Promise<void> => {
+    try {
+      await apiPost(`/oauth/instagram/disconnect/${channelAccountId}`, {})
+    } catch (error) {
+      handleApiError(error, 'Disconnect Instagram')
+      throw error
+    }
   }
 }
 

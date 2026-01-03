@@ -1345,7 +1345,7 @@ function AccountsView() {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {/* Connect/Disconnect Google button for Google accounts */}
+                  {/* Connect/Disconnect buttons for OAuth-enabled accounts */}
                   {isGoogleAccount(account, channel) && (
                     account.oauth_connected ? (
                       <button
@@ -1382,6 +1382,86 @@ function AccountsView() {
                         }}
                       >
                         {connectingAccountId === account.id ? 'Connecting...' : 'Connect Google'}
+                      </button>
+                    )
+                  )}
+                  
+                  {isFacebookAccount(account, channel) && (
+                    account.oauth_connected ? (
+                      <button
+                        onClick={() => handleDisconnectFacebook(account.id)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                          border: '1px solid #EF5350',
+                          borderRadius: '8px',
+                          color: '#EF5350',
+                          fontSize: '14px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Disconnect Facebook
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConnectFacebook(account.id)}
+                        disabled={connectingAccountId === account.id}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#1877F2',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: connectingAccountId === account.id ? 'wait' : 'pointer',
+                          opacity: connectingAccountId === account.id ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {connectingAccountId === account.id ? 'Connecting...' : 'Connect Facebook'}
+                      </button>
+                    )
+                  )}
+                  
+                  {isInstagramAccount(account, channel) && (
+                    account.oauth_connected ? (
+                      <button
+                        onClick={() => handleDisconnectInstagram(account.id)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: 'rgba(239, 83, 80, 0.1)',
+                          border: '1px solid #EF5350',
+                          borderRadius: '8px',
+                          color: '#EF5350',
+                          fontSize: '14px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Disconnect Instagram
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConnectInstagram(account.id)}
+                        disabled={connectingAccountId === account.id}
+                        style={{
+                          padding: '8px 16px',
+                          background: 'linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: connectingAccountId === account.id ? 'wait' : 'pointer',
+                          opacity: connectingAccountId === account.id ? 0.7 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {connectingAccountId === account.id ? 'Connecting...' : 'Connect Instagram'}
                       </button>
                     )
                   )}

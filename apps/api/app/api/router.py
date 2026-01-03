@@ -138,6 +138,18 @@ try:
 except ImportError:
     oauth_google_router = None
 
+# Import Facebook OAuth routes
+try:
+    from .oauth_facebook import router as oauth_facebook_router
+except ImportError:
+    oauth_facebook_router = None
+
+# Import Instagram OAuth routes
+try:
+    from .oauth_instagram import router as oauth_instagram_router
+except ImportError:
+    oauth_instagram_router = None
+
 from ..core.rate_limit import limiter, get_rate_limit
 
 router = APIRouter()
