@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
+import { logError } from '../../lib/error-handler'
 
 // Helper function to check if user is a tech user and get redirect path
 function getRedirectPath(token: string): string {

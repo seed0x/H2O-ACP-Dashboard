@@ -1784,7 +1784,7 @@ function ContentItemDetailModal({ item, channelAccounts, onClose, onUpdate }: { 
         setPostInstances(Array.isArray(data) ? data : [])
       }
     } catch (error) {
-      console.error('Failed to load post instances:', error)
+      logError(error, 'loadPostInstances')
     } finally {
       setLoading(false)
     }
