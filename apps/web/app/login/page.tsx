@@ -74,7 +74,7 @@ export default function Login() {
         setError(`Cannot connect to API server. Please check your connection.`)
       } else {
         // Something else
-        setError(err.message || 'Login failed')
+        setError(err instanceof Error ? err.message : 'Login failed')
       }
     } finally {
       setLoading(false)
