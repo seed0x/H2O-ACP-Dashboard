@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Table } from '../../components/ui/Table'
 import { Input } from '../../components/ui/Input'
+import { logError } from '../../lib/error-handler'
 
 interface Builder {
   id: number
