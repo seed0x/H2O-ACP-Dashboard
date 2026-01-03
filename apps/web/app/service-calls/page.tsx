@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
@@ -114,7 +115,7 @@ export default function ServiceCallsPage() {
     }
   }
 
-  function formatTableCell(value: unknown): React.ReactNode {
+  function formatTableCell(value: unknown): ReactNode {
     if (!value || value === 'null' || value === 'undefined' || value === null || value === '') {
       return (
         <div className="flex items-center justify-center text-[var(--color-text-secondary)]/50" style={{ minHeight: '100%' }}>
