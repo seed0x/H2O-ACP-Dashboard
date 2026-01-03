@@ -207,7 +207,7 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
       // Create FormData for file upload
       const formData = new FormData()
       files.forEach((file) => {
-        formData.append('files', file)
+        formData.append('files', file)  // FastAPI expects 'files' field name for List[UploadFile]
       })
       
       // Upload files to backend
