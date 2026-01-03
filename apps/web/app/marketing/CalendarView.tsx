@@ -143,15 +143,31 @@ export function CalendarView() {
     }
   }
 
-  const handleFillEmptySlot = (instance: PostInstance) => {
+  const handleFillEmptySlot = async (instance: PostInstance) => {
     setSelectedInstance(instance)
     setSelectedDate(new Date(instance.scheduled_for))
     setFormScheduledDate(instance.scheduled_for.split('T')[0])
     const scheduledTime = new Date(instance.scheduled_for)
     setFormScheduledTime(`${String(scheduledTime.getHours()).padStart(2, '0')}:${String(scheduledTime.getMinutes()).padStart(2, '0')}`)
-    setFormTitle('')
-    setFormCaption('')
     setFormAccountId(instance.channel_account?.id || '')
+    
+    // Auto-populate with template if suggested_category exists
+    if (instance.suggested_category) {
+      try {
+        const template = await marketingApi.getContentTemplate(instance.suggested_category)
+        setFormTitle(template.title)
+        setFormCaption(template.caption)
+      } catch (error) {
+        // If template fails, just use empty values
+        logError(error, 'loadTemplate')
+        setFormTitle('')
+        setFormCaption('')
+      }
+    } else {
+      setFormTitle('')
+      setFormCaption('')
+    }
+    
     setShowAddModal(true)
   }
 

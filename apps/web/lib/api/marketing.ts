@@ -347,6 +347,20 @@ export const marketingApi = {
     }
   },
 
+  getContentTemplate: async (category: string): Promise<{
+    category: string
+    title: string
+    caption: string
+    title_options: string[]
+  }> => {
+    try {
+      return await apiGet(`/marketing/scheduler/template/${category}`)
+    } catch (error) {
+      handleApiError(error, 'Get content template')
+      throw error
+    }
+  },
+
   // Local SEO Topics
   listLocalSEOTopics: async (tenantId: string, filters?: {
     status?: string

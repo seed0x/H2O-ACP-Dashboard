@@ -403,3 +403,32 @@ async def topoff_scheduler(
     """
     return await topoff_scheduler_logic(tenant_id, days, db)
 
+
+@router.get("/template/{category}")
+async def get_content_template(
+    category: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get template content for a specific category.
+    Returns a random title from title_templates and the caption_template.
+    """
+    import random
+    
+    if category not in CONTENT_TEMPLATES:
+        raise HTTPException(status_code=404, detail=f"Category '{category}' not found. Valid categories: {', '.join(CONTENT_TEMPLATES.keys())}")
+    
+    template = CONTENT_TEMPLATES[category]
+    title_templates = template["title_templates"]
+    selected_title = random.choice(title_templates)
+    
+    # Replace {company_name} placeholder if present (could be enhanced to use actual company name)
+    title = selected_title.replace("{company_name}", "H2O Plumbing")
+    
+    return {
+        "category": category,
+        "title": title,
+        "caption": template["caption_template"],
+        "title_options": title_templates  # Return all options so frontend can let user choose
+    }
+
