@@ -104,7 +104,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
       }
     } catch (err) {
       // Non-critical - stats are optional, just log error
-      console.error('Failed to load customer stats:', err)
+      logError(err, 'loadCustomerStats')
       setStats(null)
     }
   }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { marketingApi } from '../../lib/api/marketing'
 import { showToast } from '../../components/Toast'
-import { handleApiError } from '../../lib/error-handler'
+import { handleApiError, logError } from '../../lib/error-handler'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
