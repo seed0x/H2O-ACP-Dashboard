@@ -67,8 +67,9 @@ export default function Login() {
       logError(err, 'login')
       if (err && typeof err === 'object' && 'response' in err) {
         // API responded with error
-        setError(err.response?.data?.detail || err.response?.data?.message || `Login failed: ${err.response.status}`)
-      } else if (err.request) {
+        const axiosError = err as { response?: { data?: { detail?: string; message?: string }; status?: number } }
+        setError(axiosError.response?.data?.detail || axiosError.response?.data?.message || `Login failed: ${axiosError.response?.status}`)
+      } else if (err && typeof err === 'object' && 'request' in err) {
         // Request made but no response (network error)
         setError(`Cannot connect to API server. Please check your connection.`)
       } else {
