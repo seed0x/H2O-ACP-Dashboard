@@ -1,18 +1,22 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { showToast } from '../../components/Toast'
 import { reviewApi, ReviewRequest, Review, RecoveryTicket, ReviewStats } from '../../lib/api/reviews'
 import { handleApiError } from '../../lib/error-handler'
-import { Suspense } from 'react'
 import { useUsers } from '../../lib/useUsers'
+import { useTenant } from '../../contexts/TenantContext'
+import { getPageTenant } from '../../contexts/TenantContext'
 
 function ReviewsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { currentTenant } = useTenant()
   const activeTab = searchParams.get('tab') || 'requests'
-  const { userOptions, loading: usersLoading } = useUsers('h2o')
+  // Reviews are H2O-specific, but respect tenant selection
+  const tenantId = currentTenant === 'both' ? getPageTenant('marketing') : (currentTenant || 'h2o')
+  const { userOptions, loading: usersLoading } = useUsers(tenantId)
   
   const [reviewRequests, setReviewRequests] = useState<ReviewRequest[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
@@ -22,7 +26,6 @@ function ReviewsContent() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedRequests, setSelectedRequests] = useState<string[]>([])
-  const tenantId = 'h2o'
 
   useEffect(() => {
     loadData()
