@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useTenant } from '../../contexts/TenantContext'
+import { useTenant, getPageTenant } from '../../contexts/TenantContext'
 import { marketingApi, SeasonalEvent } from '../../lib/api/marketing'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { Input } from '../../components/ui/Input'
@@ -17,8 +17,8 @@ const EVENT_TYPES = [
 
 export function SeasonalEventsView() {
   const { currentTenant } = useTenant()
-  // Support both tenants - when 'both' is selected, default to h2o
-  const tenantId = currentTenant === 'both' ? 'h2o' : (currentTenant || 'h2o')
+  // Support both tenants - when 'both' is selected, default to marketing tenant (h2o)
+  const tenantId = currentTenant === 'both' ? getPageTenant('marketing') : (currentTenant || getPageTenant('marketing'))
   
   const [events, setEvents] = useState<SeasonalEvent[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<SeasonalEvent[]>([])

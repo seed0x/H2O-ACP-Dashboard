@@ -27,6 +27,7 @@ interface User {
 export default function UsersPage() {
   const router = useRouter()
   const isMobile = useMobile()
+  const { currentTenant } = useTenant()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -36,14 +37,15 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Form state
+  // Form state - use current tenant, default to 'h2o' if 'both' is selected
+  const defaultTenantId = currentTenant === 'both' ? 'h2o' : (currentTenant || 'h2o')
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     full_name: '',
     password: '',
     role: 'user',
-    tenant_id: 'h2o',
+    tenant_id: defaultTenantId,
     is_active: true
   })
 
@@ -84,13 +86,14 @@ export default function UsersPage() {
   }
 
   function resetForm() {
+    const defaultTenantId = currentTenant === 'both' ? 'h2o' : (currentTenant || 'h2o')
     setFormData({
       username: '',
       email: '',
       full_name: '',
       password: '',
       role: 'user',
-      tenant_id: 'h2o',
+      tenant_id: defaultTenantId,
       is_active: true
     })
     setError('')
@@ -196,13 +199,14 @@ export default function UsersPage() {
 
   function handleEdit(user: User) {
     setEditingUser(user)
+    const defaultTenantId = currentTenant === 'both' ? 'h2o' : (currentTenant || 'h2o')
     setFormData({
       username: user.username,
       email: user.email || '',
       full_name: user.full_name || '',
       password: '', // Don't pre-fill password
       role: user.role,
-      tenant_id: user.tenant_id || 'h2o',
+      tenant_id: user.tenant_id || defaultTenantId,
       is_active: user.is_active
     })
     setShowAddForm(true)

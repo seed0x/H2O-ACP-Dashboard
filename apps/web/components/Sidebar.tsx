@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
-import { useTenant } from '../contexts/TenantContext'
+import { useTenant, getPageTenant } from '../contexts/TenantContext'
 import UilDashboard from '@iconscout/react-unicons/icons/uil-dashboard'
 import UilBuilding from '@iconscout/react-unicons/icons/uil-building'
 import UilWrench from '@iconscout/react-unicons/icons/uil-wrench'
@@ -107,7 +107,7 @@ export function Sidebar({ isMobile = false, isOpen = true, onClose }: SidebarPro
       }
 
       // Signals are h2o specific, but respect tenant selection
-      const tenantParam = currentTenant === 'both' ? 'h2o' : currentTenant
+      const tenantParam = currentTenant === 'both' ? getPageTenant('marketing') : currentTenant
       const response = await fetch(`${API_BASE_URL}/signals/all?tenant_id=${tenantParam}`, {
         headers,
         credentials: 'include'

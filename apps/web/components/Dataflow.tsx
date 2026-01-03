@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { SignalCard, SignalAction } from './SignalCard'
 import { useRouter } from 'next/navigation'
-import { useTenant } from '../contexts/TenantContext'
+import { useTenant, getPageTenant } from '../contexts/TenantContext'
 import UilFileAlt from '@iconscout/react-unicons/icons/uil-file-alt'
 import { apiGet } from '../lib/api/client'
 
@@ -39,7 +39,7 @@ export function Dataflow() {
   async function loadSignals() {
     try {
       // Signals are h2o specific, but respect tenant selection
-      const tenantParam = currentTenant === 'both' ? 'h2o' : currentTenant
+      const tenantParam = currentTenant === 'both' ? getPageTenant('marketing') : currentTenant
       const data = await apiGet<Signal[]>(`/signals/all?tenant_id=${tenantParam}`)
       setSignals(Array.isArray(data) ? data : [])
     } catch (error) {

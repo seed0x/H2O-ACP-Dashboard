@@ -1,14 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useTenant } from '../../contexts/TenantContext'
+import { useTenant, getPageTenant } from '../../contexts/TenantContext'
 import { marketingApi, ContentMixSummary } from '../../lib/api/marketing'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { handleApiError } from '../../lib/error-handler'
 
 export function ContentMixWidget() {
   const { currentTenant } = useTenant()
-  // Support both tenants - when 'both' is selected, default to h2o
-  const tenantId = currentTenant === 'both' ? 'h2o' : (currentTenant || 'h2o')
+  // Support both tenants - when 'both' is selected, default to marketing tenant (h2o)
+  const tenantId = currentTenant === 'both' ? getPageTenant('marketing') : (currentTenant || getPageTenant('marketing'))
   
   const [summaries, setSummaries] = useState<ContentMixSummary[]>([])
   const [loading, setLoading] = useState(true)

@@ -92,8 +92,11 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
     if (!customerId || !currentTenant) return
     try {
       const headers = getAuthHeaders()
+      // Customers can belong to any tenant, use current tenant selection
+      const tenantId = currentTenant === 'both' ? undefined : currentTenant
+      const tenantParam = tenantId ? `?tenant_id=${tenantId}` : ''
       const statsRes = await axios.get(
-        `${API_BASE_URL}/customers/${customerId}/stats?tenant_id=${currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'}`,
+        `${API_BASE_URL}/customers/${customerId}/stats${tenantParam}`,
         { headers, withCredentials: true }
       )
       if (statsRes.data) {

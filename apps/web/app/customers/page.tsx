@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Table } from '../../components/ui/Table'
 import { Card } from '../../components/ui/Card'
-import { useTenant } from '../../contexts/TenantContext'
+import { useTenant, getPageTenant } from '../../contexts/TenantContext'
 
 interface Customer {
   id: string
@@ -43,8 +43,8 @@ export default function CustomersPage() {
       const token = localStorage.getItem('token')
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
       
-      // Customers are only for H2O tenant
-      const tenantId = currentTenant === 'both' ? 'h2o' : currentTenant || 'h2o'
+      // Customers are only for H2O tenant (marketing page tenant)
+      const tenantId = currentTenant === 'both' ? getPageTenant('marketing') : (currentTenant || getPageTenant('marketing'))
       const params: any = { tenant_id: tenantId }
       if (search) params.search = search
       
