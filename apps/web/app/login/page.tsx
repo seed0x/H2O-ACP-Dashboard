@@ -17,7 +17,10 @@ function getRedirectPath(token: string): string {
       }
     }
   } catch (error) {
-    console.error('Failed to parse token:', error)
+    // Non-critical error - just return default path
+    if (error instanceof Error) {
+      // Silently fail for token parsing errors
+    }
   }
   return '/'
 }

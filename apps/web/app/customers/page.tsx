@@ -56,7 +56,7 @@ export default function CustomersPage() {
       
       setCustomers(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
-      console.error('Failed to load customers:', error)
+      logError(error, 'loadCustomers')
       setCustomers([])
     } finally {
       setLoading(false)

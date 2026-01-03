@@ -52,7 +52,7 @@ export default function ProfilePage() {
           setUserId(payload.user_id)
         }
       } catch (error) {
-        console.error('Failed to parse token:', error)
+        logError(error, 'parseToken')
       }
     }
   }, [])
@@ -234,7 +234,7 @@ export default function ProfilePage() {
       }
     } catch (err) {
       // Ignore logout errors
-      console.error('Logout error:', err)
+      logError(err, 'logout')
     } finally {
       // Clear local storage
       localStorage.removeItem('token')
