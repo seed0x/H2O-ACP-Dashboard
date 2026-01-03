@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input'
 import { Table } from '../../components/ui/Table'
 import { Card } from '../../components/ui/Card'
 import { useTenant, getPageTenant } from '../../contexts/TenantContext'
+import { logError } from '../../lib/error-handler'
 
 interface Customer {
   id: string

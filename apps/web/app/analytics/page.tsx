@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
         setPerformance(null)
       }
     } catch (err) {
-      console.error('Failed to load analytics', err)
+      logError(err, 'loadAnalytics')
     } finally {
       setLoading(false)
     }

@@ -79,7 +79,7 @@ export function CalendarView() {
       setInstances(allInstances)
       setAccounts(accountsData)
     } catch (error) {
-      console.error('Failed to load calendar:', error)
+      logError(error, 'loadCalendar')
       handleApiError(error, 'Load calendar')
       setInstances([])
     } finally {

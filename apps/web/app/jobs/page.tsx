@@ -52,7 +52,7 @@ export default function JobsPage() {
       setJobs(Array.isArray(response.data) ? response.data : [])
       setLoading(false)
     } catch (error) {
-      console.error('Failed to load jobs:', error)
+      logError(error, 'loadJobs')
       handleApiError(error, 'Loading jobs', loadJobs)
       setJobs([])
       setLoading(false)

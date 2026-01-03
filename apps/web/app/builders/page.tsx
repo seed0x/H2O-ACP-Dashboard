@@ -44,7 +44,7 @@ export default function BuildersPage() {
       setBuilders(Array.isArray(response.data) ? response.data : [])
       setLoading(false)
     } catch (error: any) {
-      console.error('Failed to load builders:', error)
+      logError(error, 'loadBuilders')
       setBuilders([])
       setLoading(false)
     }
@@ -80,7 +80,7 @@ export default function BuildersPage() {
       setError('')
       await loadBuilders()
     } catch (error: any) {
-      console.error('Failed to create builder:', error)
+      logError(error, 'createBuilder')
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to create builder'
       setError(errorMessage)
     } finally {
