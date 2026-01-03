@@ -276,9 +276,7 @@ export const marketingApi = {
       }
       
       const res = await apiClient.post<MediaAsset>(`/marketing/media/upload?${params}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
+        // Don't set Content-Type header - axios will set it automatically with boundary for FormData
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)

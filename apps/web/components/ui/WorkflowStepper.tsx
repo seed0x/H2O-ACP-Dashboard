@@ -218,8 +218,8 @@ export function WorkflowStepper({ serviceCallId, onComplete }: WorkflowStepperPr
         formData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
+            'Authorization': `Bearer ${token}`
+            // Don't set Content-Type - axios sets it automatically with boundary for FormData
           },
           withCredentials: true
         }
