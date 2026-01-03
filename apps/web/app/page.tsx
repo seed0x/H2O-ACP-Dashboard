@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { useMobile } from '../lib/useMobile'
