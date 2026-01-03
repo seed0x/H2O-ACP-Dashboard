@@ -62,9 +62,9 @@ export default function Login() {
         // Fallback redirect
         window.location.href = '/'
       }
-    } catch (err: any) {
-      console.error('Login error:', err)
-      if (err.response) {
+    } catch (err: unknown) {
+      logError(err, 'login')
+      if (err && typeof err === 'object' && 'response' in err) {
         // API responded with error
         setError(err.response?.data?.detail || err.response?.data?.message || `Login failed: ${err.response.status}`)
       } else if (err.request) {

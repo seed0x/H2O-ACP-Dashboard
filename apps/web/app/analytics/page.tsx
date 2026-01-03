@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { API_BASE_URL } from '../../lib/config'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { handleApiError } from '../../lib/error-handler'
+import { handleApiError, logError } from '../../lib/error-handler'
 import { StatSkeleton, CardSkeleton } from '../../components/ui/Skeleton'
 
 export default function AnalyticsPage() {
